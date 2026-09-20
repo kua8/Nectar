@@ -1,0 +1,68 @@
+use std::sync::{atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicI64}, Mutex, OnceLock};
+use std::sync::mpsc::Sender;
+use std::collections::HashMap;
+use crate::types::{SystemCommand, IntRect, AppInfo};
+use tauri::{AppHandle, PhysicalPosition, PhysicalSize};
+
+pub static COMMAND_SENDER: OnceLock<Sender<SystemCommand>> = OnceLock::new();
+pub static MAIN_APPBAR_REGISTERED: AtomicBool = AtomicBool::new(false);
+pub static DOCK_APPBAR_REGISTERED: AtomicBool = AtomicBool::new(false);
+pub static CURRENT_DOCK_OVERLAP: AtomicI32 = AtomicI32::new(-1);
+pub static CURRENT_NOTCH_OVERLAP: AtomicI32 = AtomicI32::new(-1);
+pub static NATIVE_TASKBAR_HIDDEN: AtomicBool = AtomicBool::new(false);
+
+
+pub static DOCK_RECT: Mutex<Option<IntRect>> = Mutex::new(None);
+pub static NOTCH_RECT: Mutex<Option<IntRect>> = Mutex::new(None);
+pub static DOCK_IS_HOVERED: AtomicBool = AtomicBool::new(false);
+pub static NOTCH_IS_HOVERED: AtomicBool = AtomicBool::new(false);
+pub static MENU_IS_OPEN: AtomicBool = AtomicBool::new(false);
+pub static MENU_RECT: Mutex<Option<IntRect>> = Mutex::new(None);
+// Set while the user is drag-reordering a pinned dock icon. The mouse hook's
+// click-through hit-test region is tight (icon-sized + small hysteresis), and a
+// real drag gesture can easily carry the cursor outside it — if that happens
+// mid-drag, the dock window goes click-through and stops receiving mouse
+// events entirely, silently killing the drag with no pointerup ever delivered.
+// This flag forces the dock fully interactive for the gesture's duration.
+pub static DOCK_IS_DRAGGING: AtomicBool = AtomicBool::new(false);
+pub static ICON_CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+
+pub static INSTALLED_APPS_CACHE: OnceLock<Mutex<Vec<AppInfo>>> = OnceLock::new();
+pub static IS_SCANNING: AtomicBool = AtomicBool::new(false);
+
+pub static BRIGHTNESS_SENDER: OnceLock<Sender<u32>> = OnceLock::new();
+pub static CURRENT_BRIGHTNESS: AtomicU32 = AtomicU32::new(50);
+pub static CURRENT_VOLUME: AtomicU32 = AtomicU32::new(50);
+pub static LAST_BRIGHTNESS_CHANGE: AtomicI64 = AtomicI64::new(0);
+pub static ANY_MEDIA_PLAYING: AtomicBool = AtomicBool::new(false);
+pub static OVERLAY_IN_SPLASH: AtomicBool = AtomicBool::new(false);
+pub static CURRENT_FOREGROUND_FULLSCREEN: AtomicBool = AtomicBool::new(false);
+
+pub static SINGLE_INSTANCE_MUTEX_HANDLE: OnceLock<isize> = OnceLock::new();
+pub static SINGLE_INSTANCE_EVENT_HANDLE: OnceLock<isize> = OnceLock::new();
+
+pub fn close_single_instance_handles() {
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::Foundation::HANDLE;
+    if let Some(&h) = SINGLE_INSTANCE_MUTEX_HANDLE.get() {
+        if h != 0 {
+            unsafe { let _ = CloseHandle(HANDLE(h as *mut _)); }
+        }
+    }
+    if let Some(&h) = SINGLE_INSTANCE_EVENT_HANDLE.get() {
+        if h != 0 {
+            unsafe { let _ = CloseHandle(HANDLE(h as *mut _)); }
+        }
+    }
+}
+
+pub static MAIN_WINDOW_RECT: Mutex<Option<(PhysicalPosition<i32>, PhysicalSize<u32>)>> = Mutex::new(None);
+pub static DOCK_WINDOW_RECT: Mutex<Option<(PhysicalPosition<i32>, PhysicalSize<u32>)>> = Mutex::new(None);
+
+pub static DISPLAY_MONITOR_HANDLE: OnceLock<AppHandle> = OnceLock::new();
+pub static LAST_DISPLAY_CHANGE_MS: AtomicI64 = AtomicI64::new(0);
+
+pub static THUMBNAIL_CACHE: OnceLock<Mutex<HashMap<isize, (String, i64)>>> = OnceLock::new();
+pub static FOCUS_TIMESTAMPS: OnceLock<Mutex<HashMap<isize, i64>>> = OnceLock::new();
+pub static SETTINGS_CACHE: OnceLock<Mutex<HashMap<String, serde_json::Value>>> = OnceLock::new();
+

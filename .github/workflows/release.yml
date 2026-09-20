@@ -1,0 +1,200 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [windows-latest]
+
+    concurrency:
+      group: release-${{ github.ref }}
+      cancel-in-progress: false
+
+    runs-on: ${{ matrix.platform }}
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            src-tauri
+            installer-app/src-tauri
+
+      - name: Verify version matches tag
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_TYPE}" != "tag" ]; then
+            echo "::error::This workflow must run on a version tag (e.g. v3.8.7)."
+            exit 1
+          fi
+
+          VERSION="${GITHUB_REF_NAME#v}"
+          if [[ $VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
+            VERSION="$VERSION.0"
+          fi
+
+          PKG_VERSION=$(bun -e "console.log(JSON.parse(require('fs').readFileSync('package.json','utf8')).version)")
+          CONF_VERSION=$(bun -e "console.log(JSON.parse(require('fs').readFileSync('src-tauri/tauri.conf.json','utf8')).version)")
+          CARGO_VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -n 1)
+          INSTALLER_PKG_VERSION=$(bun -e "console.log(JSON.parse(require('fs').readFileSync('installer-app/package.json','utf8')).version)")
+          INSTALLER_CONF_VERSION=$(bun -e "console.log(JSON.parse(require('fs').readFileSync('installer-app/src-tauri/tauri.conf.json','utf8')).version)")
+          INSTALLER_CARGO_VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' installer-app/src-tauri/Cargo.toml | head -n 1)
+
+          echo "Tag: $VERSION | package.json: $PKG_VERSION | tauri.conf.json: $CONF_VERSION | Cargo.toml: $CARGO_VERSION"
+          echo "installer-app -- package.json: $INSTALLER_PKG_VERSION | tauri.conf.json: $INSTALLER_CONF_VERSION | Cargo.toml: $INSTALLER_CARGO_VERSION"
+
+          if [ "$PKG_VERSION" != "$VERSION" ] || [ "$CONF_VERSION" != "$VERSION" ] || [ "$CARGO_VERSION" != "$VERSION" ] || \
+             [ "$INSTALLER_PKG_VERSION" != "$VERSION" ] || [ "$INSTALLER_CONF_VERSION" != "$VERSION" ] || [ "$INSTALLER_CARGO_VERSION" != "$VERSION" ]; then
+            echo "::error::Version files do not match tag $VERSION. Run 'bun run bump $VERSION' and commit before tagging."
+            exit 1
+          fi
+
+      - name: Generate release notes
+        id: notes
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          PREV_TAG=$(git tag --sort=-version:refname | grep '^v' | sed -n '2p')
+          if [ -n "$PREV_TAG" ]; then
+            RANGE="${PREV_TAG}..HEAD"
+          else
+            RANGE="HEAD"
+          fi
+          COMMIT_COUNT=$(git log "$RANGE" --pretty=format:"%H" --no-merges | wc -l)
+
+          # A single commit since the last tag (e.g. this release's own hand-written,
+          # multi-paragraph commit) gets its full body used verbatim as the release
+          # notes — %s alone would flatten it to just the subject line. Multiple
+          # commits fall back to the feat:/fix: digest below, built for a run of many
+          # small conventional-commit-style messages.
+          if [ "$COMMIT_COUNT" -eq 1 ]; then
+            BODY=$(git log "$RANGE" -1 --pretty=format:"%B" --no-merges)
+            NOTES=$(printf "## Nectar %s\n\n%s\n" "$VERSION" "$BODY")
+            echo "body<<EOF" >> "$GITHUB_OUTPUT"
+            echo "$NOTES" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          COMMITS=$(git log "$RANGE" --pretty=format:"%s" --no-merges)
+
+          FEATURES=""
+          FIXES=""
+          OTHER=""
+          while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            if [[ "$line" =~ ^feat[\(:] ]]; then
+              FEATURES+=$(printf "\n- %s" "${line#*: }")
+            elif [[ "$line" =~ ^fix[\(:] ]]; then
+              FIXES+=$(printf "\n- %s" "${line#*: }")
+            else
+              OTHER+=$(printf "\n- %s" "$line")
+            fi
+          done <<< "$COMMITS"
+
+          NOTES=$(printf "## Nectar %s\n" "$VERSION")
+          if [ -n "$FEATURES" ]; then
+            NOTES+=$(printf "\n### What's New\n%s\n" "$FEATURES")
+          fi
+          if [ -n "$FIXES" ]; then
+            NOTES+=$(printf "\n### Bug Fixes\n%s\n" "$FIXES")
+          fi
+          if [ -n "$OTHER" ]; then
+            NOTES+=$(printf "\n### Other\n%s\n" "$OTHER")
+          fi
+          echo "body<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$NOTES" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Install frontend dependencies
+        run: bun install
+
+      - name: Build Tauri App
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Nectar ${{ github.ref_name }}"
+          releaseBody: ${{ steps.notes.outputs.body }}
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true
+          updaterJsonPreferNsis: true
+
+      # tauri-action only uploads the NSIS installer (which now offers a
+      # "just me" / "all users" choice via installMode: "both" in
+      # tauri.conf.json). This adds a second, install-free artifact — the raw
+      # compiled exe, zipped — for people who just want to run it without
+      # installing anything.
+      - name: Package portable build
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cd src-tauri/target/release
+          7z a "nectar-${VERSION}-portable-windows-x64.zip" nectar.exe
+          mv "nectar-${VERSION}-portable-windows-x64.zip" "$GITHUB_WORKSPACE/"
+
+      - name: Upload portable build to release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          gh release upload "${{ github.ref_name }}" "nectar-${VERSION}-portable-windows-x64.zip" --clobber
+
+      # The NSIS installer above exists only to feed the silent auto-updater
+      # (tauri-plugin-updater only recognizes NSIS/MSI artifacts). This custom
+      # installer-app/ build is the actual thing people download and run —
+      # see installer-app/README.md for why the two are separate.
+      - name: Package installer payload
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "src-tauri/target/release/nectar.exe" -DestinationPath "installer-app/src-tauri/payload.zip" -Force
+
+      - name: Install installer-app dependencies
+        working-directory: installer-app
+        run: npm install
+
+      - name: Build custom installer
+        working-directory: installer-app
+        run: npm run tauri build -- --no-bundle
+
+      - name: Rename and upload custom installer
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          OUT="Nectar-Setup-${VERSION}.exe"
+          cp "installer-app/src-tauri/target/release/nectar-installer.exe" "$OUT"
+          gh release upload "${{ github.ref_name }}" "$OUT" --clobber

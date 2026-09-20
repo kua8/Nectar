@@ -1,0 +1,70 @@
+[package]
+name = "nectar"
+version = "1.0.0"
+description = ""
+authors = ["kua8"]
+edition = "2021"
+license = "GPL-3.0-only"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "nectar_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2.11", features = ["tray-icon", "image-png"] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+windows = { version = "0.61", features = [
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_Shell",
+  "Win32_UI_Shell_PropertiesSystem",
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_Foundation",
+  "Win32_System_Com",
+  "Win32_UI_Accessibility",
+  "Win32_System_Variant",
+  "Media_Control",
+  "Win32_Media_Audio",
+  "Win32_Media_Audio_Endpoints",
+  "Win32_System_Threading",
+  "Win32_System_Com_StructuredStorage",
+  "Win32_System_SystemInformation",
+  "Win32_System_Wmi",
+  "Win32_Storage_FileSystem",
+  "Win32_System_Ole",
+  "Storage_Streams",
+  "Win32_System_Console",
+  "Graphics_Imaging",
+  "Win32_Graphics_Imaging",
+  "Win32_Graphics_Dwm",
+  "Win32_Graphics_Gdi",
+  "Win32_System_LibraryLoader",
+  "Win32_System_IO",
+  "Win32_Security",
+  "Win32_System_Registry",
+  "Win32_Devices_FunctionDiscovery",
+  "Devices_Radios",
+  "System_Power",
+  "Win32_NetworkManagement_IpHelper",
+  "Win32_NetworkManagement_Ndis"
+] }
+base64 = "0.22"
+tauri-plugin-autostart = "2.5.1"
+tauri-plugin-updater = "2"
+window-vibrancy = "0.7.1"
+wmi = "0.14"
+tokio = { version = "1", features = ["time", "sync"] }
+image = "0.25"
+tauri-plugin-drag = "2.1.1"
+tauri-plugin-dialog = "2"
+rustfft = "6"
+
