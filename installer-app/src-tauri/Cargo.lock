@@ -1880,7 +1880,7 @@ dependencies = [
 
 [[package]]
 name = "nectar-installer"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "serde",
  "serde_json",

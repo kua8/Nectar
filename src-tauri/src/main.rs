@@ -7,6 +7,7 @@ mod services;
 mod commands;
 mod monitors;
 mod updater;
+mod uninstall_registry;
 
 use tauri::Manager;
 use windows::Win32::System::Console::SetConsoleCtrlHandler;
@@ -157,6 +158,9 @@ fn main() {
             }
 
             crate::utils::init_settings_cache(app.handle());
+
+            #[cfg(not(debug_assertions))]
+            std::thread::spawn(crate::uninstall_registry::heal_uninstall_registration);
 
             // Update check on startup (non-blocking). Always runs so the UI can
             // show an update badge; auto-install only happens when the user

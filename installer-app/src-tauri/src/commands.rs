@@ -167,7 +167,14 @@ pub async fn start_install(
         uninstall_string: &uninstall_string,
         estimated_size_kb: size_kb,
     };
-    let _ = crate::registry::write_uninstall_entry(all_users, &info);
+    // Unlike the shortcuts above, a failure here is fatal and must surface: this
+    // registry entry is the only thing that makes Nectar show up in Add/Remove
+    // Programs at all. Swallowing this error (as it was before) let all-users
+    // installs silently finish "successfully" with files on disk but no way to
+    // uninstall them through Windows — exactly the orphaned-install bug this
+    // fixes.
+    crate::registry::write_uninstall_entry(all_users, &info)
+        .map_err(|e| format!("Files were installed, but registering with Windows failed: {e}. Try running the installer as Administrator."))?;
 
     let _ = app.emit(
         "install-progress",

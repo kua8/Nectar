@@ -1,6 +1,6 @@
 [package]
 name = "nectar"
-version = "1.1.1"
+version = "1.1.2"
 description = ""
 authors = ["kua8"]
 edition = "2021"

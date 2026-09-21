@@ -1464,6 +1464,8 @@ pub async fn quit_nectar(handle: AppHandle) {
 
 #[tauri::command]
 pub async fn uninstall_nectar(handle: AppHandle) -> Result<(), String> {
+    crate::uninstall_registry::heal_uninstall_registration();
+
     let uninstaller = std::env::current_exe()
         .map_err(|e| e.to_string())?
         .parent()

@@ -14,6 +14,14 @@ Nectar makes your Windows desktop feel alive: a macOS-style notch/island at the 
 
 ---
 
+<div align="center">
+<img src="docs/screenshots/desktop.webp" width="720" alt="Nectar notch and dock on the desktop" />
+<br/><br/>
+<img src="docs/screenshots/dock.png" width="480" alt="Nectar dock close-up" />
+</div>
+
+---
+
 ## The Island
 
 A notch at the top of your screen that adapts to what you're doing. Scroll or swipe to switch modes, or set it to stay fixed like a real hardware notch.
