@@ -466,20 +466,22 @@ function OverlayApp() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <img src="/nectar.png" className="update-splash-logo" alt="Nectar" />
-            <p className="update-splash-text">
-              {updateStatus === 'checking' && "Checking for updates..."}
-              {updateStatus === 'downloading' && `Downloading update... ${updateProgress}%`}
-              {updateStatus === 'installing' && "Installing update..."}
-            </p>
-            {updateStatus === 'downloading' && (
-              <div className="update-progress-bar">
-                <div
-                  className="update-progress-fill"
-                  style={{ width: `${updateProgress}%` }}
-                />
-              </div>
-            )}
+            <div className="update-splash-card">
+              <img src="/nectar.png" className="update-splash-logo" alt="Nectar" />
+              <p className="update-splash-text">
+                {updateStatus === 'checking' && "Checking for updates..."}
+                {updateStatus === 'downloading' && `Downloading update... ${updateProgress}%`}
+                {updateStatus === 'installing' && "Installing update..."}
+              </p>
+              {updateStatus === 'downloading' && (
+                <div className="update-progress-bar">
+                  <div
+                    className="update-progress-fill"
+                    style={{ width: `${updateProgress}%` }}
+                  />
+                </div>
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

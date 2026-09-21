@@ -16,8 +16,6 @@ Nectar makes your Windows desktop feel alive: a macOS-style notch/island at the 
 
 <div align="center">
 <img src="docs/screenshots/desktop.webp" width="720" alt="Nectar notch and dock on the desktop" />
-<br/><br/>
-<img src="docs/screenshots/dock.png" width="480" alt="Nectar dock close-up" />
 </div>
 
 ---
@@ -38,6 +36,10 @@ Each transition is spring-loaded — width, height, border-radius, and position 
 A taskbar that actually moves. Nectar replaces your native Windows taskbar and sits at the bottom of the screen: drag to reorder, hover for window previews, right-click for context menus. A Start-adjacent search icon opens Windows Search directly.
 
 Pinned and running apps stay in two separate groups by default, with a divider marking the split — flip "Mix Pinned & Running" in Settings to drag any icon anywhere instead.
+
+<div align="center">
+<img src="docs/screenshots/dock.png" width="480" alt="Nectar dock close-up" />
+</div>
 
 ## Under the Hood
 
@@ -63,10 +65,6 @@ bun run tauri dev
 You'll need [Rust](https://rustup.rs/) and [Bun](https://bun.sh/).
 
 ---
-
-## Microsoft Defender
-
-Unsigned, low-download-count Windows apps built by independent developers commonly trigger a Defender warning purely on reputation heuristics, not because anything was actually found. If Nectar gets flagged and you'd rather not wait it out, you can submit the file to Microsoft for analysis yourself, or build from source instead of using a prebuilt binary.
 
 ## Contributing
 

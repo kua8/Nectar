@@ -67,7 +67,7 @@ export function useSettings() {
     () => localStorage.getItem("nectar-dock-mixed-reorder") === "true"
   );
   const [dockMode, setDockMode] = useState(() => {
-    const raw = localStorage.getItem("nectar-dock-mode") || "smart";
+    const raw = localStorage.getItem("nectar-dock-mode") || "fixed";
     return raw === "auto-hide" ? "smart" : raw;
   });
   const [notchMode, setNotchMode] = useState("fixed");
