@@ -129,6 +129,11 @@ function SettingsApp() {
             <NotchTab
               notchMode={settings.notchMode}
               setNotchModeValue={settings.setNotchModeValue}
+              monitors={settings.monitors}
+              notchMonitorMode={settings.notchMonitorMode}
+              setNotchMonitorModeValue={settings.setNotchMonitorModeValue}
+              notchMonitorId={settings.notchMonitorId}
+              setNotchMonitorIdValue={settings.setNotchMonitorIdValue}
               calendarEnabled={settings.calendarEnabled}
               toggleCalendar={settings.toggleCalendar}
               musicModeEnabled={settings.musicModeEnabled}
@@ -171,6 +176,11 @@ function SettingsApp() {
               toggleDockIconOnly={settings.toggleDockIconOnly}
               dockMixedReorder={settings.dockMixedReorder}
               toggleDockMixedReorder={settings.toggleDockMixedReorder}
+              monitors={settings.monitors}
+              dockMonitorMode={settings.dockMonitorMode}
+              setDockMonitorModeValue={settings.setDockMonitorModeValue}
+              dockMonitorId={settings.dockMonitorId}
+              setDockMonitorIdValue={settings.setDockMonitorIdValue}
             />
           )}
           {activeTab === "overlays" && (

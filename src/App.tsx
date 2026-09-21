@@ -319,6 +319,7 @@ function App() {
   useEffect(() => {
     setWindowLabel(getCurrentWebviewWindow().label);
   }, []);
+  const isNotchWindow = windowLabel === 'main' || windowLabel.startsWith('main-');
 
   // Update state
   const [updateAvailable, setUpdateAvailable] = useState(false);
@@ -397,14 +398,14 @@ function App() {
   }, [isAnyInteraction]);
 
   useEffect(() => {
-    if (windowLabel === 'main') {
+    if (isNotchWindow) {
       invoke('set_notch_hovered', { hovered: isNotchHovered }).catch(() => { });
     }
-  }, [isNotchHovered, windowLabel]);
+  }, [isNotchHovered, isNotchWindow]);
 
   useEffect(() => {
     const updateRect = () => {
-      if (nectarRef.current && windowLabel === 'main') {
+      if (nectarRef.current && isNotchWindow) {
         const rect = nectarRef.current.getBoundingClientRect();
         invoke('update_notch_rect', {
           rect: {
@@ -1900,7 +1901,6 @@ function App() {
                         className={`cc-pill-tile ${wifiEnabled ? 'active' : ''}`}
                         onClick={(e) => { e.stopPropagation(); toggleWifi(); }}
                         onContextMenu={handleWifiRightClick}
-                        data-tooltip="Left-click to toggle, Right-click for Settings"
                       >
                         <div className="cc-pill-icon-wrapper">
                           <WifiIcon connected={wifiEnabled} />
@@ -1915,7 +1915,6 @@ function App() {
                       <div
                         className={`cc-pill-tile ${dockMode === 'fixed' ? 'active' : ''}`}
                         onClick={toggleDockModeSetting}
-                        data-tooltip="Cycle dock mode: Fixed / Smart / Peek"
                       >
                         <div className="cc-pill-icon-wrapper">
                           <DockIcon />
@@ -1931,7 +1930,6 @@ function App() {
                         className={`cc-pill-tile ${bluetoothEnabled ? 'active' : ''}`}
                         onClick={(e) => { e.stopPropagation(); toggleBluetooth(); }}
                         onContextMenu={handleBluetoothRightClick}
-                        data-tooltip="Left-click to toggle, Right-click for Settings"
                       >
                         <div className="cc-pill-icon-wrapper">
                           <BluetoothIcon />
@@ -1946,7 +1944,6 @@ function App() {
                       <div
                         className={`cc-pill-tile ${notchMode === 'fixed' ? 'active' : ''}`}
                         onClick={toggleNotchModeSetting}
-                        data-tooltip="Cycle notch mode: Fixed / Smart / Peek"
                       >
                         <div className="cc-pill-icon-wrapper">
                           <NotchIcon />
@@ -1963,42 +1960,36 @@ function App() {
                       <button
                         className={`cc-circular-btn ${dndActive ? 'active' : ''}`}
                         onClick={(e) => { e.stopPropagation(); setDndActive(prev => !prev); }}
-                        data-tooltip={`Focus / DND: ${dndActive ? 'On' : 'Off'}`}
                       >
                         <MoonIcon />
                       </button>
                       <button
                         className={`cc-circular-btn ${batterySaverEnabled ? 'active' : ''}`}
                         onClick={(e) => { e.stopPropagation(); openBatterySaverSettings(); }}
-                        data-tooltip={`Energy Saver: ${batterySaverEnabled ? 'On' : 'Off'} — Click to open Settings`}
                       >
                         <BatterySaverIcon />
                       </button>
                       <button
                         className="cc-circular-btn"
                         onClick={(e) => { e.stopPropagation(); openSystemTray(e); }}
-                        data-tooltip="System Tray"
                       >
                         <TrayIcon />
                       </button>
                       <button
                         className="cc-circular-btn"
                         onClick={(e) => { e.stopPropagation(); invoke("open_notification_center"); }}
-                        data-tooltip="Notification Center"
                       >
                         <BellIcon />
                       </button>
                       <button
                         className="cc-circular-btn"
                         onClick={(e) => { e.stopPropagation(); openSettingsWindow(); }}
-                        data-tooltip="Nectar Settings"
                       >
                         <SettingsIcon />
                       </button>
                       <button
                         className="cc-circular-btn"
                         onClick={(e) => { e.stopPropagation(); invoke("restart_nectar"); }}
-                        data-tooltip="Restart Nectar"
                       >
                         <ReloadIcon />
                       </button>

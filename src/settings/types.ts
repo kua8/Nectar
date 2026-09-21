@@ -5,6 +5,18 @@ export interface WidgetConfig {
   right: string[];
 }
 
+export interface MonitorInfo {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  is_primary: boolean;
+}
+
+export type MonitorMode = "primary" | "all" | "specific";
+
 export type SettingsTab = "general" | "appearance" | "notch" | "dock" | "overlays" | "about";
 
 export interface SettingRowProps {

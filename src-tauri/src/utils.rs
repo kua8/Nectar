@@ -76,10 +76,14 @@ pub fn set_taskbar_visibility(visible: bool, always_on_top: bool) {
         }
 
         let state_val = if visible {
-            let orig = ORIGINAL_TASKBAR_STATE.load(std::sync::atomic::Ordering::Relaxed);
-            if orig != -1 { orig as isize } else { if always_on_top { 2 } else { 1 } }
+            if always_on_top {
+                2
+            } else {
+                let orig = ORIGINAL_TASKBAR_STATE.load(std::sync::atomic::Ordering::Relaxed);
+                if orig != -1 { orig as isize } else { 1 }
+            }
         } else {
-            1 // Force Auto-hide when hiding
+            1
         };
 
         // 1. Set the taskbar state (Auto-hide or Always-on-top)
@@ -291,15 +295,17 @@ pub fn get_now_ms() -> i64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as i64
 }
 
+fn settings_cache() -> &'static std::sync::Mutex<std::collections::HashMap<String, serde_json::Value>> {
+    crate::state::SETTINGS_CACHE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
 /// Load settings.json into the in-memory cache. Call once at startup.
 pub fn init_settings_cache(app: &tauri::AppHandle) {
     use tauri::Manager;
-    use crate::state::SETTINGS_CACHE;
-    let _ = SETTINGS_CACHE.set(std::sync::Mutex::new(std::collections::HashMap::new()));
     if let Some(path) = app.path().app_config_dir().ok().map(|p| p.join("settings.json")) {
         if let Ok(content) = std::fs::read_to_string(path) {
             if let Ok(settings) = serde_json::from_str::<std::collections::HashMap<String, serde_json::Value>>(&content) {
-                if let Ok(mut cache) = SETTINGS_CACHE.get().unwrap().lock() {
+                if let Ok(mut cache) = settings_cache().lock() {
                     *cache = settings;
                 }
             }
@@ -309,7 +315,7 @@ pub fn init_settings_cache(app: &tauri::AppHandle) {
 
 /// Replace the entire settings cache (used by the file watcher on external changes).
 pub fn replace_settings_cache(new_settings: std::collections::HashMap<String, serde_json::Value>) {
-    if let Ok(mut cache) = crate::state::SETTINGS_CACHE.get().unwrap().lock() {
+    if let Ok(mut cache) = settings_cache().lock() {
         *cache = new_settings;
     }
 }

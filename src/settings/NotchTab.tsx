@@ -8,14 +8,21 @@ import {
   Circle,
   CloudSun,
   X,
+  Monitor,
+  MonitorCheck,
 } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { StatusWidgetConfig } from "../components/StatusWidgetConfig";
-import type { WidgetConfig } from "./types";
+import type { WidgetConfig, MonitorInfo, MonitorMode } from "./types";
 
 interface NotchTabProps {
   notchMode: string;
   setNotchModeValue: (mode: string) => void;
+  monitors: MonitorInfo[];
+  notchMonitorMode: MonitorMode;
+  setNotchMonitorModeValue: (mode: MonitorMode) => void;
+  notchMonitorId: string;
+  setNotchMonitorIdValue: (id: string) => void;
   calendarEnabled: boolean;
   toggleCalendar: () => void;
   musicModeEnabled: boolean;
@@ -47,6 +54,11 @@ interface NotchTabProps {
 export function NotchTab({
   notchMode,
   setNotchModeValue,
+  monitors,
+  notchMonitorMode,
+  setNotchMonitorModeValue,
+  notchMonitorId,
+  setNotchMonitorIdValue,
   calendarEnabled,
   toggleCalendar,
   musicModeEnabled,
@@ -89,6 +101,35 @@ export function NotchTab({
             <option value="peek">Peek</option>
           </select>
         </SettingRow>
+
+        <SettingRow icon={MonitorCheck} label="Show On" desc="Choose which monitor(s) display the notch">
+          <select
+            className="settings-select"
+            value={notchMonitorMode}
+            onChange={(e) => setNotchMonitorModeValue(e.target.value as MonitorMode)}
+          >
+            <option value="primary">Primary Monitor</option>
+            <option value="all">All Monitors</option>
+            <option value="specific">Specific Monitor</option>
+          </select>
+        </SettingRow>
+
+        {notchMonitorMode === "specific" && (
+          <SettingRow icon={Monitor} label="Monitor" desc="Which display shows the notch">
+            <select
+              className="settings-select"
+              value={notchMonitorId}
+              onChange={(e) => setNotchMonitorIdValue(e.target.value)}
+            >
+              {monitors.length === 0 && <option value="">Loading...</option>}
+              {monitors.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}{m.is_primary ? " (Primary)" : ""}
+                </option>
+              ))}
+            </select>
+          </SettingRow>
+        )}
 
         <SettingRow icon={Calendar} label="Calendar & Timer" desc="Enable productivity split-view">
           <label className="toggle-switch">

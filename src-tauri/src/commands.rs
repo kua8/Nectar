@@ -18,13 +18,13 @@ pub async fn set_menu_open(open: bool, rect: Option<IntRect>) {
 }
 
 #[tauri::command]
-pub async fn set_dock_hovered(hovered: bool) {
-    DOCK_IS_HOVERED.store(hovered, Ordering::Relaxed);
+pub async fn set_dock_hovered(window: Window, hovered: bool) {
+    crate::state::set_flag(crate::state::dock_hovered(), window.label(), hovered);
 }
 
 #[tauri::command]
-pub async fn set_notch_hovered(hovered: bool) {
-    NOTCH_IS_HOVERED.store(hovered, Ordering::Relaxed);
+pub async fn set_notch_hovered(window: Window, hovered: bool) {
+    crate::state::set_flag(crate::state::notch_hovered(), window.label(), hovered);
 }
 
 #[tauri::command]
@@ -33,16 +33,16 @@ pub async fn set_dock_dragging(dragging: bool) {
 }
 
 #[tauri::command]
-pub async fn update_dock_rect(rect: IntRect) {
-    if let Ok(mut r) = DOCK_RECT.lock() {
-        *r = Some(rect);
+pub async fn update_dock_rect(window: Window, rect: IntRect) {
+    if let Ok(mut m) = crate::state::dock_rects().lock() {
+        m.insert(window.label().to_string(), rect);
     }
 }
 
 #[tauri::command]
-pub async fn update_notch_rect(rect: IntRect) {
-    if let Ok(mut r) = NOTCH_RECT.lock() {
-        *r = Some(rect);
+pub async fn update_notch_rect(window: Window, rect: IntRect) {
+    if let Ok(mut m) = crate::state::notch_rects().lock() {
+        m.insert(window.label().to_string(), rect);
     }
 }
 
@@ -79,81 +79,87 @@ pub async fn init_dock(app: AppHandle, mode: String) {
     if enabled != "true" {
         if let Some(dock_win) = app.get_webview_window("dock") {
             let _ = dock_win.hide();
-            DOCK_APPBAR_REGISTERED.store(false, Ordering::Relaxed);
+            crate::state::set_flag(crate::state::dock_appbar_registered(), "dock", false);
         }
         return;
     }
 
     if let Some(dock_win) = app.get_webview_window("dock") {
-        // 1. Always show first — idempotent, required before any positioning
-        let _ = dock_win.show();
-        if let Ok(hwnd) = dock_win.hwnd() { re_assert_topmost(hwnd); }
+        init_dock_window(&app, dock_win, &mode).await;
+    }
+}
 
-        // 2. Register as appbar (fixed) or manually position (auto-hide)
-        if mode == "fixed" {
-            // register_dock_appbar calls show() internally too, and handles retries
-            register_dock_appbar(dock_win.clone());
-        } else {
-            // Auto-hide mode: position at bottom of screen.
-            // Retry until primary_monitor() is available (can fail on autostart before shell).
-            let dock_clone = dock_win.clone();
-            tauri::async_runtime::spawn(async move {
-                for attempt in 0..20 {
-                    // Wait for monitor and window dimensions to be available.
-                    // Never use a hardcoded fallback — wrong values produce off-screen placement.
-                    // Extract HWND as isize before any await (raw pointer is not Send).
-                    let hwnd_val = dock_clone.hwnd().map(|h| h.0 as isize).unwrap_or(0);
-                    let ph = dock_clone.outer_size().map(|s| s.height as i32).unwrap_or(0);
-                    let monitor_info = dock_clone.primary_monitor().ok().flatten().map(|m| {
-                        let s = m.size();
-                        let p = m.position();
-                        (tauri::PhysicalSize::new(s.width, s.height), tauri::PhysicalPosition::new(p.x, p.y))
-                    });
+pub async fn init_dock_window(app: &AppHandle, dock_win: tauri::WebviewWindow, mode: &str) {
+    let label = dock_win.label().to_string();
 
-                    if hwnd_val != 0 {
-                        if let Some((m_size, m_pos)) = monitor_info {
-                            if ph <= 10 {
-                                // outer_size() not ready yet — retry next tick
-                                if attempt < 19 {
-                                    tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
-                                }
-                                continue;
+    // 1. Always show first — idempotent, required before any positioning
+    let _ = dock_win.show();
+    if let Ok(hwnd) = dock_win.hwnd() { re_assert_topmost(hwnd); }
+
+    // 2. Register as appbar (fixed) or manually position (auto-hide)
+    if mode == "fixed" {
+        // register_dock_appbar calls show() internally too, and handles retries
+        register_dock_appbar(dock_win.clone());
+    } else {
+        // Auto-hide mode: position at bottom of its target monitor.
+        // Retry until that monitor is available (can fail on autostart before shell).
+        let dock_clone = dock_win.clone();
+        tauri::async_runtime::spawn(async move {
+            for attempt in 0..20 {
+                // Wait for monitor and window dimensions to be available.
+                // Never use a hardcoded fallback — wrong values produce off-screen placement.
+                // Extract HWND as isize before any await (raw pointer is not Send).
+                let hwnd_val = dock_clone.hwnd().map(|h| h.0 as isize).unwrap_or(0);
+                let ph = dock_clone.outer_size().map(|s| s.height as i32).unwrap_or(0);
+                let monitor_info = crate::monitors::monitor_for_window_label(dock_clone.app_handle(), crate::types::WindowKind::Dock, dock_clone.label()).map(|m| {
+                    let s = m.size();
+                    let p = m.position();
+                    (tauri::PhysicalSize::new(s.width, s.height), tauri::PhysicalPosition::new(p.x, p.y))
+                });
+
+                if hwnd_val != 0 {
+                    if let Some((m_size, m_pos)) = monitor_info {
+                        if ph <= 10 {
+                            // outer_size() not ready yet — retry next tick
+                            if attempt < 19 {
+                                tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
                             }
-                            let final_y = m_pos.y + m_size.height as i32 - ph;
-                            unsafe {
-                                use windows::Win32::UI::WindowsAndMessaging::{
-                                    SetWindowPos, SWP_NOZORDER, SWP_NOACTIVATE, SWP_FRAMECHANGED
-                                };
-                                use windows::Win32::Foundation::HWND;
-                                let _ = SetWindowPos(
-                                    HWND(hwnd_val as *mut _), None,
-                                    m_pos.x, final_y,
-                                    m_size.width as i32, ph,
-                                    SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED
-                                );
-                            }
-                            // Re-assert topmost after repositioning
-                            if let Ok(hwnd) = dock_clone.hwnd() { re_assert_topmost(hwnd); }
-                            // Ensure visible after positioning
-                            let _ = dock_clone.show();
-                            break;
+                            continue;
                         }
-                    }
-                    if attempt < 19 {
-                        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+                        let final_y = m_pos.y + m_size.height as i32 - ph;
+                        unsafe {
+                            use windows::Win32::UI::WindowsAndMessaging::{
+                                SetWindowPos, SWP_NOZORDER, SWP_NOACTIVATE, SWP_FRAMECHANGED
+                            };
+                            use windows::Win32::Foundation::HWND;
+                            let _ = SetWindowPos(
+                                HWND(hwnd_val as *mut _), None,
+                                m_pos.x, final_y,
+                                m_size.width as i32, ph,
+                                SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED
+                            );
+                        }
+                        // Re-assert topmost after repositioning
+                        if let Ok(hwnd) = dock_clone.hwnd() { re_assert_topmost(hwnd); }
+                        // Ensure visible after positioning
+                        let _ = dock_clone.show();
+                        break;
                     }
                 }
-            });
-        }
-
-        // 3. Hide taskbar after showing dock (not before, so user always has something)
-        set_taskbar_visibility(false, false);
-        NATIVE_TASKBAR_HIDDEN.store(true, Ordering::Relaxed);
-
-        // 4. Reset overlap state so the overlap thread re-syncs cleanly
-        CURRENT_DOCK_OVERLAP.store(0, Ordering::Relaxed);
-        let _ = app.emit("dock-overlap", false);
+                if attempt < 19 {
+                    tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+                }
+            }
+        });
     }
+
+    // 3. Hide taskbar after showing dock (not before, so user always has something)
+    set_taskbar_visibility(false, false);
+    NATIVE_TASKBAR_HIDDEN.store(true, Ordering::Relaxed);
+
+    // 4. Reset overlap state so the overlap thread re-syncs cleanly
+    crate::state::set_overlap(crate::state::dock_overlap(), &label, 0);
+    let _ = app.emit_to(label.as_str(), "dock-overlap", false);
 }
 
 #[tauri::command]
@@ -163,7 +169,7 @@ pub async fn toggle_dock(app: AppHandle, enable: bool) {
             // Load the saved dock mode rather than hardcoding "fixed"
             let saved_mode = crate::utils::get_setting_str(&app, "nectar-dock-mode")
                 .unwrap_or_else(|| "fixed".to_string());
-            init_dock(app, saved_mode).await;
+            init_dock(app.clone(), saved_mode).await;
         } else {
             let _ = dock_win.hide();
             if let Ok(hwnd) = dock_win.hwnd() {
@@ -172,13 +178,13 @@ pub async fn toggle_dock(app: AppHandle, enable: bool) {
                     unregister_appbar_native(HWND(hwnd_val as *mut _));
                 });
             }
-            DOCK_APPBAR_REGISTERED.store(false, Ordering::Relaxed);
+            crate::state::set_flag(crate::state::dock_appbar_registered(), "dock", false);
             set_taskbar_visibility(true, true);
             NATIVE_TASKBAR_HIDDEN.store(false, Ordering::Relaxed);
 
             // Re-sync other appbars
             if let Some(main_win) = app.get_webview_window("main") {
-                if MAIN_APPBAR_REGISTERED.load(Ordering::Relaxed) {
+                if crate::state::get_flag(crate::state::main_appbar_registered(), "main") {
                     register_appbar(main_win);
                 }
             }
@@ -188,21 +194,21 @@ pub async fn toggle_dock(app: AppHandle, enable: bool) {
 
 #[tauri::command]
 pub async fn sync_appbar(app: AppHandle) {
-    if let Some(main_win) = app.get_webview_window("main") {
-        if MAIN_APPBAR_REGISTERED.load(Ordering::Relaxed) {
-            register_appbar(main_win);
-        } else {
-            if let Ok(hwnd) = main_win.hwnd() { re_assert_topmost(hwnd); }
-        }
-    }
-    if let Some(dock_win) = app.get_webview_window("dock") {
-        // Skip dock re-registration if dock is disabled in settings.
-        let dock_enabled = get_setting_str(&app, "nectar-dock-enabled")
-            .unwrap_or_else(|| "true".to_string());
-        if dock_enabled == "true" && DOCK_APPBAR_REGISTERED.load(Ordering::Relaxed) {
-            register_dock_appbar(dock_win);
-        } else {
-            if let Ok(hwnd) = dock_win.hwnd() { re_assert_topmost(hwnd); }
+    let dock_enabled = get_setting_str(&app, "nectar-dock-enabled")
+        .unwrap_or_else(|| "true".to_string());
+    for (label, win) in app.webview_windows() {
+        if crate::state::is_notch_label(&label) {
+            if crate::state::get_flag(crate::state::main_appbar_registered(), &label) {
+                register_appbar(win);
+            } else if let Ok(hwnd) = win.hwnd() {
+                re_assert_topmost(hwnd);
+            }
+        } else if crate::state::is_dock_label(&label) {
+            if dock_enabled == "true" && crate::state::get_flag(crate::state::dock_appbar_registered(), &label) {
+                register_dock_appbar(win);
+            } else if let Ok(hwnd) = win.hwnd() {
+                re_assert_topmost(hwnd);
+            }
         }
     }
     sync_overlays(&app);
@@ -210,119 +216,142 @@ pub async fn sync_appbar(app: AppHandle) {
 
 #[tauri::command]
 pub async fn change_dock_mode(app: AppHandle, mode: String) {
-    if let Some(dock_win) = app.get_webview_window("dock") {
-        if mode == "fixed" {
-            register_dock_appbar(dock_win.clone());
-        } else {
-            let _ = dock_win.show();
-            if let Ok(hwnd) = dock_win.hwnd() {
-                let hwnd_val = hwnd.0 as isize;
-                tauri::async_runtime::spawn_blocking(move || {
-                    unregister_appbar_native(HWND(hwnd_val as *mut _));
-                });
-                DOCK_APPBAR_REGISTERED.store(false, Ordering::Relaxed);
-                
-                // Retry primary_monitor() — can fail on autostart before shell initializes
-                let dock_clone = dock_win.clone();
-                tauri::async_runtime::spawn(async move {
-                    for attempt in 0..10 {
-                        // Never fall back to a hardcoded pixel height.
-                        // Extract HWND as isize before any await (raw pointer is not Send).
-                        let hwnd_val = dock_clone.hwnd().map(|h| h.0 as isize).unwrap_or(0);
-                        let ph = dock_clone.outer_size().map(|s| s.height as i32).unwrap_or(0);
-                        let monitor_info = dock_clone.primary_monitor().ok().flatten().map(|m| {
-                            let s = m.size();
-                            let p = m.position();
-                            (tauri::PhysicalSize::new(s.width, s.height), tauri::PhysicalPosition::new(p.x, p.y))
-                        });
+    let labels: Vec<String> = app.webview_windows().keys()
+        .filter(|l| crate::state::is_dock_label(l))
+        .cloned()
+        .collect();
+    for label in labels {
+        if let Some(dock_win) = app.get_webview_window(&label) {
+            change_dock_mode_for_window(&app, dock_win, &mode).await;
+        }
+    }
+}
 
-                        if hwnd_val != 0 {
-                            if let Some((m_size, m_pos)) = monitor_info {
-                                if ph <= 10 {
-                                    if attempt < 9 {
-                                        tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
-                                    }
-                                    continue;
+async fn change_dock_mode_for_window(app: &AppHandle, dock_win: tauri::WebviewWindow, mode: &str) {
+    let label = dock_win.label().to_string();
+    if mode == "fixed" {
+        register_dock_appbar(dock_win.clone());
+    } else {
+        let _ = dock_win.show();
+        if let Ok(hwnd) = dock_win.hwnd() {
+            let hwnd_val = hwnd.0 as isize;
+            tauri::async_runtime::spawn_blocking(move || {
+                unregister_appbar_native(HWND(hwnd_val as *mut _));
+            });
+            crate::state::set_flag(crate::state::dock_appbar_registered(), &label, false);
+
+            // Retry until the target monitor is available (can fail on autostart before shell initializes)
+            let dock_clone = dock_win.clone();
+            tauri::async_runtime::spawn(async move {
+                for attempt in 0..10 {
+                    // Never fall back to a hardcoded pixel height.
+                    // Extract HWND as isize before any await (raw pointer is not Send).
+                    let hwnd_val = dock_clone.hwnd().map(|h| h.0 as isize).unwrap_or(0);
+                    let ph = dock_clone.outer_size().map(|s| s.height as i32).unwrap_or(0);
+                    let monitor_info = crate::monitors::monitor_for_window_label(dock_clone.app_handle(), crate::types::WindowKind::Dock, dock_clone.label()).map(|m| {
+                        let s = m.size();
+                        let p = m.position();
+                        (tauri::PhysicalSize::new(s.width, s.height), tauri::PhysicalPosition::new(p.x, p.y))
+                    });
+
+                    if hwnd_val != 0 {
+                        if let Some((m_size, m_pos)) = monitor_info {
+                            if ph <= 10 {
+                                if attempt < 9 {
+                                    tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
                                 }
-                                let final_y = m_pos.y + m_size.height as i32 - ph;
-                                unsafe {
-                                    use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOZORDER, SWP_NOACTIVATE, SWP_FRAMECHANGED};
-                                    use windows::Win32::Foundation::HWND;
-                                    let _ = SetWindowPos(HWND(hwnd_val as *mut _), None, m_pos.x, final_y, m_size.width as i32, ph, SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
-                                }
-                                if let Ok(hwnd) = dock_clone.hwnd() { re_assert_topmost(hwnd); }
-                                break;
+                                continue;
                             }
-                        }
-                        if attempt < 9 {
-                            tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+                            let final_y = m_pos.y + m_size.height as i32 - ph;
+                            unsafe {
+                                use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOZORDER, SWP_NOACTIVATE, SWP_FRAMECHANGED};
+                                use windows::Win32::Foundation::HWND;
+                                let _ = SetWindowPos(HWND(hwnd_val as *mut _), None, m_pos.x, final_y, m_size.width as i32, ph, SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+                            }
+                            if let Ok(hwnd) = dock_clone.hwnd() { re_assert_topmost(hwnd); }
+                            break;
                         }
                     }
-                });
-            }
+                    if attempt < 9 {
+                        tokio::time::sleep(tokio::time::Duration::from_millis(300)).await;
+                    }
+                }
+            });
         }
-        
-        // Ensure always on top and native taskbar stays hidden
-        if let Ok(hwnd) = dock_win.hwnd() { re_assert_topmost(hwnd); }
-        set_taskbar_visibility(false, false);
-        NATIVE_TASKBAR_HIDDEN.store(true, Ordering::Relaxed);
-
-        
-        // Sync the current overlap state immediately to the frontend
-        let current = CURRENT_DOCK_OVERLAP.load(Ordering::Relaxed);
-        if current != -1 {
-            let _ = app.emit("dock-overlap", current == 1);
-        }
-
-        // Double sync after a short delay to catch any layout changes
-        let dock_clone = dock_win.clone();
-        tauri::async_runtime::spawn(async move {
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-            if DOCK_APPBAR_REGISTERED.load(Ordering::Relaxed) {
-                register_dock_appbar(dock_clone);
-            }
-        });
     }
+
+    // Ensure always on top and native taskbar stays hidden
+    if let Ok(hwnd) = dock_win.hwnd() { re_assert_topmost(hwnd); }
+    set_taskbar_visibility(false, false);
+    NATIVE_TASKBAR_HIDDEN.store(true, Ordering::Relaxed);
+
+    // Sync the current overlap state immediately to the frontend
+    let current = crate::state::get_overlap(crate::state::dock_overlap(), &label);
+    if current != -1 {
+        let _ = app.emit_to(label.as_str(), "dock-overlap", current == 1);
+    }
+
+    // Double sync after a short delay to catch any layout changes
+    let dock_clone = dock_win.clone();
+    let label_clone = label.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        if crate::state::get_flag(crate::state::dock_appbar_registered(), &label_clone) {
+            register_dock_appbar(dock_clone);
+        }
+    });
 }
 
 #[tauri::command]
 pub async fn change_notch_mode(app: AppHandle, mode: String) {
-    if let Some(main_win) = app.get_webview_window("main") {
-        if mode == "fixed" {
-            register_appbar(main_win.clone());
-        } else {
-            let _ = main_win.show();
-            if let Ok(hwnd) = main_win.hwnd() {
-                let hwnd_val = hwnd.0 as isize;
-                tauri::async_runtime::spawn_blocking(move || {
-                    unregister_appbar_native(HWND(hwnd_val as *mut _));
-                });
-                MAIN_APPBAR_REGISTERED.store(false, Ordering::Relaxed);
-                
-                let main_clone = main_win.clone();
-                tauri::async_runtime::spawn(async move {
-                    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-                    if !MAIN_APPBAR_REGISTERED.load(Ordering::Relaxed) {
-                        if let Ok(hwnd) = main_clone.hwnd() { re_assert_topmost(hwnd); }
-                    }
-                });
-            }
+    let labels: Vec<String> = app.webview_windows().keys()
+        .filter(|l| crate::state::is_notch_label(l))
+        .cloned()
+        .collect();
+    for label in labels {
+        if let Some(main_win) = app.get_webview_window(&label) {
+            init_notch_window(&app, main_win, &mode).await;
         }
-        // Reposition window to span the full primary monitor so CSS justify-content:center works
-        if let Ok(Some(monitor)) = main_win.primary_monitor() {
-            let m_pos = monitor.position();
-            let m_size = monitor.size();
-            let scale = monitor.scale_factor();
-            let nectar_scale = crate::utils::get_nectar_scale(&app);
-            let target_height = (420.0 * nectar_scale * scale) as u32;
-            let _ = main_win.set_position(tauri::PhysicalPosition::new(m_pos.x, m_pos.y));
-            let _ = main_win.set_size(tauri::PhysicalSize::new(m_size.width, target_height));
+    }
+}
+
+pub async fn init_notch_window(app: &AppHandle, main_win: tauri::WebviewWindow, mode: &str) {
+    let label = main_win.label().to_string();
+    if mode == "fixed" {
+        register_appbar(main_win.clone());
+    } else {
+        let _ = main_win.show();
+        if let Ok(hwnd) = main_win.hwnd() {
+            let hwnd_val = hwnd.0 as isize;
+            tauri::async_runtime::spawn_blocking(move || {
+                unregister_appbar_native(HWND(hwnd_val as *mut _));
+            });
+            crate::state::set_flag(crate::state::main_appbar_registered(), &label, false);
+
+            let main_clone = main_win.clone();
+            let label_clone = label.clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+                if !crate::state::get_flag(crate::state::main_appbar_registered(), &label_clone) {
+                    if let Ok(hwnd) = main_clone.hwnd() { re_assert_topmost(hwnd); }
+                }
+            });
         }
-        
-        let current = CURRENT_NOTCH_OVERLAP.load(Ordering::Relaxed);
-        if current != -1 {
-            let _ = app.emit("notch-overlap", current == 1);
-        }
+    }
+    // Reposition window to span the full target monitor so CSS justify-content:center works
+    if let Some(monitor) = crate::monitors::monitor_for_window_label(app, crate::types::WindowKind::Notch, &label) {
+        let m_pos = monitor.position();
+        let m_size = monitor.size();
+        let scale = monitor.scale_factor();
+        let nectar_scale = crate::utils::get_nectar_scale(app);
+        let target_height = (420.0 * nectar_scale * scale) as u32;
+        let _ = main_win.set_position(tauri::PhysicalPosition::new(m_pos.x, m_pos.y));
+        let _ = main_win.set_size(tauri::PhysicalSize::new(m_size.width, target_height));
+    }
+
+    let current = crate::state::get_overlap(crate::state::notch_overlap(), &label);
+    if current != -1 {
+        let _ = app.emit_to(label.as_str(), "notch-overlap", current == 1);
     }
 }
 
@@ -450,10 +479,7 @@ pub async fn open_app(app_name: String) {
         let mut final_path = actual_path.clone();
         
         if !Path::new(&final_path).exists() {
-            let file_name = Path::new(&final_path).file_name().and_then(|n| n.to_str()).unwrap_or("").to_lowercase();
-            
-            // Handle Discord/Slack style auto-updaters (app-x.x.x folder structure)
-            if file_name == "discord.exe" || file_name == "slack.exe" || file_name == "githubdesktop.exe" || file_name == "zentwilight.exe" {
+            if let Some(exe_name) = Path::new(&final_path).file_name() {
                 if let Some(parent) = Path::new(&final_path).parent().and_then(|p| p.parent()) {
                     if parent.exists() {
                         if let Ok(entries) = std::fs::read_dir(parent) {
@@ -466,7 +492,7 @@ pub async fn open_app(app_name: String) {
                             }
                             app_dirs.sort();
                             if let Some(latest) = app_dirs.last() {
-                                let exe = latest.join(Path::new(&final_path).file_name().unwrap());
+                                let exe = latest.join(exe_name);
                                 if exe.exists() {
                                     final_path = exe.to_string_lossy().to_string();
                                 }
@@ -566,20 +592,36 @@ pub async fn get_active_windows() -> Vec<AppInfo> {
     }).await.unwrap_or_default()
 }
 
+unsafe fn force_set_foreground(hwnd: HWND) {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{SendInput, INPUT, INPUT_0, KEYBDINPUT, VK_MENU, KEYEVENTF_KEYUP, INPUT_KEYBOARD};
+    use windows::Win32::UI::WindowsAndMessaging::SetForegroundWindow;
+
+    let key_input = |flags| INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT { wVk: VK_MENU, wScan: 0, dwFlags: flags, time: 0, dwExtraInfo: 0 },
+        },
+    };
+    let inputs = [key_input(Default::default()), key_input(KEYEVENTF_KEYUP)];
+    SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
+
+    let _ = SetForegroundWindow(hwnd);
+}
+
 #[tauri::command]
 pub async fn focus_window(hwnd: isize) {
     tauri::async_runtime::spawn_blocking(move || unsafe {
-        use windows::Win32::UI::WindowsAndMessaging::{SetForegroundWindow, ShowWindow, SW_RESTORE, SW_SHOW, SW_MINIMIZE, IsIconic, IsWindowVisible, GetForegroundWindow, GetWindowThreadProcessId};
+        use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_RESTORE, SW_SHOW, SW_MINIMIZE, IsIconic, IsWindowVisible, GetForegroundWindow, GetWindowThreadProcessId};
         let hwnd = HWND(hwnd as *mut _);
         let my_pid = std::process::id();
 
         if !IsWindowVisible(hwnd).as_bool() {
             let _ = ShowWindow(hwnd, SW_SHOW);
             let _ = ShowWindow(hwnd, SW_RESTORE);
-            let _ = SetForegroundWindow(hwnd);
+            force_set_foreground(hwnd);
         } else if IsIconic(hwnd).as_bool() {
             let _ = ShowWindow(hwnd, SW_RESTORE);
-            let _ = SetForegroundWindow(hwnd);
+            force_set_foreground(hwnd);
         } else {
             // Minimize if: window is foreground, OR same process as foreground (not Nectar), OR recently focused
             let fg = GetForegroundWindow();
@@ -611,7 +653,7 @@ pub async fn focus_window(hwnd: isize) {
             if should_minimize {
                 let _ = ShowWindow(hwnd, SW_MINIMIZE);
             } else {
-                let _ = SetForegroundWindow(hwnd);
+                force_set_foreground(hwnd);
             }
         }
     }).await.unwrap_or_default();
@@ -671,6 +713,19 @@ pub async fn get_app_icon(app: AppHandle, path: String, name: Option<String>, hw
     let cache_dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
     let cache_path = cache_dir.join("icons_cache.json");
     let cache_key = get_cache_key(&path, name.as_deref());
+
+    if path == "nectar-settings" {
+        if let Some(icon) = app.default_window_icon() {
+            if let Some(rgba) = image::RgbaImage::from_raw(icon.width(), icon.height(), icon.rgba().to_vec()) {
+                let mut out = Vec::new();
+                if image::DynamicImage::ImageRgba8(rgba).write_to(&mut std::io::Cursor::new(&mut out), image::ImageFormat::Png).is_ok() {
+                    use base64::Engine;
+                    let b64 = base64::engine::general_purpose::STANDARD.encode(&out);
+                    return Ok(Some(format!("data:image/png;base64,{}", b64)));
+                }
+            }
+        }
+    }
 
     // Strategy 0: Check for custom icon first
     let custom_icons_dir = cache_dir.join("custom_icons");
@@ -1380,11 +1435,17 @@ pub fn set_volume(volume: f32) { if let Some(sender) = COMMAND_SENDER.get() { le
 /// handlers so that any shutdown path (including Task Manager's WM_CLOSE) behaves
 /// identically.
 pub fn restore_taskbar_and_exit(handle: &AppHandle) {
-    if let Some(w) = handle.get_webview_window("main") {
-        if MAIN_APPBAR_REGISTERED.load(Ordering::Relaxed) { unregister_appbar_native(w.hwnd().unwrap()); }
-    }
-    if let Some(w) = handle.get_webview_window("dock") {
-        if DOCK_APPBAR_REGISTERED.load(Ordering::Relaxed) { unregister_appbar_native(w.hwnd().unwrap()); }
+    for (label, w) in handle.webview_windows() {
+        let registered = if crate::state::is_notch_label(&label) {
+            crate::state::get_flag(crate::state::main_appbar_registered(), &label)
+        } else if crate::state::is_dock_label(&label) {
+            crate::state::get_flag(crate::state::dock_appbar_registered(), &label)
+        } else {
+            false
+        };
+        if registered {
+            if let Ok(hwnd) = w.hwnd() { unregister_appbar_native(hwnd); }
+        }
     }
     set_taskbar_visibility(true, true);
     NATIVE_TASKBAR_HIDDEN.store(false, Ordering::Relaxed);
@@ -1440,19 +1501,24 @@ pub async fn close_window(hwnd: isize) {
 }
 
 fn re_register_appbars(app: &AppHandle, settings: &HashMap<String, serde_json::Value>) {
-    if let Some(main_win) = app.get_webview_window("main") {
-        let notch_fixed = settings.get("nectar-notch-mode").map(|v| v.as_str() == Some("fixed")).unwrap_or(true);
-        if notch_fixed {
-            crate::services::register_appbar(main_win);
-        }
-    }
-    if let Some(dock_win) = app.get_webview_window("dock") {
-        let is_fixed = settings.get("nectar-dock-mode").map(|v| v.as_str() == Some("fixed")).unwrap_or(false);
-        if is_fixed {
-            crate::services::register_dock_appbar(dock_win);
+    let notch_fixed = settings.get("nectar-notch-mode").map(|v| v.as_str() == Some("fixed")).unwrap_or(true);
+    let dock_fixed = settings.get("nectar-dock-mode").map(|v| v.as_str() == Some("fixed")).unwrap_or(false);
+    for (label, win) in app.webview_windows() {
+        if crate::state::is_notch_label(&label) && notch_fixed {
+            crate::services::register_appbar(win);
+        } else if crate::state::is_dock_label(&label) && dock_fixed {
+            crate::services::register_dock_appbar(win);
         }
     }
 }
+
+const MONITOR_TARGETING_KEYS: [&str; 5] = [
+    "nectar-dock-monitor-mode",
+    "nectar-dock-monitor-id",
+    "nectar-notch-monitor-mode",
+    "nectar-notch-monitor-id",
+    "nectar-dock-enabled",
+];
 
 #[tauri::command]
 pub fn save_setting(app: AppHandle, key: String, value: serde_json::Value) -> Result<(), String> {
@@ -1472,7 +1538,30 @@ pub fn save_setting(app: AppHandle, key: String, value: serde_json::Value) -> Re
     if key == "nectar-scale" {
         re_register_appbars(&app, &settings);
     }
+
+    if MONITOR_TARGETING_KEYS.contains(&key.as_str()) {
+        let app_clone = app.clone();
+        tauri::async_runtime::spawn(async move {
+            crate::monitors::sync_monitor_windows(&app_clone);
+            let dock_enabled = crate::utils::get_setting_str(&app_clone, "nectar-dock-enabled")
+                .map(|v| v == "true").unwrap_or(true);
+            if dock_enabled {
+                let dock_mode = crate::utils::get_setting_str(&app_clone, "nectar-dock-mode")
+                    .unwrap_or_else(|| "smart".to_string());
+                change_dock_mode(app_clone.clone(), dock_mode).await;
+            }
+            let notch_mode = crate::utils::get_setting_str(&app_clone, "nectar-notch-mode")
+                .unwrap_or_else(|| "fixed".to_string());
+            change_notch_mode(app_clone.clone(), notch_mode).await;
+        });
+    }
+
     Ok(())
+}
+
+#[tauri::command]
+pub fn get_monitors(app: AppHandle) -> Vec<crate::types::MonitorInfo> {
+    crate::monitors::list_monitors(&app)
 }
 
 
@@ -1983,9 +2072,6 @@ pub fn setup_settings_watcher(app: AppHandle) {
         Err(_) => return,
     };
     let settings_path = config_dir.join("settings.json");
-
-    // Initialize SETTINGS_CACHE if not yet set (backup for race with init_settings_cache)
-    let _ = crate::state::SETTINGS_CACHE.set(std::sync::Mutex::new(HashMap::new()));
 
     std::thread::spawn(move || {
         use windows::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};

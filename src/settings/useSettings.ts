@@ -6,7 +6,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import type { UpdateCheckResult } from "../updater";
 import { useSettingsSync } from "../hooks/useSettingsSync";
 import { hexToHsl } from "../theme";
-import type { WidgetConfig } from "./types";
+import type { WidgetConfig, MonitorInfo, MonitorMode } from "./types";
 
 function saveSetting(key: string, value: string) {
   localStorage.setItem(key, value);
@@ -71,6 +71,19 @@ export function useSettings() {
     return raw === "auto-hide" ? "smart" : raw;
   });
   const [notchMode, setNotchMode] = useState("fixed");
+  const [dockMonitorMode, setDockMonitorMode] = useState<MonitorMode>(
+    () => (localStorage.getItem("nectar-dock-monitor-mode") as MonitorMode) || "primary"
+  );
+  const [dockMonitorId, setDockMonitorId] = useState(
+    () => localStorage.getItem("nectar-dock-monitor-id") || ""
+  );
+  const [notchMonitorMode, setNotchMonitorMode] = useState<MonitorMode>(
+    () => (localStorage.getItem("nectar-notch-monitor-mode") as MonitorMode) || "primary"
+  );
+  const [notchMonitorId, setNotchMonitorId] = useState(
+    () => localStorage.getItem("nectar-notch-monitor-id") || ""
+  );
+  const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
   const [lowBatteryThreshold, setLowBatteryThreshold] = useState(20);
   const [hasBattery, setHasBattery] = useState(true);
   const [updateStatus, setUpdateStatus] = useState<
@@ -147,6 +160,11 @@ export function useSettings() {
       apply(getVal("nectar-notch-mode"), setNotchMode, (v) => (v === "auto-hide" ? "smart" : v));
       apply(getVal("nectar-dock-mode"), setDockMode, (v) => (v === "auto-hide" ? "smart" : v));
 
+      apply(getVal("nectar-dock-monitor-mode"), setDockMonitorMode, (v) => v as MonitorMode);
+      apply(getVal("nectar-dock-monitor-id"), setDockMonitorId, (v) => v);
+      apply(getVal("nectar-notch-monitor-mode"), setNotchMonitorMode, (v) => v as MonitorMode);
+      apply(getVal("nectar-notch-monitor-id"), setNotchMonitorId, (v) => v);
+
       const savedCity = getVal("nectar-weather-city");
       if (savedCity) setCityName(savedCity);
 
@@ -187,10 +205,25 @@ export function useSettings() {
     checkForUpdates(false);
   }, []);
 
+  useEffect(() => {
+    const refreshMonitors = () => {
+      invoke<MonitorInfo[]>("get_monitors").then(setMonitors).catch(() => {});
+    };
+    refreshMonitors();
+    const unlisten = listen("monitors-changed", refreshMonitors);
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
+
   // ── Sync settings from other windows ──
   useSettingsSync({
     "nectar-dock-mode": setDockMode,
     "nectar-notch-mode": setNotchMode,
+    "nectar-dock-monitor-mode": (v) => setDockMonitorMode(v as MonitorMode),
+    "nectar-dock-monitor-id": setDockMonitorId,
+    "nectar-notch-monitor-mode": (v) => setNotchMonitorMode(v as MonitorMode),
+    "nectar-notch-monitor-id": setNotchMonitorId,
     "nectar-dock-enabled": setDockEnabled,
     "nectar-dock-icon-only": setDockIconOnly,
     "nectar-dock-preview-enabled": setDockPreviewEnabled,
@@ -475,6 +508,26 @@ export function useSettings() {
     saveSetting("nectar-notch-mode", newMode);
   };
 
+  const setDockMonitorModeValue = (mode: MonitorMode) => {
+    setDockMonitorMode(mode);
+    saveSetting("nectar-dock-monitor-mode", mode);
+  };
+
+  const setDockMonitorIdValue = (id: string) => {
+    setDockMonitorId(id);
+    saveSetting("nectar-dock-monitor-id", id);
+  };
+
+  const setNotchMonitorModeValue = (mode: MonitorMode) => {
+    setNotchMonitorMode(mode);
+    saveSetting("nectar-notch-monitor-mode", mode);
+  };
+
+  const setNotchMonitorIdValue = (id: string) => {
+    setNotchMonitorId(id);
+    saveSetting("nectar-notch-monitor-id", id);
+  };
+
   const handleThresholdChange = (val: number) => {
     setLowBatteryThreshold(val);
     saveSetting("nectar-low-battery-threshold", val.toString());
@@ -726,6 +779,16 @@ export function useSettings() {
     toggleDockIconOnly,
     dockMixedReorder,
     toggleDockMixedReorder,
+
+    monitors,
+    dockMonitorMode,
+    setDockMonitorModeValue,
+    dockMonitorId,
+    setDockMonitorIdValue,
+    notchMonitorMode,
+    setNotchMonitorModeValue,
+    notchMonitorId,
+    setNotchMonitorIdValue,
 
     // Overlays
     volumeOverlayEnabled,

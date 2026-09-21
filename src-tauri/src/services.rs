@@ -879,23 +879,23 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                                         should_notch_overlap = true;
                                     } else {
                                         should_overlap = false;
-                                        if let Ok(dock_rect_lock) = DOCK_RECT.lock() {
-                                            if let Some(dr) = *dock_rect_lock {
+                                        if let Some(dr) = crate::state::dock_rects().lock().ok().and_then(|m| m.get("dock").copied()) {
+                                            {
                                                 let scale = cached_scale;
                                                 let d_left = (dr.x as f64 * scale) as i32;
                                                 let d_right = d_left + (dr.width as f64 * scale) as i32;
                                                 let res_h = (56.0 * scale) as i32;
                                                 let trigger_y = screen_rect.bottom - res_h;
 
-                                                if rect.left < d_right - 4 && rect.right > d_left + 4 && 
+                                                if rect.left < d_right - 4 && rect.right > d_left + 4 &&
                                                    rect.bottom > trigger_y + 4 {
                                                     should_overlap = true;
                                                 }
                                             }
                                         }
 
-                                        if let Ok(notch_rect_lock) = NOTCH_RECT.lock() {
-                                            if let Some(nr) = *notch_rect_lock {
+                                        if let Some(nr) = crate::state::notch_rects().lock().ok().and_then(|m| m.get("main").copied()) {
+                                            {
                                                 let scale = cached_scale;
                                                 let n_left = (nr.x as f64 * scale) as i32;
                                                 let n_right = n_left + (nr.width as f64 * scale) as i32;
@@ -931,19 +931,18 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                     .is_some_and(|w| w.is_visible().unwrap_or(false));
                 let effective_dock_overlap = should_overlap && dock_visible;
 
-                // Update overlap state
-                CURRENT_DOCK_OVERLAP.store(if effective_dock_overlap { 1 } else { 0 }, Ordering::Relaxed);
-                CURRENT_NOTCH_OVERLAP.store(if should_notch_overlap { 1 } else { 0 }, Ordering::Relaxed);
+                crate::state::set_overlap(crate::state::dock_overlap(), "dock", if effective_dock_overlap { 1 } else { 0 });
+                crate::state::set_overlap(crate::state::notch_overlap(), "main", if should_notch_overlap { 1 } else { 0 });
                 CURRENT_FOREGROUND_FULLSCREEN.store(current_is_fs, Ordering::Relaxed);
-                
+
                 if Some(effective_dock_overlap) != last_dock_overlap || last_emit.elapsed() >= Duration::from_secs(3) {
-                    let _ = handle_visibility.emit("dock-overlap", effective_dock_overlap);
+                    let _ = handle_visibility.emit_to("dock", "dock-overlap", effective_dock_overlap);
                     last_dock_overlap = Some(effective_dock_overlap);
                     last_emit = Instant::now();
                 }
 
                 if Some(should_notch_overlap) != last_notch_overlap || last_emit.elapsed() >= Duration::from_secs(3) {
-                    let _ = handle_visibility.emit("notch-overlap", should_notch_overlap);
+                    let _ = handle_visibility.emit_to("main", "notch-overlap", should_notch_overlap);
                     last_notch_overlap = Some(should_notch_overlap);
                 }
 
@@ -1168,6 +1167,10 @@ static MH_RIGHT_EXPIRY_MS: AtomicI64 = AtomicI64::new(0);
 static MH_LAST_MONITOR_UPDATE_MS: AtomicI64 = AtomicI64::new(0);
 static MH_CACHED_MON_POS: Mutex<Option<(i32, i32)>> = Mutex::new(None);
 static MH_CACHED_MON_SIZE: Mutex<Option<(u32, u32)>> = Mutex::new(None);
+static MH_CACHED_DOCK_MON_POS: Mutex<Option<(i32, i32)>> = Mutex::new(None);
+static MH_CACHED_DOCK_MON_SIZE: Mutex<Option<(u32, u32)>> = Mutex::new(None);
+static MH_CACHED_NOTCH_MON_POS: Mutex<Option<(i32, i32)>> = Mutex::new(None);
+static MH_CACHED_NOTCH_MON_SIZE: Mutex<Option<(u32, u32)>> = Mutex::new(None);
 static MH_LAST_PROCESS_MS: AtomicI64 = AtomicI64::new(0);
 static CAPTURE_UI_ACTIVE: AtomicBool = AtomicBool::new(false);
 static CAPTURE_RECHECK: AtomicBool = AtomicBool::new(true);
@@ -1224,23 +1227,24 @@ fn is_capture_ui_present() -> bool {
 }
 
 fn apply_capture_ui_state(app: &AppHandle, active: bool) {
-    if let Some(main_win) = app.get_webview_window("main") {
-        if active {
-            let _ = main_win.set_ignore_cursor_events(true);
-            let _ = main_win.hide();
-        } else {
-            let _ = main_win.show();
-            if MAIN_APPBAR_REGISTERED.load(Ordering::Relaxed) {
-                register_appbar(main_win.clone());
-            } else if let Ok(hwnd) = main_win.hwnd() {
-                re_assert_topmost(hwnd);
+    for (label, win) in app.webview_windows() {
+        if crate::state::is_notch_label(&label) {
+            if active {
+                let _ = win.set_ignore_cursor_events(true);
+                let _ = win.hide();
+            } else {
+                let _ = win.show();
+                if crate::state::get_flag(crate::state::main_appbar_registered(), &label) {
+                    register_appbar(win.clone());
+                } else if let Ok(hwnd) = win.hwnd() {
+                    re_assert_topmost(hwnd);
+                }
             }
+        } else if crate::state::is_dock_label(&label) && active {
+            let _ = win.set_ignore_cursor_events(true);
         }
     }
     if active {
-        if let Some(dock_win) = app.get_webview_window("dock") {
-            let _ = dock_win.set_ignore_cursor_events(true);
-        }
         if let Some(ov_win) = app.get_webview_window("overlay") {
             let _ = ov_win.set_ignore_cursor_events(true);
         }
@@ -1249,6 +1253,8 @@ fn apply_capture_ui_state(app: &AppHandle, active: bool) {
     MH_LAST_MAIN_IGNORE.store(-1, Ordering::Relaxed);
     MH_LAST_DOCK_IGNORE.store(-1, Ordering::Relaxed);
     MH_LAST_OV_IGNORE.store(-1, Ordering::Relaxed);
+    if let Ok(mut m) = crate::state::dock_extra_last_ignore().lock() { for v in m.values_mut() { *v = -1; } }
+    if let Ok(mut m) = crate::state::notch_extra_last_ignore().lock() { for v in m.values_mut() { *v = -1; } }
 }
 
 pub fn setup_mouse_hook(app_handle: AppHandle) {
@@ -1306,8 +1312,20 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
                     let size = *monitor.size();
                     *MH_CACHED_MON_POS.lock().unwrap() = Some((pos.x, pos.y));
                     *MH_CACHED_MON_SIZE.lock().unwrap() = Some((size.width, size.height));
-                    MH_LAST_MONITOR_UPDATE_MS.store(now, Ordering::Relaxed);
                 }
+                if let Some(monitor) = crate::monitors::monitor_for_window_label(app_handle, crate::types::WindowKind::Dock, "dock") {
+                    let pos = *monitor.position();
+                    let size = *monitor.size();
+                    *MH_CACHED_DOCK_MON_POS.lock().unwrap() = Some((pos.x, pos.y));
+                    *MH_CACHED_DOCK_MON_SIZE.lock().unwrap() = Some((size.width, size.height));
+                }
+                if let Some(monitor) = crate::monitors::monitor_for_window_label(app_handle, crate::types::WindowKind::Notch, "main") {
+                    let pos = *monitor.position();
+                    let size = *monitor.size();
+                    *MH_CACHED_NOTCH_MON_POS.lock().unwrap() = Some((pos.x, pos.y));
+                    *MH_CACHED_NOTCH_MON_SIZE.lock().unwrap() = Some((size.width, size.height));
+                }
+                MH_LAST_MONITOR_UPDATE_MS.store(now, Ordering::Relaxed);
             }
 
             let cached_pos = MH_CACHED_MON_POS.lock().unwrap().unwrap_or((0, 0));
@@ -1316,6 +1334,16 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
             let mon_y = cached_pos.1;
             let mon_w = cached_size.0 as i32;
             let mon_h = cached_size.1 as i32;
+
+            let dock_cached_pos = MH_CACHED_DOCK_MON_POS.lock().unwrap().unwrap_or((mon_x, mon_y));
+            let dock_cached_size = MH_CACHED_DOCK_MON_SIZE.lock().unwrap().unwrap_or((mon_w as u32, mon_h as u32));
+            let (dock_mon_x, dock_mon_y) = dock_cached_pos;
+            let (dock_mon_w, dock_mon_h) = (dock_cached_size.0 as i32, dock_cached_size.1 as i32);
+
+            let notch_cached_pos = MH_CACHED_NOTCH_MON_POS.lock().unwrap().unwrap_or((mon_x, mon_y));
+            let notch_cached_size = MH_CACHED_NOTCH_MON_SIZE.lock().unwrap().unwrap_or((mon_w as u32, mon_h as u32));
+            let (notch_mon_x, notch_mon_y) = notch_cached_pos;
+            let (notch_mon_w, _notch_mon_h) = (notch_cached_size.0 as i32, notch_cached_size.1 as i32);
 
             let fg_fs = CURRENT_FOREGROUND_FULLSCREEN.load(Ordering::Relaxed);
 
@@ -1332,15 +1360,15 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
                     let mut is_hovered = false;
                     let mut dock_span: Option<(i32, i32)> = None;
 
-                    let dock_rect_val = DOCK_WINDOW_RECT.lock().ok().and_then(|g| *g);
+                    let dock_rect_val = crate::state::dock_window_rects().lock().ok().and_then(|m| m.get("dock").copied());
 
                     if let Some((win_pos, win_size)) = dock_rect_val {
                         let in_window = cursor.x >= win_pos.x && cursor.x <= (win_pos.x + win_size.width as i32) &&
                                          cursor.y >= win_pos.y && cursor.y <= (win_pos.y + win_size.height as i32);
 
                         if in_window {
-                            if let Ok(region) = DOCK_RECT.try_lock() {
-                                if let Some(r) = *region {
+                            if let Ok(region) = crate::state::dock_rects().try_lock() {
+                                if let Some(r) = region.get("dock").copied() {
                                     let scale = dock_win.scale_factor().unwrap_or(1.0);
                                     let pad_x = (5.0 * scale) as i32;
                                     let pad_y_top = (8.0 * scale) as i32;
@@ -1378,10 +1406,10 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
                     }
 
                     // Hot-edge detection (Bottom edge)
-                    let in_dock_hover = DOCK_IS_HOVERED.load(Ordering::Relaxed);
+                    let in_dock_hover = crate::state::get_flag(crate::state::dock_hovered(), "dock");
                     let scale = dock_win.scale_factor().unwrap_or(1.0);
-                    let at_bottom_edge = cursor.y >= (mon_y + mon_h - (8.0 * scale) as i32) &&
-                                         cursor.x >= mon_x && cursor.x <= (mon_x + mon_w);
+                    let at_bottom_edge = cursor.y >= (dock_mon_y + dock_mon_h - (8.0 * scale) as i32) &&
+                                         cursor.x >= dock_mon_x && cursor.x <= (dock_mon_x + dock_mon_w);
 
                     if at_bottom_edge || in_dock_hover {
                         is_hovered = true;
@@ -1449,11 +1477,11 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
             {
                 if let Some(main_win) = app_handle.get_webview_window("main") {
                     if main_win.is_visible().unwrap_or(false) {
-                        let in_notch_hover = NOTCH_IS_HOVERED.load(Ordering::Relaxed);
+                        let in_notch_hover = crate::state::get_flag(crate::state::notch_hovered(), "main");
                         let mut is_notch_hovered = false;
                         let scale = main_win.scale_factor().unwrap_or(1.0);
-                        let at_top_edge = cursor.y <= (mon_y + (8.0 * scale) as i32) &&
-                                          cursor.x >= mon_x && cursor.x <= (mon_x + mon_w);
+                        let at_top_edge = cursor.y <= (notch_mon_y + (8.0 * scale) as i32) &&
+                                          cursor.x >= notch_mon_x && cursor.x <= (notch_mon_x + notch_mon_w);
 
                         if at_top_edge || in_notch_hover {
                             is_notch_hovered = true;
@@ -1461,11 +1489,11 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
                         }
 
                         let mut is_click_interactive = false;
-                        let main_rect_val = MAIN_WINDOW_RECT.lock().ok().and_then(|g| *g);
+                        let main_rect_val = crate::state::main_window_rects().lock().ok().and_then(|m| m.get("main").copied());
 
                         if let Some((win_pos, _)) = main_rect_val {
-                            if let Ok(region) = NOTCH_RECT.try_lock() {
-                                if let Some(r) = *region {
+                            if let Ok(region) = crate::state::notch_rects().try_lock() {
+                                if let Some(r) = region.get("main").copied() {
                                     let scale = main_win.scale_factor().unwrap_or(1.0);
                                     let pad_x = (20.0 * scale) as i32;
                                     let pad_y_bottom = (5.0 * scale) as i32;
@@ -1624,9 +1652,195 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
                     }
                 }
             }
+
+            hit_test_extra_dock_windows(app_handle, cursor, now, fg_fs);
+            hit_test_extra_notch_windows(app_handle, cursor, now, fg_fs);
         }
     }
     CallNextHookEx(None, code, wparam, lparam)
+}
+
+fn monitor_rect_for_hwnd(hwnd: HWND) -> Option<(i32, i32, i32, i32)> {
+    use windows::Win32::Graphics::Gdi::{MonitorFromWindow, GetMonitorInfoA, MONITORINFO, MONITOR_DEFAULTTONEAREST};
+    unsafe {
+        let h_monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
+        if GetMonitorInfoA(h_monitor, &mut mi).as_bool() {
+            let r = mi.rcMonitor;
+            Some((r.left, r.top, r.right - r.left, r.bottom - r.top))
+        } else {
+            None
+        }
+    }
+}
+
+fn hit_test_extra_dock_windows(app_handle: &AppHandle, cursor: windows::Win32::Foundation::POINT, now: i64, fg_fs: bool) {
+    let windows: Vec<(String, tauri::WebviewWindow)> = app_handle.webview_windows().into_iter()
+        .filter(|(l, _)| is_dock_label(l) && crate::state::monitor_suffix(l).is_some())
+        .collect();
+
+    for (label, dock_win) in windows {
+        if !dock_win.is_visible().unwrap_or(false) {
+            if crate::state::get_i32(crate::state::dock_extra_last_ignore(), &label, -1) != 1 {
+                let _ = dock_win.set_ignore_cursor_events(true);
+                crate::state::set_i32(crate::state::dock_extra_last_ignore(), &label, 1);
+            }
+            continue;
+        }
+        let Ok(hwnd) = dock_win.hwnd() else { continue };
+        let Some((mon_x, mon_y, mon_w, mon_h)) = monitor_rect_for_hwnd(hwnd) else { continue };
+
+        let mut is_click_interactive = false;
+        let mut dock_span: Option<(i32, i32)> = None;
+        let scale = dock_win.scale_factor().unwrap_or(1.0);
+
+        let dock_rect_val = crate::state::dock_window_rects().lock().ok().and_then(|m| m.get(&label).copied());
+        if let Some((win_pos, win_size)) = dock_rect_val {
+            let in_window = cursor.x >= win_pos.x && cursor.x <= (win_pos.x + win_size.width as i32) &&
+                             cursor.y >= win_pos.y && cursor.y <= (win_pos.y + win_size.height as i32);
+            if in_window {
+                if let Some(r) = crate::state::dock_rects().lock().ok().and_then(|m| m.get(&label).copied()) {
+                    let pad_x = (5.0 * scale) as i32;
+                    let pad_y_top = (8.0 * scale) as i32;
+                    let pad_y_bottom = (5.0 * scale) as i32;
+                    let last_ignore = crate::state::get_i32(crate::state::dock_extra_last_ignore(), &label, -1);
+                    let hyst = if last_ignore == 0 { (10.0 * scale) as i32 } else { 0 };
+                    let rx = win_pos.x + (r.x as f64 * scale) as i32 - pad_x - hyst;
+                    let ry = win_pos.y + (r.y as f64 * scale) as i32 - pad_y_top - hyst;
+                    let rw = (r.width as f64 * scale) as i32 + (pad_x * 2) + (hyst * 2);
+                    let rh = (r.height as f64 * scale) as i32 + pad_y_top + pad_y_bottom + (hyst * 2);
+                    if cursor.x >= rx && cursor.x <= (rx + rw) && cursor.y >= ry && cursor.y <= (ry + rh) {
+                        is_click_interactive = true;
+                    }
+                    dock_span = Some((rx, rx + rw));
+                }
+            }
+
+            if !is_click_interactive && MENU_IS_OPEN.load(Ordering::Relaxed) {
+                if let Ok(rect) = MENU_RECT.try_lock() {
+                    if let Some(r) = *rect {
+                        let rx = win_pos.x + (r.x as f64 * scale) as i32 - (5.0 * scale) as i32;
+                        let ry = win_pos.y + (r.y as f64 * scale) as i32 - (5.0 * scale) as i32;
+                        let rw = (r.width as f64 * scale) as i32 + (10.0 * scale) as i32;
+                        let rh = (r.height as f64 * scale) as i32 + (10.0 * scale) as i32;
+                        if cursor.x >= rx && cursor.x <= (rx + rw) && cursor.y >= ry && cursor.y <= (ry + rh) {
+                            is_click_interactive = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        let in_dock_hover = crate::state::get_flag(crate::state::dock_hovered(), &label);
+        let at_bottom_edge = cursor.y >= (mon_y + mon_h - (8.0 * scale) as i32) &&
+                             cursor.x >= mon_x && cursor.x <= (mon_x + mon_w);
+
+        let mut is_hovered = false;
+        if at_bottom_edge || in_dock_hover {
+            is_hovered = true;
+            crate::state::set_i64(crate::state::dock_extra_expiry_ms(), &label, now + 500);
+        }
+
+        if at_bottom_edge && !fg_fs {
+            if let Some((span_left, span_right)) = dock_span {
+                let edge_pad = (60.0 * scale) as i32;
+                if cursor.x >= span_left - edge_pad && cursor.x <= span_right + edge_pad {
+                    is_click_interactive = true;
+                }
+            }
+        }
+
+        let expiry = crate::state::get_i64(crate::state::dock_extra_expiry_ms(), &label, 0);
+        let final_dock_hover = is_hovered || now < expiry;
+        let prev_hover = crate::state::get_i32(crate::state::dock_extra_last_edge_hover(), &label, -1);
+        let new_hover = if final_dock_hover { 1 } else { 0 };
+        if prev_hover != new_hover {
+            let _ = app_handle.emit_to(label.as_str(), "dock-edge-hover", final_dock_hover);
+            crate::state::set_i32(crate::state::dock_extra_last_edge_hover(), &label, new_hover);
+        }
+
+        let should_ignore = !is_click_interactive
+            && !MENU_IS_OPEN.load(Ordering::Relaxed)
+            && !DOCK_IS_DRAGGING.load(Ordering::Relaxed);
+        let prev_ignore = crate::state::get_i32(crate::state::dock_extra_last_ignore(), &label, -1);
+        let new_ignore = if should_ignore { 1 } else { 0 };
+        if prev_ignore != new_ignore {
+            re_assert_topmost(hwnd);
+            let _ = dock_win.set_ignore_cursor_events(should_ignore);
+            crate::state::set_i32(crate::state::dock_extra_last_ignore(), &label, new_ignore);
+        }
+    }
+}
+
+fn hit_test_extra_notch_windows(app_handle: &AppHandle, cursor: windows::Win32::Foundation::POINT, now: i64, fg_fs: bool) {
+    let windows: Vec<(String, tauri::WebviewWindow)> = app_handle.webview_windows().into_iter()
+        .filter(|(l, _)| is_notch_label(l) && crate::state::monitor_suffix(l).is_some())
+        .collect();
+
+    for (label, main_win) in windows {
+        if !main_win.is_visible().unwrap_or(false) {
+            if crate::state::get_i32(crate::state::notch_extra_last_ignore(), &label, -1) != 1 {
+                let _ = main_win.set_ignore_cursor_events(true);
+                crate::state::set_i32(crate::state::notch_extra_last_ignore(), &label, 1);
+            }
+            continue;
+        }
+        let Ok(hwnd) = main_win.hwnd() else { continue };
+        let Some((mon_x, mon_y, mon_w, _mon_h)) = monitor_rect_for_hwnd(hwnd) else { continue };
+
+        let scale = main_win.scale_factor().unwrap_or(1.0);
+        let in_notch_hover = crate::state::get_flag(crate::state::notch_hovered(), &label);
+        let at_top_edge = cursor.y <= (mon_y + (8.0 * scale) as i32) &&
+                          cursor.x >= mon_x && cursor.x <= (mon_x + mon_w);
+
+        let mut is_notch_hovered = false;
+        if at_top_edge || in_notch_hover {
+            is_notch_hovered = true;
+            crate::state::set_i64(crate::state::notch_extra_expiry_ms(), &label, now + 500);
+        }
+
+        let mut is_click_interactive = false;
+        let main_rect_val = crate::state::main_window_rects().lock().ok().and_then(|m| m.get(&label).copied());
+        if let Some((win_pos, _)) = main_rect_val {
+            if let Some(r) = crate::state::notch_rects().lock().ok().and_then(|m| m.get(&label).copied()) {
+                let pad_x = (20.0 * scale) as i32;
+                let pad_y_bottom = (5.0 * scale) as i32;
+                let last_ignore = crate::state::get_i32(crate::state::notch_extra_last_ignore(), &label, -1);
+                let hyst = if last_ignore == 0 { (10.0 * scale) as i32 } else { 0 };
+                let rx = win_pos.x + (r.x as f64 * scale) as i32 - pad_x - hyst;
+                let rw = (r.width as f64 * scale) as i32 + (pad_x * 2) + (hyst * 2);
+                let ry_top = win_pos.y;
+                let ry_bottom = win_pos.y + (r.height as f64 * scale) as i32 + pad_y_bottom + hyst;
+
+                if cursor.x >= rx && cursor.x <= (rx + rw) && cursor.y >= ry_top && cursor.y <= ry_bottom {
+                    is_click_interactive = true;
+                }
+
+                let edge_pad = (60.0 * scale) as i32;
+                if !fg_fs && at_top_edge && cursor.x >= rx - edge_pad && cursor.x <= rx + rw + edge_pad {
+                    is_click_interactive = true;
+                }
+            }
+        }
+
+        let expiry = crate::state::get_i64(crate::state::notch_extra_expiry_ms(), &label, 0);
+        let final_notch_hover = is_notch_hovered || now < expiry;
+        let prev_hover = crate::state::get_i32(crate::state::notch_extra_last_edge_hover(), &label, -1);
+        let new_hover = if final_notch_hover { 1 } else { 0 };
+        if prev_hover != new_hover {
+            let _ = app_handle.emit_to(label.as_str(), "notch-edge-hover", final_notch_hover);
+            crate::state::set_i32(crate::state::notch_extra_last_edge_hover(), &label, new_hover);
+        }
+
+        let final_ignore = !is_click_interactive && !MENU_IS_OPEN.load(Ordering::Relaxed);
+        let prev_ignore = crate::state::get_i32(crate::state::notch_extra_last_ignore(), &label, -1);
+        let new_ignore = if final_ignore { 1 } else { 0 };
+        if prev_ignore != new_ignore {
+            re_assert_topmost(hwnd);
+            let _ = main_win.set_ignore_cursor_events(final_ignore);
+            crate::state::set_i32(crate::state::notch_extra_last_ignore(), &label, new_ignore);
+        }
+    }
 }
 
 pub fn trigger_app_scan() {
@@ -1670,10 +1884,29 @@ pub fn trigger_app_scan() {
                                         } else { name.clone() };
 
                                         if !name.to_lowercase().contains("uninstall") && !name.is_empty() && name != "Unknown" {
+                                            let icon = {
+                                                use windows::Win32::UI::Shell::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON, SHGFI_PIDL};
+                                                use windows::Win32::UI::WindowsAndMessaging::DestroyIcon;
+                                                let mut shfi: SHFILEINFOW = std::mem::zeroed();
+                                                let res = SHGetFileInfoW(
+                                                    windows::core::PCWSTR(pidl_item as *const u16),
+                                                    Default::default(),
+                                                    Some(&mut shfi),
+                                                    std::mem::size_of::<SHFILEINFOW>() as u32,
+                                                    SHGFI_ICON | SHGFI_LARGEICON | SHGFI_PIDL,
+                                                );
+                                                if res != 0 && !shfi.hIcon.is_invalid() {
+                                                    let b64 = crate::utils::icon_to_base64(shfi.hIcon);
+                                                    let _ = DestroyIcon(shfi.hIcon);
+                                                    b64
+                                                } else {
+                                                    None
+                                                }
+                                            };
                                             apps.push(AppInfo {
                                                 name,
                                                 path,
-                                                icon: None,
+                                                icon,
                                                 is_running: false,
                                                 hwnd: None,
                                                 executable: None,
@@ -1770,7 +2003,8 @@ pub fn sync_overlays(app: &AppHandle) {
 }
 
 pub fn register_appbar(window: tauri::WebviewWindow) {
-    if let Ok(Some(monitor)) = window.app_handle().primary_monitor() {
+    let label = window.label().to_string();
+    if let Some(monitor) = crate::monitors::monitor_for_window_label(window.app_handle(), crate::types::WindowKind::Notch, &label) {
         let m_size = monitor.size();
         let m_pos = monitor.position();
         let hwnd = window.hwnd().unwrap();
@@ -1792,7 +2026,7 @@ pub fn register_appbar(window: tauri::WebviewWindow) {
             // and registering it as a Windows AppBar is what left a stray gap above
             // maximized windows' content (e.g. above Chrome's tab strip). It's just
             // topmost and positioned at the top of the monitor.
-            MAIN_APPBAR_REGISTERED.store(true, Ordering::Relaxed);
+            crate::state::set_flag(crate::state::main_appbar_registered(), &label, true);
 
             let target_left = m_pos.x;
             let target_top = m_pos.y;
@@ -1831,7 +2065,7 @@ pub fn register_appbar(window: tauri::WebviewWindow) {
         tauri::async_runtime::spawn(async move {
             for _ in 0..10 {
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                if let Ok(Some(_monitor)) = w.app_handle().primary_monitor() {
+                if crate::monitors::monitor_for_window_label(w.app_handle(), crate::types::WindowKind::Notch, w.label()).is_some() {
                     register_appbar(w);
                     break;
                 }
@@ -1845,7 +2079,8 @@ pub fn register_dock_appbar(window: tauri::WebviewWindow) {
 }
 
 fn register_dock_appbar_inner(window: tauri::WebviewWindow, attempt: i32) {
-    if let Ok(Some(monitor)) = window.app_handle().primary_monitor() {
+    let label = window.label().to_string();
+    if let Some(monitor) = crate::monitors::monitor_for_window_label(window.app_handle(), crate::types::WindowKind::Dock, &label) {
         let m_size = monitor.size();
         let m_pos = monitor.position();
         let hwnd = window.hwnd().unwrap();
@@ -1883,10 +2118,10 @@ fn register_dock_appbar_inner(window: tauri::WebviewWindow, attempt: i32) {
             set_taskbar_visibility(false, false);
 
             let mut abd = APPBARDATA { cbSize: std::mem::size_of::<APPBARDATA>() as u32, hWnd: hwnd, ..Default::default() };
-            
-            if !DOCK_APPBAR_REGISTERED.load(Ordering::Relaxed) {
+
+            if !crate::state::get_flag(crate::state::dock_appbar_registered(), &label) {
                 SHAppBarMessage(ABM_NEW, &mut abd);
-                DOCK_APPBAR_REGISTERED.store(true, Ordering::Relaxed);
+                crate::state::set_flag(crate::state::dock_appbar_registered(), &label, true);
             }
 
             abd.uEdge = ABE_BOTTOM;
@@ -1936,7 +2171,7 @@ fn register_dock_appbar_inner(window: tauri::WebviewWindow, attempt: i32) {
         tauri::async_runtime::spawn(async move {
             for _ in 0..10 {
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                if let Ok(Some(_monitor)) = w.app_handle().primary_monitor() {
+                if crate::monitors::monitor_for_window_label(w.app_handle(), crate::types::WindowKind::Dock, w.label()).is_some() {
                     register_dock_appbar(w);
                     break;
                 }
@@ -1989,12 +2224,11 @@ pub unsafe extern "system" fn enum_windows_proc(hwnd: HWND, lparam: LPARAM) -> B
 
                     // Filter out Nectar itself (except the Settings window) and some common background processes
                     if (lowercase_path.contains("nectar.exe") && title != "Settings") ||
-                       lowercase_path.contains("conhost.exe") || 
-                       (lowercase_path.contains("explorer.exe") && !is_explorer_folder) || 
+                       lowercase_path.contains("conhost.exe") ||
+                       (lowercase_path.contains("explorer.exe") && !is_explorer_folder) ||
                        lowercase_path.contains("shellexperiencehost.exe") ||
-                       lowercase_path.contains("searchhost.exe") || 
-                       lowercase_path.contains("applicationframehost.exe") ||
-                       lowercase_path.contains("textinputhost.exe") || 
+                       lowercase_path.contains("searchhost.exe") ||
+                       lowercase_path.contains("textinputhost.exe") ||
                        lowercase_path.contains("systemsettings.exe") {
                         let _ = CloseHandle(process_handle);
                         return true.into();
@@ -2048,24 +2282,142 @@ pub fn unregister_appbar_native(hwnd: HWND) {
     }
 }
 
-fn reposition_all_windows(app_handle: &AppHandle) {
-    if MAIN_APPBAR_REGISTERED.load(Ordering::Relaxed) {
-        if let Some(main_win) = app_handle.get_webview_window("main") {
-            register_appbar(main_win);
+pub fn wire_window_events(app: &AppHandle, window: &tauri::WebviewWindow, kind: crate::types::WindowKind, is_dynamic: bool) {
+    let label = window.label().to_string();
+
+    let win_for_rect = window.clone();
+    let label_for_rect = label.clone();
+    let update_rect = move || {
+        if let (Ok(p), Ok(s)) = (win_for_rect.outer_position(), win_for_rect.outer_size()) {
+            let map = match kind {
+                crate::types::WindowKind::Dock => crate::state::dock_window_rects(),
+                crate::types::WindowKind::Notch => crate::state::main_window_rects(),
+            };
+            if let Ok(mut m) = map.lock() {
+                m.insert(label_for_rect.clone(), (p, s));
+            }
         }
-    }
-    // Only reposition the dock if it's enabled in settings.
-    // Without this guard, power events (plug/unplug, wake) would re-show
-    // a dock that the user had previously disabled.
-    let dock_enabled = get_setting_str(app_handle, "nectar-dock-enabled")
-        .unwrap_or_else(|| "true".to_string());
-    if dock_enabled == "true" {
-        if let Some(dock_win) = app_handle.get_webview_window("dock") {
-            if DOCK_APPBAR_REGISTERED.load(Ordering::Relaxed) {
-                register_dock_appbar(dock_win);
-            } else {
-                // Auto-hide mode: reposition dock at bottom of screen
-                reposition_autohide_dock(app_handle, dock_win);
+    };
+    update_rect();
+
+    let u = update_rect.clone();
+    let win_for_events = window.clone();
+    let app_for_events = app.clone();
+    let label_for_events = label.clone();
+    window.on_window_event(move |e| {
+        match e {
+            tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
+                u();
+                sync_overlays(&app_for_events);
+            }
+            tauri::WindowEvent::ScaleFactorChanged { .. } => {
+                match kind {
+                    crate::types::WindowKind::Notch => {
+                        let w = win_for_events.clone();
+                        let h = app_for_events.clone();
+                        tauri::async_runtime::spawn(async move {
+                            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                            register_appbar(w);
+                            sync_overlays(&h);
+                        });
+                    }
+                    crate::types::WindowKind::Dock => {
+                        let h = app_for_events.clone();
+                        if crate::state::get_flag(crate::state::dock_appbar_registered(), &label_for_events) {
+                            let w = win_for_events.clone();
+                            tauri::async_runtime::spawn(async move {
+                                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                                register_dock_appbar(w);
+                                sync_overlays(&h);
+                            });
+                        } else {
+                            sync_overlays(&h);
+                        }
+                    }
+                }
+            }
+            tauri::WindowEvent::CloseRequested { api, .. } => {
+                api.prevent_close();
+                if is_dynamic {
+                    let _ = win_for_events.hide();
+                } else {
+                    crate::commands::restore_taskbar_and_exit(&app_for_events);
+                }
+            }
+            _ => {}
+        }
+    });
+}
+
+pub fn create_monitor_window(app: &AppHandle, kind: crate::types::WindowKind, label: &str, monitor: &tauri::Monitor) {
+    let app = app.clone();
+    let label = label.to_string();
+    let monitor = monitor.clone();
+    let base_label = match kind {
+        crate::types::WindowKind::Dock => "dock",
+        crate::types::WindowKind::Notch => "main",
+    };
+
+    tauri::async_runtime::spawn(async move {
+        let base_config = match app.config().app.windows.iter().find(|c| c.label == base_label) {
+            Some(c) => c.clone(),
+            None => return,
+        };
+
+        let mut conf = base_config;
+        conf.label = label.clone();
+
+        let pos = monitor.position();
+        let scale = monitor.scale_factor();
+        conf.x = Some(pos.x as f64 / scale);
+        conf.y = Some(pos.y as f64 / scale);
+        conf.visible = false;
+
+        let builder = match tauri::WebviewWindowBuilder::from_config(&app, &conf) {
+            Ok(b) => b,
+            Err(_) => return,
+        };
+        let window = match builder.build() {
+            Ok(w) => w,
+            Err(_) => return,
+        };
+
+        wire_window_events(&app, &window, kind, true);
+
+        match kind {
+            crate::types::WindowKind::Dock => {
+                let mode = crate::utils::get_setting_str(&app, "nectar-dock-mode").unwrap_or_else(|| "smart".to_string());
+                crate::commands::init_dock_window(&app, window, &mode).await;
+            }
+            crate::types::WindowKind::Notch => {
+                let mode = crate::utils::get_setting_str(&app, "nectar-notch-mode").unwrap_or_else(|| "fixed".to_string());
+                crate::commands::init_notch_window(&app, window, &mode).await;
+            }
+        }
+    });
+}
+
+fn reposition_all_windows(app_handle: &AppHandle) {
+    crate::monitors::sync_monitor_windows(app_handle);
+
+    for (label, win) in app_handle.webview_windows() {
+        if crate::state::is_notch_label(&label) {
+            if crate::state::get_flag(crate::state::main_appbar_registered(), &label) {
+                register_appbar(win);
+            }
+        } else if crate::state::is_dock_label(&label) {
+            // Only reposition the dock if it's enabled in settings.
+            // Without this guard, power events (plug/unplug, wake) would re-show
+            // a dock that the user had previously disabled.
+            let dock_enabled = get_setting_str(app_handle, "nectar-dock-enabled")
+                .unwrap_or_else(|| "true".to_string());
+            if dock_enabled == "true" {
+                if crate::state::get_flag(crate::state::dock_appbar_registered(), &label) {
+                    register_dock_appbar(win);
+                } else {
+                    // Auto-hide mode: reposition dock at bottom of its own target monitor
+                    reposition_autohide_dock(app_handle, win);
+                }
             }
         }
     }
@@ -2074,11 +2426,10 @@ fn reposition_all_windows(app_handle: &AppHandle) {
     }
     sync_overlays(app_handle);
     // Re-assert topmost on all windows after repositioning to recover from any z-order loss
-    if let Some(main_win) = app_handle.get_webview_window("main") {
-        if let Ok(hwnd) = main_win.hwnd() { re_assert_topmost(hwnd); }
-    }
-    if let Some(dock_win) = app_handle.get_webview_window("dock") {
-        if let Ok(hwnd) = dock_win.hwnd() { re_assert_topmost(hwnd); }
+    for (label, win) in app_handle.webview_windows() {
+        if crate::state::is_notch_label(&label) || crate::state::is_dock_label(&label) {
+            if let Ok(hwnd) = win.hwnd() { re_assert_topmost(hwnd); }
+        }
     }
 }
 
@@ -2099,7 +2450,7 @@ fn reposition_autohide_dock(app_handle: &AppHandle, dock_win: tauri::WebviewWind
             if ph <= 10 {
                 continue;
             }
-            let monitor_info = dock_clone.primary_monitor().ok().flatten().map(|m| {
+            let monitor_info = crate::monitors::monitor_for_window_label(dock_clone.app_handle(), crate::types::WindowKind::Dock, dock_clone.label()).map(|m| {
                 let s = m.size();
                 let p = m.position();
                 (s.width as i32, s.height as i32, p.x, p.y)

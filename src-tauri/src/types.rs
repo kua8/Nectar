@@ -51,6 +51,40 @@ pub struct IntRect {
     pub height: i32,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum MonitorMode {
+    Primary,
+    All,
+    Specific,
+}
+
+impl MonitorMode {
+    pub fn from_setting(value: Option<&str>) -> Self {
+        match value {
+            Some("all") => MonitorMode::All,
+            Some("specific") => MonitorMode::Specific,
+            _ => MonitorMode::Primary,
+        }
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum WindowKind {
+    Dock,
+    Notch,
+}
+
+#[derive(Clone, Serialize, Debug)]
+pub struct MonitorInfo {
+    pub id: String,
+    pub label: String,
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+    pub is_primary: bool,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AppInfo {
     pub name: String,

@@ -405,6 +405,7 @@ const Dock = memo(function Dock() {
   const handleContextMenu = (e: React.MouseEvent, app: AppInfo | null) => {
     e.stopPropagation();
     e.preventDefault();
+    setContextMenuHeight(0);
     setContextMenu({ x: e.clientX, y: e.clientY, app });
   };
 
@@ -1099,12 +1100,19 @@ const Dock = memo(function Dock() {
     </div>
 
       {contextMenu && (
-        <div 
-          ref={menuRef}
-          className="context-menu" 
+        <div
           style={{
+            position: 'fixed',
             left: contextMenu.x,
             top: Math.max(8, contextMenu.y - (contextMenuHeight || (contextMenu.app ? 200 : 100) * scale)),
+            zIndex: 9999,
+          }}
+        >
+        <div
+          ref={menuRef}
+          className="context-menu"
+          style={{
+            position: 'static',
             zoom: scale
           }}
           onClick={(e) => e.stopPropagation()}
@@ -1197,6 +1205,7 @@ const Dock = memo(function Dock() {
               </div>
             </>
           )}
+        </div>
         </div>
       )}
 

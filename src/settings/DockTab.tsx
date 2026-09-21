@@ -1,5 +1,6 @@
-import { Monitor, Eye, EyeOff, Circle, Search, Shuffle } from "lucide-react";
+import { Monitor, Eye, EyeOff, Circle, Search, Shuffle, MonitorCheck } from "lucide-react";
 import { SettingRow } from "./SettingRow";
+import type { MonitorInfo, MonitorMode } from "./types";
 
 interface DockTabProps {
   dockEnabled: boolean;
@@ -14,6 +15,11 @@ interface DockTabProps {
   toggleDockIconOnly: () => void;
   dockMixedReorder: boolean;
   toggleDockMixedReorder: () => void;
+  monitors: MonitorInfo[];
+  dockMonitorMode: MonitorMode;
+  setDockMonitorModeValue: (mode: MonitorMode) => void;
+  dockMonitorId: string;
+  setDockMonitorIdValue: (id: string) => void;
 }
 
 export function DockTab({
@@ -29,6 +35,11 @@ export function DockTab({
   toggleDockIconOnly,
   dockMixedReorder,
   toggleDockMixedReorder,
+  monitors,
+  dockMonitorMode,
+  setDockMonitorModeValue,
+  dockMonitorId,
+  setDockMonitorIdValue,
 }: DockTabProps) {
   return (
     <>
@@ -54,6 +65,35 @@ export function DockTab({
                 <option value="peek">Peek</option>
               </select>
             </SettingRow>
+
+            <SettingRow icon={MonitorCheck} label="Show On" desc="Choose which monitor(s) display the dock">
+              <select
+                className="settings-select"
+                value={dockMonitorMode}
+                onChange={(e) => setDockMonitorModeValue(e.target.value as MonitorMode)}
+              >
+                <option value="primary">Primary Monitor</option>
+                <option value="all">All Monitors</option>
+                <option value="specific">Specific Monitor</option>
+              </select>
+            </SettingRow>
+
+            {dockMonitorMode === "specific" && (
+              <SettingRow icon={Monitor} label="Monitor" desc="Which display shows the dock">
+                <select
+                  className="settings-select"
+                  value={dockMonitorId}
+                  onChange={(e) => setDockMonitorIdValue(e.target.value)}
+                >
+                  {monitors.length === 0 && <option value="">Loading...</option>}
+                  {monitors.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}{m.is_primary ? " (Primary)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </SettingRow>
+            )}
 
             <SettingRow icon={Eye} label="Show App Previews" desc="Show window thumbnails on hover">
               <label className="toggle-switch">

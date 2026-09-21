@@ -5,6 +5,7 @@ mod state;
 mod utils;
 mod services;
 mod commands;
+mod monitors;
 mod updater;
 
 use tauri::Manager;
@@ -130,6 +131,7 @@ fn main() {
             has_battery,
             open_battery_saver_settings,
             get_system_accent_color,
+            get_monitors,
             get_cpu_usage,
             get_ram_usage,
             get_disk_space,
@@ -153,6 +155,8 @@ fn main() {
                 NATIVE_TASKBAR_HIDDEN.store(false, Ordering::Relaxed);
             }
 
+            crate::utils::init_settings_cache(app.handle());
+
             // Update check on startup (non-blocking). Always runs so the UI can
             // show an update badge; auto-install only happens when the user
             // enabled it and the release has aged past the rollout gate.
@@ -166,85 +170,17 @@ fn main() {
             let window = app.get_webview_window("main").unwrap();
             let dock_win = app.get_webview_window("dock").unwrap();
 
-            // Sync window rects initially and on event
-            let win_clone = window.clone();
-            let update_main_rect = move || {
-                if let (Ok(p), Ok(s)) = (win_clone.outer_position(), win_clone.outer_size()) {
-                    if let Ok(mut lock) = MAIN_WINDOW_RECT.lock() {
-                        *lock = Some((p, s));
-                    }
-                }
-            };
-
-            let dock_clone = dock_win.clone();
-            let update_dock_window_rect = move || {
-                if let (Ok(p), Ok(s)) = (dock_clone.outer_position(), dock_clone.outer_size()) {
-                    if let Ok(mut lock) = DOCK_WINDOW_RECT.lock() {
-                        *lock = Some((p, s));
-                    }
-                }
-            };
-
-            update_main_rect();
-            update_dock_window_rect();
-
-            let u_main = update_main_rect.clone();
-            let win_for_events = window.clone();
-            let handle_for_events = app.handle().clone();
-            window.on_window_event(move |e| {
-                match e {
-                    tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
-                        u_main();
-                        sync_overlays(&handle_for_events);
-                    }
-                    tauri::WindowEvent::ScaleFactorChanged { .. } => {
-                        let w = win_for_events.clone();
-                        let h = handle_for_events.clone();
-                        tauri::async_runtime::spawn(async move {
-                            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                            register_appbar(w);
-                            sync_overlays(&h);
-                        });
-                    }
-                    tauri::WindowEvent::CloseRequested { api, .. } => {
-                        api.prevent_close();
-                        restore_taskbar_and_exit(&handle_for_events);
-                    }
-                    _ => {}
-                }
-            });
-
-            let u_dock = update_dock_window_rect.clone();
-            let dock_for_events = dock_win.clone();
-            let handle_for_dock_events = app.handle().clone();
-            dock_win.on_window_event(move |e| {
-                match e {
-                    tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
-                        u_dock();
-                        sync_overlays(&handle_for_dock_events);
-                    }
-                    tauri::WindowEvent::ScaleFactorChanged { .. } => {
-                        let h = handle_for_dock_events.clone();
-                        if DOCK_APPBAR_REGISTERED.load(Ordering::Relaxed) {
-                            let w = dock_for_events.clone();
-                            tauri::async_runtime::spawn(async move {
-                                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                                register_dock_appbar(w);
-                                sync_overlays(&h);
-                            });
-                        } else {
-                             sync_overlays(&h);
-                        }
-                    }
-                    tauri::WindowEvent::CloseRequested { api, .. } => {
-                        api.prevent_close();
-                        restore_taskbar_and_exit(&handle_for_dock_events);
-                    }
-                    _ => {}
-                }
-            });
+            crate::services::wire_window_events(app.handle(), &window, crate::types::WindowKind::Notch, false);
+            crate::services::wire_window_events(app.handle(), &dock_win, crate::types::WindowKind::Dock, false);
 
             sync_overlays(app.handle());
+
+            {
+                let ah = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    crate::monitors::sync_monitor_windows(&ah);
+                });
+            }
 
             // Initialize the overlay window — on Windows, set_position doesn't
             // take effect on a window that has never been shown. Show it once
@@ -275,7 +211,6 @@ fn main() {
             let _hook = services::setup_keyboard_hook();
             setup_taskbar_hook();
             setup_audio_visualization(app.handle().clone());
-            crate::utils::init_settings_cache(app.handle());
             setup_settings_watcher(app.handle().clone());
 
             // Listen for second-instance signal to open settings
@@ -331,11 +266,10 @@ fn main() {
                             crate::commands::restore_taskbar_and_exit(&ah);
                         }
                         "restart" => {
-                            if let Some(w) = ah.get_webview_window("main") {
-                                unregister_appbar_native(w.hwnd().unwrap());
-                            }
-                            if let Some(w) = ah.get_webview_window("dock") {
-                                unregister_appbar_native(w.hwnd().unwrap());
+                            for (label, w) in ah.webview_windows() {
+                                if crate::state::is_notch_label(&label) || crate::state::is_dock_label(&label) {
+                                    if let Ok(hwnd) = w.hwnd() { unregister_appbar_native(hwnd); }
+                                }
                             }
                             if let Some(w) = ah.get_webview_window("settings") { let _ = w.destroy(); }
                             set_taskbar_visibility(true, true);
