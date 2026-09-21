@@ -1,4 +1,4 @@
-import { Download, RefreshCw, FileDown, Upload, RotateCcw } from "lucide-react";
+import { Download, RefreshCw, FileDown, Upload, RotateCcw, Trash2 } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 
 interface AboutTabProps {
@@ -15,6 +15,8 @@ interface AboutTabProps {
   handleImportSettings: () => void;
   resetStatus: string;
   handleResetSettings: () => void;
+  uninstallStatus: string;
+  handleUninstallNectar: () => void;
 }
 
 export function AboutTab({
@@ -31,6 +33,8 @@ export function AboutTab({
   handleImportSettings,
   resetStatus,
   handleResetSettings,
+  uninstallStatus,
+  handleUninstallNectar,
 }: AboutTabProps) {
   const getUpdateLabel = () => {
     switch (updateStatus) {
@@ -96,6 +100,19 @@ export function AboutTab({
   const getResetDesc = () =>
     resetStatus === "confirm" ? "This will erase all settings — cannot be undone" : "Restore all settings to defaults";
 
+  const getUninstallLabel = () => {
+    if (uninstallStatus === "uninstalling") return "Uninstalling...";
+    if (uninstallStatus === "confirm") return "Click Again to Confirm";
+    if (uninstallStatus === "error") return "Couldn't Start Uninstaller";
+    return "Uninstall Nectar";
+  };
+
+  const getUninstallDesc = () => {
+    if (uninstallStatus === "confirm") return "This will remove Nectar from your computer";
+    if (uninstallStatus === "error") return "Try again, or use Windows Settings > Apps";
+    return "Doesn't require Windows Settings to be open";
+  };
+
 
   return (
     <div className="about-tab-container">
@@ -145,6 +162,21 @@ export function AboutTab({
           divider={false}
           danger={resetStatus === "confirm"}
           onClick={handleResetSettings}
+        />
+      </div>
+
+      <div className="setting-group-label setting-group-label--spaced">
+        Danger Zone
+      </div>
+      <div className="setting-group">
+        <SettingRow
+          icon={Trash2}
+          label={getUninstallLabel()}
+          desc={getUninstallDesc()}
+          action
+          divider={false}
+          danger={uninstallStatus === "confirm" || uninstallStatus === "error"}
+          onClick={handleUninstallNectar}
         />
       </div>
 

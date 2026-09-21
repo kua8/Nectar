@@ -1463,6 +1463,27 @@ pub async fn quit_nectar(handle: AppHandle) {
 }
 
 #[tauri::command]
+pub async fn uninstall_nectar(handle: AppHandle) -> Result<(), String> {
+    let uninstaller = std::env::current_exe()
+        .map_err(|e| e.to_string())?
+        .parent()
+        .ok_or_else(|| "Could not resolve install directory".to_string())?
+        .join("uninstall.exe");
+
+    if !uninstaller.exists() {
+        return Err("uninstall.exe not found next to the running app".to_string());
+    }
+
+    std::process::Command::new(&uninstaller)
+        .arg("--uninstall")
+        .spawn()
+        .map_err(|e| e.to_string())?;
+
+    restore_taskbar_and_exit(&handle);
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn restart_nectar(handle: AppHandle) {
     // `tauri dev`'s frontend is served by a Vite dev server that's tied to the
     // specific process tauri-cli launched. A real OS-level restart here spawns a

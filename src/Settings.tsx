@@ -210,6 +210,8 @@ function SettingsApp() {
               handleImportSettings={settings.handleImportSettings}
               resetStatus={settings.resetStatus}
               handleResetSettings={settings.handleResetSettings}
+              uninstallStatus={settings.uninstallStatus}
+              handleUninstallNectar={settings.handleUninstallNectar}
             />
           )}
         </div>

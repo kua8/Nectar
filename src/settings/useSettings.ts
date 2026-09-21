@@ -118,6 +118,7 @@ export function useSettings() {
   const [exportStatus, setExportStatus] = useState<"idle" | "exporting" | "success" | "error">("idle");
   const [importStatus, setImportStatus] = useState<"idle" | "importing" | "success" | "error">("idle");
   const [resetStatus, setResetStatus] = useState<"idle" | "confirm" | "resetting">("idle");
+  const [uninstallStatus, setUninstallStatus] = useState<"idle" | "confirm" | "uninstalling" | "error">("idle");
 
   // ── Load all settings from backend + localStorage ──
   const loadAllSettings = useCallback(async () => {
@@ -703,6 +704,24 @@ export function useSettings() {
     }
   };
 
+  const handleUninstallNectar = async () => {
+    if (uninstallStatus === "idle" || uninstallStatus === "error") {
+      setUninstallStatus("confirm");
+      setTimeout(() => setUninstallStatus((s) => (s === "confirm" ? "idle" : s)), 4000);
+      return;
+    }
+    if (uninstallStatus !== "confirm") return;
+
+    setUninstallStatus("uninstalling");
+    try {
+      await invoke("uninstall_nectar");
+    } catch (e) {
+      console.error("Uninstall failed:", e);
+      setUninstallStatus("error");
+      setTimeout(() => setUninstallStatus((s) => (s === "error" ? "idle" : s)), 4000);
+    }
+  };
+
   return {
     // System
     autostart,
@@ -814,6 +833,8 @@ export function useSettings() {
     handleImportSettings,
     resetStatus,
     handleResetSettings,
+    uninstallStatus,
+    handleUninstallNectar,
 
     // Utilities
     restartNectar: () => invoke("restart_nectar"),

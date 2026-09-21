@@ -113,6 +113,7 @@ fn main() {
             close_window,
             quit_nectar,
             restart_nectar,
+            uninstall_nectar,
             get_volume,
             get_brightness,
             set_volume,

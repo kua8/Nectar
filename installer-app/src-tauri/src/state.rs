@@ -13,8 +13,12 @@ pub struct LaunchArgs {
 /// re-pick everything after the UAC prompt.
 pub fn parse_launch_args() -> LaunchArgs {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    let launched_as_uninstaller = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_lowercase()))
+        .is_some_and(|n| n == "uninstall.exe");
     let mut out = LaunchArgs {
-        uninstall: false,
+        uninstall: launched_as_uninstaller,
         prefill_install_dir: None,
         prefill_all_users: false,
         prefill_desktop_shortcut: true,
