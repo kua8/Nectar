@@ -195,6 +195,11 @@ function OverlayApp() {
   const timeoutRef = useRef<any>(null);
   const hideWindowTimeoutRef = useRef<any>(null);
   const splashActiveRef = useRef(false);
+  const splashDoneRef = useRef(false);
+  const splashPlayingRef = useRef(false);
+  const pendingUpdateRef = useRef<{ status: string; progress?: number } | null>(null);
+  const applyUpdateStatusRef = useRef<(p: { status: string; progress?: number }) => void>(() => {});
+  const onSplashCompleteRef = useRef<() => void>(() => {});
 
   const resetHideTimeout = useCallback(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -220,46 +225,39 @@ function OverlayApp() {
 
   // ── Splash Detection ──
   useEffect(() => {
-    const firstRun = localStorage.getItem("nectar-first-run") === null;
-    const storedVersion = localStorage.getItem("nectar-app-version");
-
-    const showSplash = (version?: string) => {
+    const showSplash = async () => {
       splashActiveRef.current = true;
-      setMode('splash');
-      invoke('set_splash_fullscreen', { fullscreen: true });
-      if (version) localStorage.setItem("nectar-app-version", version);
-      setTimeout(() => emit('splash-done'), 2800);
-    };
-
-    // First run or old version without version key — splash immediately
-    if (firstRun || storedVersion === null) {
-      showSplash();
-      // Still try to store the version in the background
-      getVersion().then((v) => localStorage.setItem("nectar-app-version", v)).catch(() => {});
-      return;
-    }
-
-    // Has version key — check if it matches
-    getVersion().then((currentVersion) => {
-      if (storedVersion !== currentVersion) {
-        showSplash(currentVersion);
-      } else {
-        emit('splash-done');
+      splashPlayingRef.current = true;
+      try { await invoke('set_splash_fullscreen', { fullscreen: true }); } catch { /* keep going */ }
+      for (let i = 0; i < 30 && document.visibilityState !== 'visible'; i++) {
+        await new Promise((r) => setTimeout(r, 50));
       }
-    }).catch(() => {
-      // Version check failed — let nectar start
-      emit('splash-done');
-    });
+      await new Promise((r) => setTimeout(r, 200));
+      setMode('splash');
+    };
+    setTimeout(() => onSplashCompleteRef.current(), 5500);
+
+    showSplash();
+    getVersion().then((v) => localStorage.setItem("nectar-app-version", v)).catch(() => {});
   }, []);
 
   const onSplashComplete = useCallback(() => {
+    if (splashDoneRef.current) return;
+    splashDoneRef.current = true;
     localStorage.setItem("nectar-first-run", "done");
     setTimeout(() => {
       splashActiveRef.current = false;
+      splashPlayingRef.current = false;
       setMode('idle');
       invoke('set_splash_fullscreen', { fullscreen: false });
+      const pending = pendingUpdateRef.current;
+      pendingUpdateRef.current = null;
+      if (pending && pending.status !== 'done') applyUpdateStatusRef.current(pending);
     }, 300);
+    emit('splash-done');
+    [800, 2000, 4000].forEach((ms) => setTimeout(() => emit('splash-done'), ms));
   }, []);
+  onSplashCompleteRef.current = onSplashComplete;
 
   // ── Event Listeners ──
   useEffect(() => {
@@ -307,8 +305,7 @@ function OverlayApp() {
       }
     });
 
-    const autoUpdatePromise = listen<{ status: string; progress?: number }>("auto-update-status", (event) => {
-      const { status, progress } = event.payload;
+    const applyUpdateStatus = ({ status, progress }: { status: string; progress?: number }) => {
       setUpdateStatus(status);
       if (progress !== undefined) setUpdateProgress(progress);
 
@@ -321,6 +318,15 @@ function OverlayApp() {
         setMode('idle');
         invoke('set_splash_fullscreen', { fullscreen: false });
       }
+    };
+    applyUpdateStatusRef.current = applyUpdateStatus;
+
+    const autoUpdatePromise = listen<{ status: string; progress?: number }>("auto-update-status", (event) => {
+      if (splashPlayingRef.current) {
+        pendingUpdateRef.current = event.payload;
+        return;
+      }
+      applyUpdateStatus(event.payload);
     });
 
     const settingsResetPromise = listen("settings-reset", () => {

@@ -781,7 +781,6 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                 let mut hwnd = GetForegroundWindow();
                 
                 // Find the first meaningful window for overlap detection.
-                // We skip Nectar windows, invisible windows, minimized windows, and 'cloaked' system ghosts.
                 let mut check_count = 0;
                 while !hwnd.is_invalid() && check_count < 15 {
                     let mut process_id = 0u32;
@@ -1181,7 +1180,6 @@ fn now_ms() -> i64 {
 }
 
 /// True while a screen-capture UI (Windows Snipping Tool) has a visible window.
-/// Nectar's notch sits exactly where that toolbar lives, so it must get out of
 /// the way even if the capture window isn't recognised as fullscreen.
 unsafe extern "system" fn capture_ui_enum_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
     use windows::Win32::UI::WindowsAndMessaging::IsIconic;
@@ -1281,7 +1279,6 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
             let pt = &*(lparam.0 as *const MSLLHOOKSTRUCT);
             let cursor = pt.pt;
 
-            // While a capture UI (Snipping Tool) is up, Nectar is fully
             // click-through and skipped entirely so the tool owns the screen.
             if CAPTURE_UI_ACTIVE.load(Ordering::Relaxed) {
                 if MH_LAST_MAIN_IGNORE.load(Ordering::Relaxed) != 1 {
@@ -1348,12 +1345,6 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
             let fg_fs = CURRENT_FOREGROUND_FULLSCREEN.load(Ordering::Relaxed);
 
             // --- Dock Interaction ---
-            // Hover detection (and the resulting reveal) always runs, even over a
-            // fullscreen app — it's a passive read of cursor position via the global
-            // hook, so it can't steal input from anything. Only click-interactivity
-            // (`should_ignore`) is forced off during fullscreen, so a fullscreen app
-            // (or a Snipping Tool selection ending at the bottom edge) never has its
-            // input intercepted, while Smart/Peek can still visually reveal on hover.
             if let Some(dock_win) = app_handle.get_webview_window("dock") {
                 if dock_win.is_visible().unwrap_or(false) {
                     let mut is_click_interactive = false;
@@ -1418,12 +1409,6 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
 
                     // Approaching along the bottom edge keeps the dock interactive
                     // while near its horizontal span, so the reveal can't be clicked
-                    // through mid-animation. The corners stay click-through. Skipped
-                    // during fullscreen: this zone is wider than the dock's own visible
-                    // rect, and grabbing it pre-emptively is what used to swallow clicks
-                    // meant for other apps' own edge-hugging UI (e.g. a Snipping Tool
-                    // selection ending at the bottom edge). The dock's actual rect below
-                    // is still real-time interactive once genuinely hovered/revealed.
                     if at_bottom_edge && !fg_fs {
                         if let Some((span_left, span_right)) = dock_span {
                             let edge_pad = (60.0 * scale) as i32;
@@ -1441,14 +1426,6 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
                         MH_LAST_EDGE_HOVER.store(new_val, Ordering::Relaxed);
                     }
 
-                    // Once the dock is genuinely revealed and the cursor is over its
-                    // actual rect (is_click_interactive, computed above), it's fully
-                    // clickable even during fullscreen — only the wide pre-emptive edge
-                    // grab above is fullscreen-restricted. DOCK_IS_DRAGGING keeps the
-                    // dock fully interactive for the whole gesture even if the cursor
-                    // strays outside the tight hit-test rect mid-drag — otherwise the
-                    // window can go click-through mid-gesture and silently swallow the
-                    // pointerup that would have ended the drag.
                     let should_ignore = !is_click_interactive
                         && !MENU_IS_OPEN.load(Ordering::Relaxed)
                         && !DOCK_IS_DRAGGING.load(Ordering::Relaxed);
@@ -1460,7 +1437,6 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
                         MH_LAST_DOCK_IGNORE.store(new_ignore, Ordering::Relaxed);
                     }
                 } else {
-                    // Dock not visible (disabled) — make sure hover/ignore state is clean.
                     if MH_LAST_EDGE_HOVER.swap(0, Ordering::Relaxed) != 0 {
                         let _ = app_handle.emit("dock-edge-hover", false);
                     }
@@ -1471,9 +1447,6 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
             }
 
             // --- Main (TopBar) Interaction ---
-            // Same principle as the Dock above: hover/reveal detection always runs
-            // (passive cursor-position read, never steals input), only click-through
-            // is forced during fullscreen.
             {
                 if let Some(main_win) = app_handle.get_webview_window("main") {
                     if main_win.is_visible().unwrap_or(false) {
@@ -1514,10 +1487,6 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
                                     // interactive while near the notch's horizontal
                                     // span, so peek/hover can't flicker at the
                                     // boundary. The screen corners stay click-through.
-                                    // Skipped during fullscreen for the same reason as
-                                    // the Dock's edge grab — this zone is wider than the
-                                    // notch's own rect and shouldn't pre-emptively steal
-                                    // input meant for another app's edge-hugging UI.
                                     let edge_pad = (60.0 * scale) as i32;
                                     if !fg_fs && at_top_edge && cursor.x >= rx - edge_pad && cursor.x <= rx + rw + edge_pad {
                                         is_click_interactive = true;
@@ -1534,10 +1503,6 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
                             MH_LAST_TOP_EDGE_HOVER.store(new_val, Ordering::Relaxed);
                         }
 
-                        // Once the notch is genuinely revealed and the cursor is over its
-                        // actual rect (is_click_interactive, computed above), it's fully
-                        // clickable even during fullscreen — only the wide pre-emptive
-                        // edge grab above is fullscreen-restricted.
                         let final_ignore = !is_click_interactive && !MENU_IS_OPEN.load(Ordering::Relaxed);
                         let prev_ignore = MH_LAST_MAIN_IGNORE.load(Ordering::Relaxed);
                         let new_ignore = if final_ignore { 1 } else { 0 };
@@ -1547,7 +1512,6 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
                             MH_LAST_MAIN_IGNORE.store(new_ignore, Ordering::Relaxed);
                         }
                     } else {
-                        // Notch not visible — make sure hover/ignore state is clean.
                         let prev = MH_LAST_TOP_EDGE_HOVER.load(Ordering::Relaxed);
                         if prev != 0 {
                             let _ = app_handle.emit("notch-edge-hover", false);
@@ -1863,46 +1827,30 @@ pub fn trigger_app_scan() {
                             
                             if res.is_ok() {
                                 if let Some(enum_id) = enum_id {
-                                    let mut pidl_item = std::ptr::null_mut();
+                                    let mut items = [std::ptr::null_mut(); 1];
                                     let mut fetched = 0;
-                                    while enum_id.Next(&mut [pidl_item], Some(&mut fetched)).is_ok() && fetched > 0 {
-                                        
-                                        let name = if let Ok(n_ptr) = SHGetNameFromIDList(pidl_item, SIGDN_NORMALDISPLAY) {
+                                    while enum_id.Next(&mut items, Some(&mut fetched)).is_ok() && fetched > 0 {
+                                        let pidl_item = items[0];
+                                        let abs_item = windows::Win32::UI::Shell::ILCombine(Some(pidl_apps as *const _), Some(pidl_item as *const _));
+
+                                        let name = if let Ok(n_ptr) = SHGetNameFromIDList(abs_item, SIGDN_NORMALDISPLAY) {
                                             let s = String::from_utf16_lossy(windows::core::PCWSTR(n_ptr.0).as_wide());
                                             CoTaskMemFree(Some(n_ptr.0 as *const _));
                                             s
                                         } else { "Unknown".to_string() };
 
-                                        let path = if let Ok(p_ptr) = SHGetNameFromIDList(pidl_item, SIGDN_FILESYSPATH) {
+                                        let path = if let Ok(p_ptr) = SHGetNameFromIDList(abs_item, SIGDN_FILESYSPATH) {
                                             let s = String::from_utf16_lossy(windows::core::PCWSTR(p_ptr.0).as_wide());
                                             CoTaskMemFree(Some(p_ptr.0 as *const _));
                                             s
-                                        } else if let Ok(p_ptr) = SHGetNameFromIDList(pidl_item, SIGDN_URL) {
+                                        } else if let Ok(p_ptr) = SHGetNameFromIDList(abs_item, SIGDN_URL) {
                                             let s = String::from_utf16_lossy(windows::core::PCWSTR(p_ptr.0).as_wide());
                                             CoTaskMemFree(Some(p_ptr.0 as *const _));
                                             s
                                         } else { name.clone() };
 
                                         if !name.to_lowercase().contains("uninstall") && !name.is_empty() && name != "Unknown" {
-                                            let icon = {
-                                                use windows::Win32::UI::Shell::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON, SHGFI_PIDL};
-                                                use windows::Win32::UI::WindowsAndMessaging::DestroyIcon;
-                                                let mut shfi: SHFILEINFOW = std::mem::zeroed();
-                                                let res = SHGetFileInfoW(
-                                                    windows::core::PCWSTR(pidl_item as *const u16),
-                                                    Default::default(),
-                                                    Some(&mut shfi),
-                                                    std::mem::size_of::<SHFILEINFOW>() as u32,
-                                                    SHGFI_ICON | SHGFI_LARGEICON | SHGFI_PIDL,
-                                                );
-                                                if res != 0 && !shfi.hIcon.is_invalid() {
-                                                    let b64 = crate::utils::icon_to_base64(shfi.hIcon);
-                                                    let _ = DestroyIcon(shfi.hIcon);
-                                                    b64
-                                                } else {
-                                                    None
-                                                }
-                                            };
+                                            let icon = if abs_item.is_null() { None } else { crate::utils::icon_from_absolute_pidl(abs_item) };
                                             apps.push(AppInfo {
                                                 name,
                                                 path,
@@ -1913,8 +1861,9 @@ pub fn trigger_app_scan() {
                                                 all_hwnds: None,
                                             });
                                         }
+                                        if !abs_item.is_null() { CoTaskMemFree(Some(abs_item as *const _)); }
                                         CoTaskMemFree(Some(pidl_item as *const _));
-                                        pidl_item = std::ptr::null_mut();
+                                        items[0] = std::ptr::null_mut();
                                     }
                                 }
                             }
@@ -2021,11 +1970,6 @@ pub fn register_appbar(window: tauri::WebviewWindow) {
             ex_style |= (WS_EX_TOOLWINDOW.0 | WS_EX_NA.0) as usize;
             let _ = SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex_style as isize);
 
-            // Unlike the Dock, the notch never reserves desktop work-area space via
-            // SHAppBarMessage — a real hardware notch doesn't shrink usable app space,
-            // and registering it as a Windows AppBar is what left a stray gap above
-            // maximized windows' content (e.g. above Chrome's tab strip). It's just
-            // topmost and positioned at the top of the monitor.
             crate::state::set_flag(crate::state::main_appbar_registered(), &label, true);
 
             let target_left = m_pos.x;
@@ -2052,7 +1996,6 @@ pub fn register_appbar(window: tauri::WebviewWindow) {
 
             // Re-assert topmost after repositioning — use re_assert_topmost instead of
             // set_always_on_top(true) to include SWP_NOACTIVATE and re-stamp WS_EX_NOACTIVATE.
-            // This prevents WM_ACTIVATE from reaching WebView2, which caused nectar windows
             // to blank/hide when other windows were minimized or closed.
             re_assert_topmost(hwnd);
 
@@ -2222,7 +2165,6 @@ pub unsafe extern "system" fn enum_windows_proc(hwnd: HWND, lparam: LPARAM) -> B
                         false
                     };
 
-                    // Filter out Nectar itself (except the Settings window) and some common background processes
                     if (lowercase_path.contains("nectar.exe") && title != "Settings") ||
                        lowercase_path.contains("conhost.exe") ||
                        (lowercase_path.contains("explorer.exe") && !is_explorer_folder) ||
@@ -2246,10 +2188,15 @@ pub unsafe extern "system" fn enum_windows_proc(hwnd: HWND, lparam: LPARAM) -> B
                     let final_name = if (name == "msedge" || name == "chrome" || name == "ApplicationFrameHost") && !title.is_empty() {
                         // Extract a cleaner name from the window title for host processes (PWAs, UWP apps)
                         title.split(" - ").next().map(|s| s.trim()).unwrap_or(&title).to_string()
-                    } else if name == "explorer" && title.is_empty() {
+                    } else if name.eq_ignore_ascii_case("explorer") {
                         "File Explorer".to_string()
                     } else {
-                        name.clone()
+                        let from_start_menu = INSTALLED_APPS_CACHE.get().and_then(|c| c.lock().ok()).and_then(|apps| {
+                            apps.iter().find(|a| a.path.eq_ignore_ascii_case(&path)).map(|a| a.name.clone())
+                        });
+                        from_start_menu
+                            .or_else(|| crate::utils::exe_description(&path))
+                            .unwrap_or_else(|| name.clone())
                     };
 
                     // Only avoid adding the exact same window handle (HWND) multiple times
@@ -2415,7 +2362,6 @@ fn reposition_all_windows(app_handle: &AppHandle) {
                 if crate::state::get_flag(crate::state::dock_appbar_registered(), &label) {
                     register_dock_appbar(win);
                 } else {
-                    // Auto-hide mode: reposition dock at bottom of its own target monitor
                     reposition_autohide_dock(app_handle, win);
                 }
             }
@@ -2604,4 +2550,53 @@ unsafe extern "system" fn display_monitor_proc(
         }
         _ => DefWindowProcW(hwnd, msg, wparam, lparam),
     }
+}
+
+pub fn start_window_style_guard(app: AppHandle) {
+    std::thread::spawn(move || loop {
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        for (label, win) in app.webview_windows() {
+            let is_notch = is_notch_label(&label);
+            let is_dock = is_dock_label(&label);
+            if !(is_notch || is_dock || label == "overlay") { continue; }
+            let Ok(hwnd) = win.hwnd() else { continue };
+            unsafe {
+                use windows::Win32::UI::WindowsAndMessaging::{
+                    GetWindowLongPtrW, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT,
+                };
+                let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as usize;
+                let want = (WS_EX_TOOLWINDOW.0 | WS_EX_NOACTIVATE.0) as usize;
+                if ex & want != want {
+                    SetWindowLongPtrW(hwnd, GWL_EXSTYLE, (ex | want) as isize);
+                }
+
+                let actual_ignore = (ex & WS_EX_TRANSPARENT.0 as usize) != 0;
+                let extra = crate::state::monitor_suffix(&label).is_some();
+                let last = if label == "overlay" {
+                    MH_LAST_OV_IGNORE.load(Ordering::Relaxed)
+                } else if is_notch && !extra {
+                    MH_LAST_MAIN_IGNORE.load(Ordering::Relaxed)
+                } else if is_dock && !extra {
+                    MH_LAST_DOCK_IGNORE.load(Ordering::Relaxed)
+                } else if is_notch {
+                    crate::state::get_i32(crate::state::notch_extra_last_ignore(), &label, -1)
+                } else {
+                    crate::state::get_i32(crate::state::dock_extra_last_ignore(), &label, -1)
+                };
+                if last != -1 && (last == 1) != actual_ignore {
+                    if label == "overlay" {
+                        MH_LAST_OV_IGNORE.store(-1, Ordering::Relaxed);
+                    } else if is_notch && !extra {
+                        MH_LAST_MAIN_IGNORE.store(-1, Ordering::Relaxed);
+                    } else if is_dock && !extra {
+                        MH_LAST_DOCK_IGNORE.store(-1, Ordering::Relaxed);
+                    } else if is_notch {
+                        crate::state::set_i32(crate::state::notch_extra_last_ignore(), &label, -1);
+                    } else {
+                        crate::state::set_i32(crate::state::dock_extra_last_ignore(), &label, -1);
+                    }
+                }
+            }
+        }
+    });
 }

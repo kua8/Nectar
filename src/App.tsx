@@ -3,7 +3,6 @@ import { useEffect, useState, useCallback, useRef, memo } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { getVersion } from "@tauri-apps/api/app";
 import type { UpdateCheckResult } from "./updater";
 import "./App.css";
 import { initTheme } from "./theme";
@@ -160,6 +159,23 @@ export const Visualizer = memo(function Visualizer({ isPlaying, bars = 5, height
   );
 });
 
+function UpdateActivity() {
+  return (
+    <div className="update-activity">
+      <motion.div
+        className="update-activity-glow"
+        animate={{ opacity: [0.5, 1, 0.5], scale: [0.9, 1, 0.9] }}
+        transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#32D74B" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 5v11" />
+          <path d="M6 12l6 6 6-6" />
+        </svg>
+      </motion.div>
+    </div>
+  );
+}
+
 interface MediaInfo {
   title: string;
   artist: string;
@@ -260,9 +276,6 @@ function App() {
 
 
   useEffect(() => {
-    // Desktops with no physical battery still resolve navigator.getBattery() with a
-    // synthetic "always charging" reading, which would otherwise fire this pulse once
-    // on startup — hasBattery (real hardware check) gates it out entirely.
     if (hasBattery && isReady && prevChargingRef.current !== null && prevChargingRef.current !== isCharging) {
       setShowPowerPulse(true);
       if (notchMode === 'peek') triggerEventPeek(4000);
@@ -333,8 +346,12 @@ function App() {
     let disposed = false;
 
     listen<UpdateCheckResult>("update-available", (event) => {
-      if (!event.payload.available) return;
-      setUpdateAvailable(true);
+      setUpdateAvailable(event.payload.available);
+      if (!event.payload.available) {
+        setShowUpdatePulse(false);
+        if (updatePulseTimerRef.current) clearTimeout(updatePulseTimerRef.current);
+        return;
+      }
       setShowUpdatePulse(true);
       if (notchMode === 'peek') triggerEventPeek(6000);
       if (updatePulseTimerRef.current) clearTimeout(updatePulseTimerRef.current);
@@ -347,9 +364,7 @@ function App() {
     });
 
     invoke<UpdateCheckResult>("get_update_state")
-      .then((state) => {
-        if (state.available) setUpdateAvailable(true);
-      })
+      .then((state) => setUpdateAvailable(state.available))
       .catch((e) => console.error("Failed to read update state:", e));
 
     return () => {
@@ -467,56 +482,33 @@ function App() {
       return interval;
     };
 
-    // Mirror Overlay.tsx's splash decision so we only wait when a splash will actually fire.
-    // Overlay always emits splash-done, but on a normal relaunch it emits it near-instantly
-    // (after one async getVersion() call) — before this listener would be registered.
-    // By making the same decision here we avoid a race and avoid any unnecessary delay.
-    const firstRun = localStorage.getItem("nectar-first-run") === null;
-    const storedVersion = localStorage.getItem("nectar-app-version");
-
+    const DOCK_SYNC_DELAY_MS = 400;
     const waitForSplash = () => {
-      // Splash is definitely coming — register listener now (2800ms animation gives us plenty of time)
       let started = false;
       let interval: any;
-      const unlistenSplash = listen("splash-done", () => {
+      let syncTimer: any;
+      const begin = () => {
         if (started) return;
         started = true;
-        interval = proceedWithStartup();
+        syncTimer = setTimeout(() => { interval = proceedWithStartup(); }, DOCK_SYNC_DELAY_MS);
+      };
+      const unlistenSplash = listen("splash-done", () => {
+        begin();
         unlistenSplash.then(fn => fn());
       });
       const safetyTimer = setTimeout(() => {
-        if (started) return;
-        started = true;
-        interval = proceedWithStartup();
+        begin();
         unlistenSplash.then(fn => fn());
       }, 6000);
       return () => {
         clearTimeout(safetyTimer);
+        clearTimeout(syncTimer);
         if (interval) clearInterval(interval);
         unlistenSplash.then(fn => fn());
       };
     };
 
-    if (firstRun || storedVersion === null) {
-      // Splash is definitely showing — wait for it
-      return waitForSplash();
-    }
-
-    // Has a version key — need async check to know if version changed
-    let interval: any;
-    getVersion().then(currentVersion => {
-      if (storedVersion !== currentVersion) {
-        // Version changed — splash is coming, wait for it
-        // (splash takes 2800ms so there's plenty of time to register the listener)
-        waitForSplash();
-      } else {
-        // Same version — no splash, start immediately
-        interval = proceedWithStartup();
-      }
-    }).catch(() => {
-      interval = proceedWithStartup();
-    });
-    return () => { if (interval) clearInterval(interval); };
+    return waitForSplash();
   }, [windowLabel]);
 
   // Settings state
@@ -582,10 +574,10 @@ function App() {
         const dockMode = rawDockMode === "auto-hide" ? "smart" : rawDockMode;
         const syncWindows = async () => {
           const dockEnabled = getVal("nectar-dock-enabled", "true") === "true";
-          if (dockEnabled) {
-            await invoke("init_dock", { mode: dockMode });
-          }
-          await invoke("change_notch_mode", { mode: nMode });
+          await Promise.all([
+            dockEnabled ? invoke("init_dock", { mode: dockMode }) : Promise.resolve(),
+            invoke("change_notch_mode", { mode: nMode }),
+          ]);
           await invoke("sync_appbar");
         };
 
@@ -603,8 +595,6 @@ function App() {
           setTimeout(() => invoke("sync_appbar"), 5000);
         };
 
-        // Mirror Overlay.tsx's splash decision for dock init too — only wait when
-        // a splash is actually coming, otherwise init immediately.
         const runDockInitAfterSplash = () => {
           let dockStarted = false;
           const unlistenDock = listen("splash-done", () => {
@@ -621,18 +611,7 @@ function App() {
           }, 6000);
         };
 
-        const storedVersion = localStorage.getItem("nectar-app-version");
-        if (firstRun || storedVersion === null) {
-          runDockInitAfterSplash();
-        } else {
-          getVersion().then(currentVersion => {
-            if (storedVersion !== currentVersion) {
-              runDockInitAfterSplash();
-            } else {
-              runDockInit();
-            }
-          }).catch(() => runDockInit());
-        }
+        runDockInitAfterSplash();
       }
 
       const scaleVal = getVal("nectar-scale");
@@ -741,17 +720,10 @@ function App() {
     invoke("change_notch_mode", { mode: notchMode });
   }, [notchMode, windowLabel]);
 
-  // Nectar mode state: 'music', 'calendar', 'command-center', or 'status'
   const [nectarMode, setNectarMode] = useState<'music' | 'calendar' | 'command-center' | 'status'>('status');
 
   // Window height is now kept constant to prevent rendering layout lag and sharp corners
 
-  // Accumulate the gesture instead of gating on a flat time cooldown. A trackpad's
-  // inertial scroll sends dozens of small wheel events per swipe — a fixed cooldown
-  // window lets that momentum re-trigger a step every time it elapses, blowing
-  // through two or three modes for what felt like a single swipe. Summing delta
-  // until it crosses a threshold, then resetting once scrolling goes idle, makes a
-  // single flick (mouse wheel notch or trackpad swipe) reliably move exactly one step.
   const wheelAccumRef = useRef(0);
   const wheelIdleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const WHEEL_STEP_THRESHOLD = 60;
@@ -881,28 +853,24 @@ function App() {
     return () => clearTimeout(timer);
   }, [isPlaying, nectarMode]);
 
-  // Reset nectar mode when calendar setting is disabled
   useEffect(() => {
     if (!settingsCalendarEnabled && nectarMode === 'calendar') {
       setNectarMode('status');
     }
   }, [settingsCalendarEnabled, nectarMode]);
 
-  // Reset nectar mode when music mode setting is disabled
   useEffect(() => {
     if (!settingsMusicModeEnabled && nectarMode === 'music') {
       setNectarMode('status');
     }
   }, [settingsMusicModeEnabled, nectarMode]);
 
-  // Reset nectar mode when compact notch display is disabled while collapsed
   useEffect(() => {
     if (!settingsMusicCompactNotch && nectarMode === 'music' && !isHovered) {
       setNectarMode('status');
     }
   }, [settingsMusicCompactNotch, nectarMode, isHovered]);
 
-  // Synchronize nectar mode immediately when music settings are toggled and music is playing
   useEffect(() => {
     if (settingsMusicModeEnabled && settingsMusicCompactNotch && mediaInfo.has_media && isPlaying && nectarMode === 'status' && !isHovered) {
       setNectarMode('music');
@@ -1185,16 +1153,6 @@ function App() {
     invoke("set_brightness", { brightness: newVal }).catch(() => {});
   }, []);
 
-  // Open system tray (unhide taskbar and invoke Win+B)
-  const openSystemTray = useCallback(async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await invoke("open_system_tray");
-    } catch (e) {
-      console.error("Failed to open system tray:", e);
-    }
-  }, []);
-
   const openSettingsWindow = useCallback(async () => {
     try {
       await invoke("open_settings_window");
@@ -1325,22 +1283,11 @@ function App() {
   const getDynamicWidth = () => {
     if (isCalendarMode) return 480;
     if (nectarMode === 'command-center' && isHovered) {
-      // The command-center panel still shares the main-row header (clock +
-      // left/right status widgets) with every other mode. 350 fits the pills
-      // grid itself, but a fixed width ignored how many status widgets are
-      // configured, so with several enabled the left/right groups could bleed
-      // into the centered clock. Reuse the same per-widget budget 'status'
-      // mode uses, and never go narrower than the panel needs.
       const totalWidgets = statusWidgets.left.length + statusWidgets.right.length;
       return Math.max(350, Math.min(200 + totalWidgets * 65, 460));
     }
     if (nectarMode === 'status' && isHovered) {
       const totalWidgets = statusWidgets.left.length + statusWidgets.right.length;
-      // 50px/widget was too tight for wider content like "net" (shows both
-      // up/down speed at once, e.g. "↑45.2K ↓12.3M" — much wider than a simple
-      // percentage). Bumped the per-widget budget and the cap that goes with it;
-      // `.side-content`'s overflow:hidden is still the backstop for pathological
-      // cases (very large numbers, long city names) beyond even this.
       return Math.min(200 + totalWidgets * 65, 460);
     }
     if (isMusicMode && isHovered) return mediaLayout === 'compact' ? 300 : 340;
@@ -1421,15 +1368,10 @@ function App() {
         onWheel={handleWheel}
         initial={{ y: 250, width: 30.6, height: 44.2, borderTopLeftRadius: 18, borderTopRightRadius: 18, borderBottomLeftRadius: 18, borderBottomRightRadius: 18, scaleX: 1, scaleY: 1, opacity: 0 }}
         animate={{
-          // The island itself is never force-hidden by the backend's fullscreen
-          // detection (`isVisible`) — only notchMode + overlap (`isHidden`) governs
-          // it, so "Fixed" always stays up and "Smart"/"Peek" stay hover-revealable
-          // even over a fullscreen app. `isVisible` still gates the decorative
-          // screen corners above.
           y: !isReady ? 250 : (isHidden ? -100 : 0),
           width: !isReady ? 34 : (isExpanded && !isHidden ? getDynamicWidth() : (isImpacted ? 39.1 : 30.6)),
           height: !isReady ? 34 : getDynamicHeight(),
-          opacity: 1,
+          opacity: isReady ? 1 : 0,
           scaleX: 1,
           scaleY: 1,
           borderTopLeftRadius: isImpacted ? 0 : 18,
@@ -1729,9 +1671,20 @@ function App() {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                           >
-                            {/* Left: visualizer (music) or weather (command-center, calendar) */}
+                            {/* Left: update activity (takes priority), visualizer (music), or weather (command-center, calendar) */}
                             <div className="side-content left">
-                              {isMusicMode && settingsVisualizerEnabled ? (
+                              {updateAvailable && showUpdateIndicator ? (
+                                <AnimatePresence>
+                                  <motion.div
+                                    key="update-activity"
+                                    initial={{ scale: 0.8, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    exit={{ scale: 0.8, opacity: 0 }}
+                                  >
+                                    <UpdateActivity />
+                                  </motion.div>
+                                </AnimatePresence>
+                              ) : isMusicMode && settingsVisualizerEnabled ? (
                                 <AnimatePresence>
                                   {settingsVisualizerEnabled && (
                                     <motion.div
@@ -1787,7 +1740,14 @@ function App() {
                                   )}
                                 </AnimatePresence>
                               </div>
-                              {updateAvailable && showUpdateIndicator && <div className="update-dot" />}
+                              {updateAvailable && showUpdateIndicator && (
+                                <div className="update-pill-indicator">
+                                  <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="#0b0b0c" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M12 5v11" />
+                                    <path d="M6 12l6 6 6-6" />
+                                  </svg>
+                                </div>
+                              )}
                             </div>
 
                             {/* Right: album art (music) or battery (command-center, calendar) */}
@@ -1971,7 +1931,7 @@ function App() {
                       </button>
                       <button
                         className="cc-circular-btn"
-                        onClick={(e) => { e.stopPropagation(); openSystemTray(e); }}
+                        onClick={(e) => { e.stopPropagation(); invoke("open_tray_window"); }}
                       >
                         <TrayIcon />
                       </button>

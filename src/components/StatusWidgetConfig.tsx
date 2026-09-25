@@ -189,8 +189,6 @@ function DropZone({
 interface StatusWidgetConfigProps {
   value: WidgetConfig;
   onChange: (config: WidgetConfig) => void;
-  // Desktops with no physical battery shouldn't be able to place a widget that
-  // will never show anything meaningful.
   hasBattery?: boolean;
 }
 
@@ -209,8 +207,6 @@ export function StatusWidgetConfig({ value, onChange, hasBattery = true }: Statu
   useEffect(() => {
     const next = sanitize(value || DEFAULT_CONFIG);
     setConfig(next);
-    // Persist the drop immediately if this device had a stale "battery" entry
-    // from before (e.g. settings imported from a laptop).
     if (!hasBattery && value && (value.left.includes("battery") || value.right.includes("battery"))) {
       onChange(next);
     }

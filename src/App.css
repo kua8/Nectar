@@ -15,9 +15,6 @@ img {
     -webkit-user-select: none;
 }
 
-/* Custom hover tooltip, used in place of the native title="" attribute (which
-   renders as the OS's own yellow/system tooltip) — content comes straight from
-   data-tooltip so no JS is needed. */
 [data-tooltip] {
     position: relative;
 }
@@ -25,10 +22,6 @@ img {
 [data-tooltip]::after {
     content: attr(data-tooltip);
     position: absolute;
-    /* Opens downward, not upward: this CSS is used inside the notch window,
-       which sits flush against the top of the screen and is only 36-230px
-       tall — a tooltip positioned above its trigger renders above y=0, i.e.
-       outside the window's own bounds, so it's invisible. */
     top: calc(100% + 8px);
     left: 50%;
     transform: translateX(-50%) scale(0.95);
@@ -304,10 +297,6 @@ img {
     flex: 1;
     height: 100%;
     min-width: 0;
-    /* No overflow:hidden here — the album art's glow (.album-art-glow-bg) sits
-       in this box and bleeds a few px past its own edges on purpose. Clipping
-       happens one level down, on .passive-features-group, so long widget text
-       (weather labels, network speed pairs) still can't bleed into the clock. */
 }
 
 .side-content.left {
@@ -343,16 +332,20 @@ img {
     /* Optical adjustment for Inter font baseline */
 }
 
-.update-dot {
+.update-pill-indicator {
     position: absolute;
     top: 100%;
     left: 50%;
     transform: translateX(-50%);
     margin-top: -4px;
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
+    width: 15px;
+    height: 8px;
+    border-radius: 4px;
     background: #32D74B;
+    box-shadow: 0 0 6px rgba(50, 215, 75, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     pointer-events: none;
 }
 
@@ -372,6 +365,26 @@ img {
     height: 20px;
     width: 28px;
     position: relative;
+}
+
+.update-activity {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 20px;
+    width: 28px;
+}
+
+.update-activity-glow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(50, 215, 75, 0.15);
+    border: 1px solid rgba(50, 215, 75, 0.35);
+    box-shadow: 0 0 8px rgba(50, 215, 75, 0.25);
 }
 
 .visualizer-horizontal .bar-horizontal {

@@ -27,9 +27,7 @@ export default defineConfig(async () => ({
       : undefined,
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
-      // Native fs.watch() is unreliable over SMB/network-mapped drives (throws
-      // "UNKNOWN: unknown error, watch" from Node's FSWatcher) — fall back to polling.
+      ignored: ["**/src-tauri/**", "**/installer-app/**", "**/installer/**", "**/website/**", "**/docs/**", "**/dist/**"],
       usePolling: true,
     },
   },

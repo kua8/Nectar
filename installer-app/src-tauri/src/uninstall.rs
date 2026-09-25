@@ -2,12 +2,8 @@ use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+const CREATE_BREAKAWAY_FROM_JOB: u32 = 0x0100_0000;
 
-/// If Nectar itself is still running (e.g. uninstall launched directly from Add/Remove
-/// Programs rather than through Nectar's own "Uninstall" button), ask it to close
-/// gracefully first. A plain kill would skip Nectar's own quit path, which is what
-/// restores the native taskbar out of auto-hide and unregisters its appbars — leaving
-/// those stuck if we didn't wait here.
 fn stop_running_nectar() {
     let _ = std::process::Command::new("taskkill")
         .args(["/IM", "nectar.exe"])
@@ -27,11 +23,6 @@ fn stop_running_nectar() {
     }
 }
 
-/// Removes shortcuts and the registry entry, then hands off directory deletion to a
-/// detached PowerShell process — the running uninstall.exe can't delete its own file
-/// while it's still executing, and the user may sit on the "done" screen for a while,
-/// so rather than guessing a fixed delay, the detached process waits on our own PID
-/// and only deletes once we've actually exited.
 pub fn uninstall(install_dir: &Path, all_users: bool, shortcuts: &[PathBuf]) -> Result<(), String> {
     stop_running_nectar();
 
@@ -44,13 +35,24 @@ pub fn uninstall(install_dir: &Path, all_users: bool, shortcuts: &[PathBuf]) -> 
     let pid = std::process::id();
     let dir_str = install_dir.to_string_lossy().replace('\'', "''");
     let ps_command = format!(
-        "Wait-Process -Id {pid} -ErrorAction SilentlyContinue; Remove-Item -LiteralPath '{}' -Recurse -Force -ErrorAction SilentlyContinue",
-        dir_str
+        "Wait-Process -Id {pid} -ErrorAction SilentlyContinue; \
+         for ($i = 0; $i -lt 40 -and (Test-Path -LiteralPath '{dir}'); $i++) {{ \
+           Remove-Item -LiteralPath '{dir}' -Recurse -Force -ErrorAction SilentlyContinue -ErrorVariable failed; \
+           if (Test-Path -LiteralPath '{dir}') {{ Start-Sleep -Milliseconds 500 }} \
+         }}; \
+         if (Test-Path -LiteralPath '{dir}') {{ Add-Content (Join-Path $env:TEMP 'nectar-uninstall.log') (\"Could not remove {dir}: \" + ($failed | Out-String)) }}",
+        pid = pid,
+        dir = dir_str
     );
-    std::process::Command::new("powershell")
-        .args(["-NoProfile", "-WindowStyle", "Hidden", "-Command", &ps_command])
-        .creation_flags(CREATE_NO_WINDOW)
-        .spawn()
+
+    let spawn = |flags: u32| {
+        std::process::Command::new("powershell")
+            .args(["-NoProfile", "-WindowStyle", "Hidden", "-Command", &ps_command])
+            .creation_flags(flags)
+            .spawn()
+    };
+    spawn(CREATE_NO_WINDOW | CREATE_BREAKAWAY_FROM_JOB)
+        .or_else(|_| spawn(CREATE_NO_WINDOW))
         .map_err(|e| e.to_string())?;
 
     Ok(())

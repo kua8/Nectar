@@ -249,14 +249,14 @@ pub async fn run_startup_check(app: AppHandle) {
         }
     };
 
+    let _ = app.emit("update-available", &result);
+
     if !result.available {
         if auto_update {
             let _ = app.emit("auto-update-status", serde_json::json!({ "status": "done" }));
         }
         return;
     }
-
-    let _ = app.emit("update-available", &result);
 
     if auto_update && release_is_old_enough(&result) {
         // On Windows this never returns: the installer exits the process.
@@ -271,9 +271,7 @@ pub async fn run_startup_check(app: AppHandle) {
 #[tauri::command]
 pub async fn check_for_updates(app: AppHandle, force: bool) -> Result<UpdateCheckResult, String> {
     let result = check(&app, force).await?;
-    if result.available {
-        let _ = app.emit("update-available", &result);
-    }
+    let _ = app.emit("update-available", &result);
     Ok(result)
 }
 

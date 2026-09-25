@@ -8,6 +8,11 @@ body {
 
 * {
   box-sizing: border-box;
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
 }
 
 .installer-window {
@@ -484,9 +489,15 @@ p {
   overflow: hidden;
 }
 
+.feedback-screen .success-icon svg {
+  width: 40px;
+  height: 40px;
+}
+
 .feedback-textarea {
   width: 100%;
-  min-height: 56px;
+  height: 52px;
+  min-height: 52px;
   margin-top: 12px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);

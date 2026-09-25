@@ -16,6 +16,7 @@ interface AboutTabProps {
   resetStatus: string;
   handleResetSettings: () => void;
   uninstallStatus: string;
+  uninstallError?: string;
   handleUninstallNectar: () => void;
 }
 
@@ -34,6 +35,7 @@ export function AboutTab({
   resetStatus,
   handleResetSettings,
   uninstallStatus,
+  uninstallError,
   handleUninstallNectar,
 }: AboutTabProps) {
   const getUpdateLabel = () => {
@@ -109,7 +111,7 @@ export function AboutTab({
 
   const getUninstallDesc = () => {
     if (uninstallStatus === "confirm") return "This will remove Nectar from your computer";
-    if (uninstallStatus === "error") return "Try again, or use Windows Settings > Apps";
+    if (uninstallStatus === "error") return uninstallError || "Try again, or use Windows Settings > Apps";
     return "Doesn't require Windows Settings to be open";
   };
 

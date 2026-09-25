@@ -17,6 +17,9 @@ interface AppInfo {
   all_hwnds?: [number, string][];
 }
 
+const isNectarWindow = (app: { name: string; path: string }) =>
+  app.path.toLowerCase().includes('nectar.exe') || app.name.toLowerCase() === 'nectar';
+
 // Stable module-level constants so object references never change between renders,
 // preventing Framer Motion from re-triggering animations on every re-render.
 const ITEM_ENTRY_TRANSITION = {
@@ -62,6 +65,7 @@ const Dock = memo(function Dock() {
   const [showAddPopup, setShowAddPopup] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, app: AppInfo | null } | null>(null);
   const [contextMenuHeight, setContextMenuHeight] = useState(0);
+  const [contextMenuWidth, setContextMenuWidth] = useState(0);
   const [activeSubmenu, setActiveSubmenu] = useState<string | null>(null);
   const [activeOrder, setActiveOrder] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -256,10 +260,6 @@ const Dock = memo(function Dock() {
       poll();
     });
 
-    // "Reset to Defaults" wipes settings.json server-side, but this window's
-    // own localStorage cache and in-memory state need clearing too — a full
-    // reload is the simplest way to guarantee every setting here actually
-    // goes back to its coded default instead of a stale cached value.
     const unlistenSettingsReset = listen("settings-reset", () => {
       localStorage.clear();
       window.location.reload();
@@ -406,7 +406,14 @@ const Dock = memo(function Dock() {
     e.stopPropagation();
     e.preventDefault();
     setContextMenuHeight(0);
-    setContextMenu({ x: e.clientX, y: e.clientY, app });
+    setContextMenuWidth(0);
+    const dockRect = dockRef.current?.getBoundingClientRect();
+    const target = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setContextMenu({
+      x: app ? target.left + target.width / 2 : (dockRect ? dockRect.left + dockRect.width / 2 : e.clientX),
+      y: dockRect ? dockRect.top : e.clientY,
+      app,
+    });
   };
 
   const closeMenu = () => {
@@ -420,20 +427,21 @@ const Dock = memo(function Dock() {
     invoke('set_menu_open', { open: false, rect: null }).catch(() => {});
   };
 
-  // The menu's item count (and therefore its rendered height) varies per app
-  // (pinned vs unpinned, running vs not, custom icon options, etc.), so a
-  // fixed guess overshoots or undershoots depending on what's actually
-  // rendered. Measure the real height and correct `top` before paint.
   useLayoutEffect(() => {
     if (contextMenu && menuRef.current) {
       const measured = menuRef.current.offsetHeight;
       if (measured > 0 && measured !== contextMenuHeight) {
         setContextMenuHeight(measured);
       }
-    } else if (!contextMenu && contextMenuHeight !== 0) {
+      const measuredWidth = menuRef.current.getBoundingClientRect().width;
+      if (measuredWidth > 0 && Math.abs(measuredWidth - contextMenuWidth) > 0.5) {
+        setContextMenuWidth(measuredWidth);
+      }
+    } else if (!contextMenu && (contextMenuHeight !== 0 || contextMenuWidth !== 0)) {
       setContextMenuHeight(0);
+      setContextMenuWidth(0);
     }
-  }, [contextMenu, contextMenuHeight]);
+  }, [contextMenu, contextMenuHeight, contextMenuWidth]);
 
   useEffect(() => {
     let open = false;
@@ -540,10 +548,6 @@ const Dock = memo(function Dock() {
   const pinnedItems = useMemo(() => dockItems.filter(i => i.path !== 'start' && i.is_pinned), [dockItems]);
   const unpinnedItems = useMemo(() => dockItems.filter(i => !i.is_pinned), [dockItems]);
 
-  // Combined view used only when "Mix Pinned & Running" is on: pinned and
-  // running icons share one list instead of the two fixed blocks above.
-  // Items not yet in mixedOrder (newly launched apps, or the very first time
-  // this is turned on) fall in at the end, in their current relative order.
   const combinableItems = useMemo(() => dockItems.filter(i => i.path !== 'start'), [dockItems]);
   const mixedItems = useMemo(() => {
     if (!dockMixedReorder) return combinableItems;
@@ -578,10 +582,6 @@ const Dock = memo(function Dock() {
     setPressedApp(null);
   };
 
-  // A mixed-mode drag can move a pinned icon relative to other pinned ones,
-  // so pin order needs re-deriving from the new combined order (filtered
-  // down to just the pinned paths) — the unpinned/running side isn't
-  // persisted across restarts either way, same as the separated mode above.
   const handleMixedReorder = (newPaths: string[]) => {
     setMixedOrder(newPaths);
     const pinnedPaths = new Set(pinnedApps.map(p => p.path));
@@ -610,10 +610,6 @@ const Dock = memo(function Dock() {
   }, [isDockHovered]);
 
   useEffect(() => {
-    // Keeps the dock window fully click-interactive for the whole drag gesture
-    // (see DOCK_IS_DRAGGING in the Rust mouse hook) — without this, a drag that
-    // carries the cursor outside the icon's tight hit-test rect can make the
-    // window go click-through mid-gesture and silently eat the pointerup.
     invoke('set_dock_dragging', { dragging: isDragging }).catch(() => {});
   }, [isDragging]);
 
@@ -700,10 +696,6 @@ const Dock = memo(function Dock() {
           onMouseLeave={() => { setIsDockHovered(false); setHoveredApp(null); setPressedApp(null); }}
         initial={{ y: -800, opacity: 1, width: 34, height: 34, borderTopLeftRadius: 17, borderTopRightRadius: 17, borderBottomLeftRadius: 17, borderBottomRightRadius: 17 }}
         animate={{
-          // Same as the notch: the dock is never force-hidden by the backend's
-          // fullscreen detection (`isVisible`) — only dockMode + overlap (`isHidden`)
-          // governs it, so "Fixed" stays up and "Smart"/"Peek" stay hover-revealable
-          // even over a fullscreen app.
           y: !isReady ? -800 : (isHidden ? 100 : 0),
           width: isExpanded && !isHidden ? 'auto' : 34,
           height: isExpanded && !isHidden ? 'auto' : 34,
@@ -881,13 +873,11 @@ const Dock = memo(function Dock() {
                     const cacheKey = isHost ? `${app.path}:${app.name.toLowerCase()}` : (app.hwnd ? `${app.path}-${app.hwnd}` : app.path);
                     const icon = customIcons[cacheKey] || customIcons[app.path] || iconsRef.current[cacheKey] || iconsRef.current[app.path] || app.icon;
                     
-                    const isNectarOrSettings = app.name.toLowerCase() === 'settings' ||
-                                              app.name.toLowerCase() === 'nectar' ||
-                                              app.path.toLowerCase().includes('nectar.exe');
+                    const isNectarOrSettings = isNectarWindow(app);
                     
-                    return icon ? (
+                    return (icon || isNectarOrSettings) ? (
                       <img 
-                        src={icon} 
+                        src={isNectarOrSettings ? "/nectar.png" : (icon ?? undefined)} 
                         alt={app.name} 
                         className={isNectarOrSettings ? "nectar-icon-img" : ""} 
                         draggable={false} 
@@ -985,9 +975,9 @@ const Dock = memo(function Dock() {
                           const isHost = app.path.toLowerCase().includes("msedge.exe") || app.path.toLowerCase().includes("chrome.exe") || app.path.toLowerCase().includes("applicationframehost.exe");
                           const cacheKey = isHost ? `${app.path}:${app.name.toLowerCase()}` : (app.hwnd ? `${app.path}-${app.hwnd}` : app.path);
                         const icon = customIcons[cacheKey] || customIcons[app.path] || iconsRef.current[cacheKey] || iconsRef.current[app.path] || app.icon;
-                          const isNectarOrSettings = app.name.toLowerCase() === 'settings' || app.name.toLowerCase() === 'nectar' || app.path.toLowerCase().includes('nectar.exe');
-                          return icon ? (
-                            <img src={icon} alt={app.name} className={isNectarOrSettings ? "nectar-icon-img" : ""} draggable={false} />
+                          const isNectarOrSettings = isNectarWindow(app);
+                          return (icon || isNectarOrSettings) ? (
+                            <img src={isNectarOrSettings ? "/nectar.png" : (icon ?? undefined)} alt={app.name} className={isNectarOrSettings ? "nectar-icon-img" : ""} draggable={false} />
                           ) : (
                             <div className="fallback-icon">{app.name[0]}</div>
                           );
@@ -1079,9 +1069,9 @@ const Dock = memo(function Dock() {
                           const isHost = app.path.toLowerCase().includes("msedge.exe") || app.path.toLowerCase().includes("chrome.exe") || app.path.toLowerCase().includes("applicationframehost.exe");
                           const cacheKey = isHost ? `${app.path}:${app.name.toLowerCase()}` : (app.hwnd ? `${app.path}-${app.hwnd}` : app.path);
                           const icon = customIcons[cacheKey] || customIcons[app.path] || iconsRef.current[cacheKey] || iconsRef.current[app.path] || app.icon;
-                          const isNectarOrSettings = app.name.toLowerCase() === 'settings' || app.name.toLowerCase() === 'nectar' || app.path.toLowerCase().includes('nectar.exe');
-                          return icon ? (
-                            <img src={icon} alt={app.name} className={isNectarOrSettings ? "nectar-icon-img" : ""} draggable={false} />
+                          const isNectarOrSettings = isNectarWindow(app);
+                          return (icon || isNectarOrSettings) ? (
+                            <img src={isNectarOrSettings ? "/nectar.png" : (icon ?? undefined)} alt={app.name} className={isNectarOrSettings ? "nectar-icon-img" : ""} draggable={false} />
                           ) : (
                             <div className="fallback-icon">{app.name[0]}</div>
                           );
@@ -1103,8 +1093,11 @@ const Dock = memo(function Dock() {
         <div
           style={{
             position: 'fixed',
-            left: contextMenu.x,
-            top: Math.max(8, contextMenu.y - (contextMenuHeight || (contextMenu.app ? 200 : 100) * scale)),
+            left: Math.min(
+              Math.max(8, contextMenu.x - (contextMenuWidth || 160 * scale) / 2),
+              Math.max(8, window.innerWidth - (contextMenuWidth || 160 * scale) - 8),
+            ),
+            top: Math.max(8, contextMenu.y - 10 - (contextMenuHeight || (contextMenu.app ? 200 : 100) * scale)),
             zIndex: 9999,
           }}
         >
@@ -1174,7 +1167,10 @@ const Dock = memo(function Dock() {
                   <div className="menu-divider" />
                   <div className="menu-item quit" onClick={async () => {
                     if (contextMenu.app?.hwnd) {
-                      await invoke('close_window', { hwnd: contextMenu.app.hwnd });
+                      await invoke('end_task', {
+                        hwnd: contextMenu.app.hwnd,
+                        allHwnds: contextMenu.app.all_hwnds?.map(([h]) => h) ?? null,
+                      });
                       closeMenu();
                     }
                   }}>

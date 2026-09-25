@@ -20,8 +20,6 @@ pub struct UninstallInfo<'a> {
     pub estimated_size_kb: u32,
 }
 
-/// Registers Nectar in Add/Remove Programs — the write-side counterpart NSIS used
-/// to do for free. Root key follows install scope: HKLM for all-users, HKCU otherwise.
 pub fn write_uninstall_entry(all_users: bool, info: &UninstallInfo) -> windows::core::Result<()> {
     unsafe {
         let root = if all_users { HKEY_LOCAL_MACHINE } else { HKEY_CURRENT_USER };

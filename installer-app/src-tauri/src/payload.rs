@@ -1,9 +1,6 @@
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
-// Populated by the packaging step (see installer-app/README.md) before this crate is
-// built for real — `build.rs` writes an empty placeholder so `cargo check` still
-// works against a fresh checkout.
 static PAYLOAD: &[u8] = include_bytes!("../payload.zip");
 
 pub fn payload_present() -> bool {

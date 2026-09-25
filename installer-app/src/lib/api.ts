@@ -10,6 +10,7 @@ export interface InitialState {
   prefillAllUsers: boolean;
   prefillDesktopShortcut: boolean;
   autoInstall: boolean;
+  autoUninstall: boolean;
   appVersion: string;
   payloadPresent: boolean;
 }
@@ -60,6 +61,9 @@ export const startUninstall = (): Promise<void> =>
 
 export const openUrl = (url: string): Promise<void> =>
   isTauri() ? invoke<void>("open_url", { url }) : Promise.resolve(void window.open(url, "_blank"));
+
+export const uiReady = (): Promise<void> =>
+  isTauri() ? invoke<void>("ui_ready") : Promise.resolve();
 
 export const minimizeWindow = (): Promise<void> =>
   isTauri() ? invoke<void>("window_minimize") : Promise.resolve(console.log("[preview] minimize (no-op)"));

@@ -211,6 +211,7 @@ function SettingsApp() {
               resetStatus={settings.resetStatus}
               handleResetSettings={settings.handleResetSettings}
               uninstallStatus={settings.uninstallStatus}
+              uninstallError={settings.uninstallError}
               handleUninstallNectar={settings.handleUninstallNectar}
             />
           )}

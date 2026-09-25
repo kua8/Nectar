@@ -93,6 +93,9 @@ pub async fn init_dock_window(app: &AppHandle, dock_win: tauri::WebviewWindow, m
     let label = dock_win.label().to_string();
 
     // 1. Always show first — idempotent, required before any positioning
+    if !dock_win.is_visible().unwrap_or(false) {
+        let _ = dock_win.set_position(tauri::PhysicalPosition::new(-32000, -32000));
+    }
     let _ = dock_win.show();
     if let Ok(hwnd) = dock_win.hwnd() { re_assert_topmost(hwnd); }
 
@@ -101,8 +104,6 @@ pub async fn init_dock_window(app: &AppHandle, dock_win: tauri::WebviewWindow, m
         // register_dock_appbar calls show() internally too, and handles retries
         register_dock_appbar(dock_win.clone());
     } else {
-        // Auto-hide mode: position at bottom of its target monitor.
-        // Retry until that monitor is available (can fail on autostart before shell).
         let dock_clone = dock_win.clone();
         tauri::async_runtime::spawn(async move {
             for attempt in 0..20 {
@@ -240,7 +241,6 @@ async fn change_dock_mode_for_window(app: &AppHandle, dock_win: tauri::WebviewWi
             });
             crate::state::set_flag(crate::state::dock_appbar_registered(), &label, false);
 
-            // Retry until the target monitor is available (can fail on autostart before shell initializes)
             let dock_clone = dock_win.clone();
             tauri::async_runtime::spawn(async move {
                 for attempt in 0..10 {
@@ -338,7 +338,6 @@ pub async fn init_notch_window(app: &AppHandle, main_win: tauri::WebviewWindow, 
             });
         }
     }
-    // Reposition window to span the full target monitor so CSS justify-content:center works
     if let Some(monitor) = crate::monitors::monitor_for_window_label(app, crate::types::WindowKind::Notch, &label) {
         let m_pos = monitor.position();
         let m_size = monitor.size();
@@ -438,8 +437,6 @@ pub async fn open_app(app_name: String) {
                     ki: KEYBDINPUT { wVk: vk, wScan: 0, dwFlags: KEYEVENTF_KEYUP, time: 0, dwExtraInfo: 0 },
                 },
             };
-            // Win+S opens Windows Search directly (distinct from a bare Win tap,
-            // which opens the Start menu instead).
             let inputs = [key_down(VK_LWIN), key_down(VK_S), key_up(VK_S), key_up(VK_LWIN)];
             SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
         });
@@ -623,7 +620,6 @@ pub async fn focus_window(hwnd: isize) {
             let _ = ShowWindow(hwnd, SW_RESTORE);
             force_set_foreground(hwnd);
         } else {
-            // Minimize if: window is foreground, OR same process as foreground (not Nectar), OR recently focused
             let fg = GetForegroundWindow();
             let mut should_minimize = false;
 
@@ -739,6 +735,12 @@ pub async fn get_app_icon(app: AppHandle, path: String, name: Option<String>, hw
     }
 
     let cache = ICON_CACHE.get_or_init(|| {
+        let version_marker = cache_dir.join("icons_cache_v2");
+        if !version_marker.exists() {
+            let _ = std::fs::remove_file(&cache_path);
+            let _ = std::fs::create_dir_all(&cache_dir);
+            let _ = std::fs::write(&version_marker, b"1");
+        }
         let mut map = std::collections::HashMap::new();
         if let Ok(content) = std::fs::read_to_string(&cache_path) {
             if let Ok(existing) = serde_json::from_str::<std::collections::HashMap<String, String>>(&content) {
@@ -748,7 +750,62 @@ pub async fn get_app_icon(app: AppHandle, path: String, name: Option<String>, hw
         std::sync::Mutex::new(map)
     });
 
-    // Strategy 1: Check persistent in-memory cache
+    let is_uwp_host = path.to_lowercase().contains("applicationframehost.exe");
+    let stale_store_path = path.to_lowercase().contains("\\windowsapps\\") && !std::path::Path::new(&path).exists();
+    let match_by_name = is_uwp_host || stale_store_path;
+    let lookup_name: Option<String> = name.clone().or_else(|| {
+        if stale_store_path {
+            std::path::Path::new(&path).file_stem().map(|s| s.to_string_lossy().to_string())
+        } else {
+            None
+        }
+    });
+
+    if match_by_name {
+        let apps_cache = INSTALLED_APPS_CACHE.get_or_init(|| std::sync::Mutex::new(Vec::new()));
+        let empty = apps_cache.lock().map(|a| a.is_empty()).unwrap_or(true);
+        if empty && !IS_SCANNING.load(Ordering::Relaxed) { crate::services::trigger_app_scan(); }
+        let start = std::time::Instant::now();
+        while IS_SCANNING.load(Ordering::Relaxed) && start.elapsed() < std::time::Duration::from_secs(10) {
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+    }
+
+    if let Some(apps_cache) = INSTALLED_APPS_CACHE.get() {
+        if let Ok(apps) = apps_cache.lock() {
+            let scanned = apps.iter().find(|a| {
+                a.icon.is_some()
+                    && (a.path == path
+                        || (match_by_name && lookup_name.as_deref().is_some_and(|n| a.name.eq_ignore_ascii_case(n))))
+            });
+            if let Some(scanned) = scanned {
+                let icon = scanned.icon.clone().unwrap();
+                if let Ok(mut c) = cache.lock() {
+                    c.insert(cache_key.clone(), icon.clone());
+                }
+                schedule_icon_cache_save(app.clone());
+                return Ok(Some(icon));
+            }
+        }
+    }
+
+    {
+        let path_for_pin = path.clone();
+        let pin_icon = tauri::async_runtime::spawn_blocking(move || unsafe {
+            use windows::Win32::System::Com::{CoInitializeEx, COINIT_MULTITHREADED, CoUninitialize};
+            let com = CoInitializeEx(None, COINIT_MULTITHREADED).is_ok();
+            let icon = crate::taskbar_pins::icon_for_target(&path_for_pin);
+            if com { CoUninitialize(); }
+            icon
+        }).await.unwrap_or(None);
+
+        if let Some(icon) = pin_icon {
+            if let Ok(mut c) = cache.lock() { c.insert(cache_key.clone(), icon.clone()); }
+            schedule_icon_cache_save(app.clone());
+            return Ok(Some(icon));
+        }
+    }
+
     if let Ok(c) = cache.lock() {
         if let Some(icon) = c.get(&cache_key) {
             return Ok(Some(icon.clone()));
@@ -852,13 +909,15 @@ pub async fn get_app_icon(app: AppHandle, path: String, name: Option<String>, hw
                 }
             }
 
+            if actual_path.to_lowercase().starts_with("shell:") {
+                if let Some(icon) = crate::utils::icon_from_parsing_name(&actual_path) {
+                    if let Ok(mut lock) = ICON_CACHE.get().unwrap().lock() { lock.insert(ck_clone, icon.clone()); }
+                    CoUninitialize();
+                    return Some(icon);
+                }
+            }
+
             let mut shfi: SHFILEINFOW = std::mem::zeroed();
-            // Always use the resolved path — for bare names like "msedge" or
-            // "notepad" (the default pinned apps), `actual_path` is where the
-            // lookup above rewrote it to a real, existing file. Falling back to
-            // the original unresolved string here (as this used to do for the
-            // non-shortcut case) makes SHGetFileInfoW fail outright, since it
-            // needs a real file to read the icon from, not just a bare name.
             let icon_path = &actual_path;
             let path_u16: Vec<u16> = icon_path.encode_utf16().chain(std::iter::once(0)).collect();
             let res = SHGetFileInfoW(windows::core::PCWSTR(path_u16.as_ptr()), Default::default(), Some(&mut shfi), std::mem::size_of::<SHFILEINFOW>() as u32, SHGFI_ICON | SHGFI_LARGEICON);
@@ -893,19 +952,23 @@ pub fn save_pinned_apps(app: AppHandle, apps: Vec<AppInfo>) -> Result<(), String
 
 #[tauri::command]
 pub async fn load_pinned_apps(app: AppHandle) -> Vec<AppInfo> {
-    let path = app.path().app_config_dir().unwrap_or_default().join("pinned_apps.json");
-    if let Ok(content) = std::fs::read_to_string(&path) {
-        if let Ok(apps) = serde_json::from_str(&content) { return apps; }
+    let cfg_dir = app.path().app_config_dir().unwrap_or_default();
+    let path = cfg_dir.join("pinned_apps.json");
+    let synced_marker = cfg_dir.join("taskbar_pins_synced");
+
+    if !synced_marker.exists() {
+        let imported = tauri::async_runtime::spawn_blocking(import_taskbar_pins).await.ok().flatten();
+        if let Some(imported) = imported {
+            if !imported.is_empty() {
+                let _ = save_pinned_apps(app.clone(), imported.clone());
+                let _ = std::fs::write(&synced_marker, b"1");
+                return imported;
+            }
+        }
     }
 
-    // First run, nothing saved yet — try importing the user's actual current
-    // Windows taskbar pins rather than guessing. Far more likely to match
-    // what they already have than a hardcoded list.
-    if let Some(imported) = import_taskbar_pins() {
-        if !imported.is_empty() {
-            let _ = save_pinned_apps(app.clone(), imported.clone());
-            return imported;
-        }
+    if let Ok(content) = std::fs::read_to_string(&path) {
+        if let Ok(apps) = serde_json::from_str(&content) { return apps; }
     }
 
     vec![
@@ -916,56 +979,14 @@ pub async fn load_pinned_apps(app: AppHandle) -> Vec<AppInfo> {
     ]
 }
 
-/// Reads the user's actual pinned Windows taskbar shortcuts (the .lnk files
-/// Explorer keeps for them) and converts each into a pinned dock entry.
-///
-/// Returns `None` if the pinned-taskbar folder can't be read at all (falls
-/// back to the hardcoded defaults above); returns `Some(vec![])` if the
-/// folder exists but has nothing in it.
-///
-/// Ordering caveat: this reflects file listing order (by creation time, as a
-/// best-effort approximation), not necessarily the exact drag-reordered
-/// visual order on the real taskbar — that's stored in an undocumented
-/// binary registry blob (`Taskband\Favorites`) that isn't parsed here. Good
-/// enough for a one-time import default; not guaranteed pixel-perfect.
 fn import_taskbar_pins() -> Option<Vec<AppInfo>> {
-    let appdata = std::env::var("APPDATA").ok()?;
-    let taskbar_dir = std::path::Path::new(&appdata)
-        .join(r"Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar");
-
-    let mut entries: Vec<_> = std::fs::read_dir(&taskbar_dir).ok()?
-        .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().and_then(|ext| ext.to_str()).map(|ext| ext.eq_ignore_ascii_case("lnk")).unwrap_or(false))
-        .collect();
-
-    entries.sort_by_key(|e| e.metadata().and_then(|m| m.created()).ok());
-
-    let mut apps = Vec::new();
-    for entry in entries {
-        let lnk_path = entry.path();
-        let Some((target, _args)) = resolve_shortcut(&lnk_path.to_string_lossy()) else { continue };
-        if target.trim().is_empty() { continue; }
-
-        let name = lnk_path.file_stem()
-            .map(|s| s.to_string_lossy().to_string())
-            .unwrap_or_else(|| target.clone());
-
-        let executable = std::path::Path::new(&target)
-            .file_name()
-            .map(|s| s.to_string_lossy().to_string());
-
-        apps.push(AppInfo {
-            name,
-            path: target,
-            icon: None,
-            is_running: false,
-            hwnd: None,
-            executable,
-            all_hwnds: None,
-        });
+    use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED};
+    unsafe {
+        let com = CoInitializeEx(None, COINIT_MULTITHREADED).is_ok();
+        let pins = crate::taskbar_pins::read_pins();
+        if com { CoUninitialize(); }
+        pins
     }
-
-    Some(apps)
 }
 
 #[tauri::command]
@@ -1140,6 +1161,34 @@ pub fn open_settings_window(app: AppHandle) {
 }
 
 #[tauri::command]
+pub fn open_tray_window(app: AppHandle) {
+    let anchor = notch_anchor(&app);
+    std::thread::spawn(move || crate::tray_icons::open_native_tray(anchor));
+}
+
+fn notch_anchor(app: &AppHandle) -> Option<(i32, i32)> {
+    use windows::Win32::Foundation::POINT;
+    use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
+    let mut cursor = POINT::default();
+    unsafe { GetCursorPos(&mut cursor).ok()?; }
+
+    let windows = crate::state::main_window_rects().lock().ok()?.clone();
+    let label = windows.iter()
+        .find(|(_, (pos, size))| {
+            cursor.x >= pos.x && cursor.x <= pos.x + size.width as i32 && cursor.y >= pos.y && cursor.y <= pos.y + size.height as i32
+        })
+        .map(|(label, _)| label.clone())
+        .unwrap_or_else(|| "main".to_string());
+    let (pos, _) = windows.get(&label).copied()?;
+    let scale = app.get_webview_window(&label)?.scale_factor().ok()?;
+    let rect = crate::state::notch_rects().lock().ok()?.get(&label).copied()?;
+
+    let centre_x = pos.x + ((rect.x as f64 + rect.width as f64 / 2.0) * scale) as i32;
+    let bottom = pos.y + ((rect.y as f64 + rect.height as f64) * scale) as i32;
+    Some((centre_x, bottom))
+}
+
+#[tauri::command]
 pub fn hide_overlay(app: AppHandle) {
     if let Some(win) = app.get_webview_window("overlay") { let _ = win.hide(); }
 }
@@ -1197,135 +1246,6 @@ pub fn open_notification_center() {
         use windows::Win32::UI::Shell::ShellExecuteA;
         let _ = ShellExecuteA(Some(HWND(std::ptr::null_mut())), windows::core::PCSTR(c"open".as_ptr() as *const u8), windows::core::PCSTR(c"ms-actioncenter:".as_ptr() as *const u8), windows::core::PCSTR::null(), windows::core::PCSTR::null(), SW_SHOWNORMAL);
     }
-}
-
-#[tauri::command]
-pub fn open_system_tray() {
-    tauri::async_runtime::spawn_blocking(move || unsafe {
-        use std::sync::atomic::Ordering;
-        use windows::Win32::UI::WindowsAndMessaging::{FindWindowA, GetWindowLongA, SetWindowLongA, GWL_EXSTYLE, WS_EX_LAYERED, WS_EX_TRANSPARENT, SetLayeredWindowAttributes, LWA_ALPHA, IsWindowVisible, ShowWindow, SW_SHOW};
-        use windows::core::PCSTR;
-
-        let tray_class = PCSTR(c"Shell_TrayWnd".as_ptr() as *const u8);
-        let hwnd = FindWindowA(tray_class, windows::core::PCSTR::null()).unwrap_or_default();
-        if hwnd.0.is_null() { return; }
-
-        let currently_hidden = crate::state::NATIVE_TASKBAR_HIDDEN.load(Ordering::Relaxed);
-        if currently_hidden {
-            // 1. Make the taskbar completely invisible and click-through
-            let exstyle = GetWindowLongA(hwnd, GWL_EXSTYLE);
-            let _ = SetWindowLongA(hwnd, GWL_EXSTYLE, exstyle | WS_EX_LAYERED.0 as i32 | WS_EX_TRANSPARENT.0 as i32);
-            let _ = SetLayeredWindowAttributes(hwnd, windows::Win32::Foundation::COLORREF(0), 0, LWA_ALPHA);
-
-            // 2. Show the taskbar window WITHOUT calling ABM_SETSTATE (prevents work-area
-            //    recalculation which would displace the notch/dock appbars).
-            use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOSIZE, SWP_NOZORDER, SWP_NOACTIVATE};
-            use crate::utils::ORIGINAL_TRAY_RECT;
-            if let Ok(guard) = ORIGINAL_TRAY_RECT.lock() {
-                if let Some(rect) = *guard {
-                    let _ = SetWindowPos(hwnd, None, rect.left, rect.top, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
-                }
-            }
-            let _ = ShowWindow(hwnd, SW_SHOW);
-            crate::state::NATIVE_TASKBAR_HIDDEN.store(false, Ordering::Relaxed);
-            
-            // Give Windows a moment to realize the taskbar is "there"
-            std::thread::sleep(std::time::Duration::from_millis(50));
-
-            // 3. Send the Win+B and Space macro to open the tray chevron
-            use windows::Win32::UI::Input::KeyboardAndMouse::{SendInput, INPUT, INPUT_0, KEYBDINPUT, VK_LWIN, KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_SPACE};
-            let b_key = VIRTUAL_KEY(0x42); // 'B' key
-            
-            let inputs = [
-                // Win+B
-                INPUT {
-                    r#type: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_KEYBOARD,
-                    Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_LWIN, wScan: 0, dwFlags: Default::default(), time: 0, dwExtraInfo: 0 } },
-                },
-                INPUT {
-                    r#type: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_KEYBOARD,
-                    Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: b_key, wScan: 0, dwFlags: Default::default(), time: 0, dwExtraInfo: 0 } },
-                },
-                INPUT {
-                    r#type: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_KEYBOARD,
-                    Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: b_key, wScan: 0, dwFlags: KEYEVENTF_KEYUP, time: 0, dwExtraInfo: 0 } },
-                },
-                INPUT {
-                    r#type: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_KEYBOARD,
-                    Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_LWIN, wScan: 0, dwFlags: KEYEVENTF_KEYUP, time: 0, dwExtraInfo: 0 } },
-                },
-            ];
-            SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
-            
-            std::thread::sleep(std::time::Duration::from_millis(150));
-            
-            // Space to open the popup
-            let space_inputs = [
-                INPUT {
-                    r#type: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_KEYBOARD,
-                    Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_SPACE, wScan: 0, dwFlags: Default::default(), time: 0, dwExtraInfo: 0 } },
-                },
-                INPUT {
-                    r#type: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_KEYBOARD,
-                    Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: VK_SPACE, wScan: 0, dwFlags: KEYEVENTF_KEYUP, time: 0, dwExtraInfo: 0 } },
-                },
-            ];
-            SendInput(&space_inputs, std::mem::size_of::<INPUT>() as i32);
-
-            // 4. Start monitoring for the tray popup to close
-            std::thread::spawn(move || {
-                let overflow_class = PCSTR(c"TopLevelWindowForOverflowXamlIsland".as_ptr() as *const u8);
-                let win10_overflow_class = PCSTR(c"NotifyIconOverflowWindow".as_ptr() as *const u8);
-                
-                // Wait for it to appear
-                let mut found = false;
-                for _ in 0..50 {
-                    let h1 = FindWindowA(overflow_class, PCSTR::null()).unwrap_or_default();
-                    let h2 = FindWindowA(win10_overflow_class, PCSTR::null()).unwrap_or_default();
-                    if (!h1.0.is_null() && IsWindowVisible(h1).as_bool()) || (!h2.0.is_null() && IsWindowVisible(h2).as_bool()) {
-                        found = true;
-                        break;
-                    }
-                    std::thread::sleep(std::time::Duration::from_millis(100));
-                }
-
-                if found {
-                    // Wait for it to disappear
-                    loop {
-                        std::thread::sleep(std::time::Duration::from_millis(200));
-                        let h1 = FindWindowA(overflow_class, PCSTR::null()).unwrap_or_default();
-                        let h2 = FindWindowA(win10_overflow_class, PCSTR::null()).unwrap_or_default();
-                        let visible = (!h1.0.is_null() && IsWindowVisible(h1).as_bool()) || (!h2.0.is_null() && IsWindowVisible(h2).as_bool());
-                        if !visible {
-                            break;
-                        }
-                    }
-                }
-                
-                // Once closed, hide taskbar again
-                crate::utils::set_taskbar_visibility(false, false);
-                crate::state::NATIVE_TASKBAR_HIDDEN.store(true, Ordering::Relaxed);
-                
-                // Revert transparency
-                let tray_class = PCSTR(c"Shell_TrayWnd".as_ptr() as *const u8);
-                let hwnd = FindWindowA(tray_class, PCSTR::null()).unwrap_or_default();
-                if !hwnd.0.is_null() {
-                    let exstyle = GetWindowLongA(hwnd, GWL_EXSTYLE);
-                    let _ = SetLayeredWindowAttributes(hwnd, windows::Win32::Foundation::COLORREF(0), 255, LWA_ALPHA);
-                    let _ = SetWindowLongA(hwnd, GWL_EXSTYLE, exstyle & !(WS_EX_LAYERED.0 as i32) & !(WS_EX_TRANSPARENT.0 as i32));
-                }
-            });
-
-        } else {
-            // If already toggled on manually, toggle off
-            crate::utils::set_taskbar_visibility(false, false);
-            crate::state::NATIVE_TASKBAR_HIDDEN.store(true, Ordering::Relaxed);
-
-            let exstyle = GetWindowLongA(hwnd, GWL_EXSTYLE);
-            let _ = SetLayeredWindowAttributes(hwnd, windows::Win32::Foundation::COLORREF(0), 255, LWA_ALPHA);
-            let _ = SetWindowLongA(hwnd, GWL_EXSTYLE, exstyle & !(WS_EX_LAYERED.0 as i32) & !(WS_EX_TRANSPARENT.0 as i32));
-        }
-    });
 }
 
 #[tauri::command]
@@ -1430,11 +1350,14 @@ pub fn open_media_source_app() {
 #[tauri::command]
 pub fn set_volume(volume: f32) { if let Some(sender) = COMMAND_SENDER.get() { let _ = sender.send(crate::types::SystemCommand::SetVolume(volume)); } }
 
-/// Restore the native taskbar, unregister Nectar's appbars, and exit gracefully.
 /// Shared by the tray menu, the in-app Quit button, and the window CloseRequested
 /// handlers so that any shutdown path (including Task Manager's WM_CLOSE) behaves
 /// identically.
 pub fn restore_taskbar_and_exit(handle: &AppHandle) {
+    NATIVE_TASKBAR_HIDDEN.store(false, Ordering::SeqCst);
+    for (_, w) in handle.webview_windows() {
+        let _ = w.hide();
+    }
     for (label, w) in handle.webview_windows() {
         let registered = if crate::state::is_notch_label(&label) {
             crate::state::get_flag(crate::state::main_appbar_registered(), &label)
@@ -1462,24 +1385,48 @@ pub async fn quit_nectar(handle: AppHandle) {
     restore_taskbar_and_exit(&handle);
 }
 
+fn registered_uninstaller() -> Option<std::path::PathBuf> {
+    use std::os::windows::process::CommandExt;
+    for root in ["HKCU", "HKLM"] {
+        let key = format!(r"{}\Software\Microsoft\Windows\CurrentVersion\Uninstall\Nectar", root);
+        let Ok(out) = std::process::Command::new("reg")
+            .args(["query", &key, "/v", "UninstallString"])
+            .creation_flags(0x0800_0000)
+            .output() else { continue };
+        let text = String::from_utf8_lossy(&out.stdout);
+        let Some(line) = text.lines().find(|l| l.contains("REG_SZ")) else { continue };
+        let value = line.split("REG_SZ").nth(1).unwrap_or("").trim();
+        let exe = if let Some(rest) = value.strip_prefix('"') {
+            rest.split('"').next().unwrap_or("")
+        } else {
+            value.split(" --").next().unwrap_or("")
+        };
+        let path = std::path::PathBuf::from(exe);
+        if !exe.is_empty() && path.exists() { return Some(path); }
+    }
+    None
+}
+
 #[tauri::command]
 pub async fn uninstall_nectar(handle: AppHandle) -> Result<(), String> {
     crate::uninstall_registry::heal_uninstall_registration();
 
-    let uninstaller = std::env::current_exe()
+    let mut uninstaller = std::env::current_exe()
         .map_err(|e| e.to_string())?
         .parent()
         .ok_or_else(|| "Could not resolve install directory".to_string())?
         .join("uninstall.exe");
 
     if !uninstaller.exists() {
-        return Err("uninstall.exe not found next to the running app".to_string());
+        uninstaller = registered_uninstaller().ok_or_else(|| {
+            "This copy of Nectar isn't an installed one (it's a portable or development build), so there's nothing to uninstall. Run it from its install folder, or use Windows Settings > Apps.".to_string()
+        })?;
     }
 
     std::process::Command::new(&uninstaller)
         .arg("--uninstall")
         .spawn()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| format!("Couldn't launch {}: {}", uninstaller.display(), e))?;
 
     restore_taskbar_and_exit(&handle);
     Ok(())
@@ -1487,14 +1434,6 @@ pub async fn uninstall_nectar(handle: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn restart_nectar(handle: AppHandle) {
-    // `tauri dev`'s frontend is served by a Vite dev server that's tied to the
-    // specific process tauri-cli launched. A real OS-level restart here spawns a
-    // brand new, unsupervised copy of the binary — tauri-cli sees its tracked
-    // process exit and tears the whole dev session (including the Vite server)
-    // down, so the new process's webview gets "localhost refused to connect."
-    // A release build has no such dependency (the frontend is bundled in), so
-    // this only matters in dev — soft-reload every window's frontend instead,
-    // which resets UI state without hitting that dead end.
     #[cfg(debug_assertions)]
     {
         for (_, w) in handle.webview_windows() {
@@ -1507,11 +1446,83 @@ pub async fn restart_nectar(handle: AppHandle) {
         if let Some(w) = handle.get_webview_window("main") { unregister_appbar_native(w.hwnd().unwrap()); }
         if let Some(w) = handle.get_webview_window("dock") { unregister_appbar_native(w.hwnd().unwrap()); }
         if let Some(w) = handle.get_webview_window("settings") { let _ = w.destroy(); }
-        set_taskbar_visibility(true, true);
-        NATIVE_TASKBAR_HIDDEN.store(false, Ordering::Relaxed);
+        std::env::set_var("NECTAR_RESTARTING", "1");
         close_single_instance_handles();
         handle.restart();
     }
+}
+
+#[tauri::command]
+pub async fn end_task(hwnd: isize, all_hwnds: Option<Vec<isize>>) {
+    use std::os::windows::process::CommandExt;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        EnumChildWindows, GetWindowThreadProcessId, PostMessageW, WM_CLOSE,
+    };
+    use windows::Win32::System::Threading::{
+        OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+
+    struct HostScan { host_pid: u32, found: u32 }
+    unsafe extern "system" fn child_proc(child: HWND, lparam: LPARAM) -> windows::core::BOOL {
+        let scan = &mut *(lparam.0 as *mut HostScan);
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(child, Some(&mut pid));
+        if pid != 0 && pid != scan.host_pid {
+            scan.found = pid;
+            return windows::core::BOOL(0);
+        }
+        windows::core::BOOL(1)
+    }
+
+    unsafe fn image_name(pid: u32) -> Option<String> {
+        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+        let mut buf = [0u16; 520];
+        let mut len = buf.len() as u32;
+        let res = QueryFullProcessImageNameW(handle, PROCESS_NAME_WIN32, windows::core::PWSTR(buf.as_mut_ptr()), &mut len);
+        let _ = windows::Win32::Foundation::CloseHandle(handle);
+        res.ok()?;
+        Some(String::from_utf16_lossy(&buf[..len as usize]))
+    }
+
+    unsafe fn app_pid(hwnd: HWND) -> Option<u32> {
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        if pid == 0 { return None; }
+        let name = image_name(pid)?.to_lowercase();
+        if name.ends_with("\\explorer.exe") { return None; }
+        if name.ends_with("\\applicationframehost.exe") {
+            let mut scan = HostScan { host_pid: pid, found: 0 };
+            let _ = EnumChildWindows(Some(hwnd), Some(child_proc), LPARAM(&mut scan as *mut HostScan as isize));
+            return if scan.found != 0 { Some(scan.found) } else { None };
+        }
+        Some(pid)
+    }
+
+    tauri::async_runtime::spawn_blocking(move || unsafe {
+        let mut handles = vec![hwnd];
+        handles.extend(all_hwnds.unwrap_or_default());
+
+        let own_pid = std::process::id();
+        let mut pids = std::collections::BTreeSet::new();
+        let mut politely = Vec::new();
+        for h in handles {
+            match app_pid(HWND(h as *mut _)) {
+                Some(pid) if pid != own_pid => { pids.insert(pid); }
+                Some(_) => {}
+                None => politely.push(h),
+            }
+        }
+
+        for pid in pids {
+            let _ = std::process::Command::new("taskkill")
+                .args(["/F", "/T", "/PID", &pid.to_string()])
+                .creation_flags(0x0800_0000)
+                .output();
+        }
+        for h in politely {
+            let _ = PostMessageW(Some(HWND(h as *mut _)), WM_CLOSE, windows::Win32::Foundation::WPARAM(0), windows::Win32::Foundation::LPARAM(0));
+        }
+    }).await.unwrap_or_default();
 }
 
 #[tauri::command]
@@ -1555,7 +1566,6 @@ pub fn save_setting(app: AppHandle, key: String, value: serde_json::Value) -> Re
 
     crate::utils::replace_settings_cache(settings.clone());
 
-    // Broadcast so all windows sync — emit the key as-is (nectar-prefixed)
     let _ = app.emit("settings-changed", serde_json::json!({ "key": &key, "value": &settings[&key] }));
 
     if key == "nectar-scale" {
@@ -1598,10 +1608,6 @@ pub fn load_settings(app: AppHandle) -> Result<HashMap<String, serde_json::Value
     Ok(HashMap::new())
 }
 
-/// Wipe settings.json and the in-memory settings cache back to an empty state.
-/// Does not by itself touch the frontend's localStorage cache — callers must
-/// clear that themselves (and restart the app so every window re-reads its
-/// defaults) or stale cached values will keep masking the reset.
 #[tauri::command]
 pub fn reset_settings(app: AppHandle) -> Result<(), String> {
     let path = app.path().app_config_dir().map_err(|e| e.to_string())?.join("settings.json");
@@ -1813,11 +1819,6 @@ pub async fn get_battery_saver_state() -> Result<bool, String> {
 
 #[tauri::command]
 pub async fn has_battery() -> Result<bool, String> {
-    // The frontend's Battery Status API (navigator.getBattery()) always reports a
-    // synthetic "100%, charging" battery on desktops with no physical battery —
-    // Chromium doesn't reject the call, it fakes a full/charging one. PowerManager's
-    // BatteryStatus reflects the real hardware, so this is what decides whether to
-    // show any battery UI at all.
     tauri::async_runtime::spawn_blocking(|| {
         unsafe {
             let _ = windows::Win32::System::Com::CoInitializeEx(
@@ -1902,6 +1903,98 @@ pub fn get_disk_space() -> Result<u64, String> {
             Some(&mut total_free),
         ).map_err(|e| format!("GetDiskFreeSpaceEx failed: {e}"))?;
         Ok(free_bytes / (1024 * 1024 * 1024))
+    }
+}
+
+#[derive(serde::Serialize, Clone)]
+pub struct ProcessInfo {
+    pub pid: u32,
+    pub name: String,
+    pub exe_path: Option<String>,
+    pub memory_kb: u64,
+}
+
+const PROTECTED_PROCESS_NAMES: &[&str] = &[
+    "system",
+    "system idle process",
+    "registry",
+    "csrss.exe",
+    "wininit.exe",
+    "winlogon.exe",
+    "services.exe",
+    "lsass.exe",
+    "smss.exe",
+    "explorer.exe",
+    "dwm.exe",
+    "nectar.exe",
+];
+
+#[tauri::command]
+pub fn get_running_processes() -> Result<Vec<ProcessInfo>, String> {
+    unsafe {
+        use windows::Win32::Foundation::CloseHandle;
+        use windows::Win32::System::Diagnostics::ToolHelp::{
+            CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
+        };
+        use windows::Win32::System::ProcessStatus::{GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS};
+        use windows::Win32::System::Threading::{
+            OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
+        };
+
+        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0).map_err(|e| e.to_string())?;
+        let mut entry = PROCESSENTRY32W { dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32, ..Default::default() };
+        let mut results = Vec::new();
+
+        if Process32FirstW(snapshot, &mut entry).is_ok() {
+            loop {
+                let name = String::from_utf16_lossy(&entry.szExeFile)
+                    .trim_end_matches('\0')
+                    .to_string();
+                let pid = entry.th32ProcessID;
+
+                if pid != 0 && !name.is_empty() && !PROTECTED_PROCESS_NAMES.contains(&name.to_lowercase().as_str()) {
+                    let mut exe_path = None;
+                    let mut memory_kb = 0u64;
+                    if let Ok(handle) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) {
+                        let mut buf = [0u16; 512];
+                        let mut size = buf.len() as u32;
+                        if QueryFullProcessImageNameW(handle, PROCESS_NAME_WIN32, windows::core::PWSTR(buf.as_mut_ptr()), &mut size).is_ok() {
+                            exe_path = Some(String::from_utf16_lossy(&buf[..size as usize]));
+                        }
+                        let mut counters = PROCESS_MEMORY_COUNTERS { cb: std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32, ..Default::default() };
+                        if GetProcessMemoryInfo(handle, &mut counters, counters.cb).is_ok() {
+                            memory_kb = (counters.WorkingSetSize as u64) / 1024;
+                        }
+                        let _ = CloseHandle(handle);
+                    }
+                    results.push(ProcessInfo { pid, name, exe_path, memory_kb });
+                }
+
+                if Process32NextW(snapshot, &mut entry).is_err() {
+                    break;
+                }
+            }
+        }
+        let _ = CloseHandle(snapshot);
+
+        results.sort_by(|a, b| b.memory_kb.cmp(&a.memory_kb));
+        Ok(results)
+    }
+}
+
+#[tauri::command]
+pub fn kill_process(pid: u32, name: String) -> Result<(), String> {
+    if PROTECTED_PROCESS_NAMES.contains(&name.to_lowercase().as_str()) {
+        return Err(format!("Refusing to end protected process: {name}"));
+    }
+    unsafe {
+        use windows::Win32::Foundation::CloseHandle;
+        use windows::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
+
+        let handle = OpenProcess(PROCESS_TERMINATE, false, pid).map_err(|e| e.to_string())?;
+        let result = TerminateProcess(handle, 1).map_err(|e| e.to_string());
+        let _ = CloseHandle(handle);
+        result
     }
 }
 
@@ -2206,3 +2299,4 @@ pub fn setup_settings_watcher(app: AppHandle) {
         }
     });
 }
+

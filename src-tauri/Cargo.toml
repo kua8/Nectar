@@ -1,6 +1,6 @@
 [package]
 name = "nectar"
-version = "1.1.3"
+version = "1.2.0"
 description = ""
 authors = ["kua8"]
 edition = "2021"
@@ -55,7 +55,9 @@ windows = { version = "0.61", features = [
   "Devices_Radios",
   "System_Power",
   "Win32_NetworkManagement_IpHelper",
-  "Win32_NetworkManagement_Ndis"
+  "Win32_NetworkManagement_Ndis",
+  "Win32_System_Diagnostics_ToolHelp",
+  "Win32_System_ProcessStatus"
 ] }
 base64 = "0.22"
 tauri-plugin-autostart = "2.5.1"

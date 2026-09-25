@@ -15,7 +15,7 @@ Nectar makes your Windows desktop feel alive: a macOS-style notch/island at the 
 ---
 
 <div align="center">
-<img src="docs/screenshots/desktop.webp" width="720" alt="Nectar notch and dock on the desktop" />
+<img src="docs/screenshots/desktop.webp" width="720" alt="Nectar notch and dock on the desktop" style="border-radius: 16px;" />
 </div>
 
 ---
@@ -31,6 +31,10 @@ A notch at the top of your screen that adapts to what you're doing. Scroll or sw
 
 Each transition is spring-loaded — width, height, border-radius, and position all animate independently. In **smart**/**peek** mode the notch still reveals and stays fully clickable over a fullscreen app; only a thin strip right at the screen edge stays click-through, so it never steals input meant for whatever else you're running (a screenshot tool, a game).
 
+<div align="center">
+<img src="docs/screenshots/island.png" width="360" alt="Nectar island close-up" style="border-radius: 16px;" />
+</div>
+
 ## The Dock
 
 A taskbar that actually moves. Nectar replaces your native Windows taskbar and sits at the bottom of the screen: drag to reorder, hover for window previews, right-click for context menus. A Start-adjacent search icon opens Windows Search directly.
@@ -38,7 +42,7 @@ A taskbar that actually moves. Nectar replaces your native Windows taskbar and s
 Pinned and running apps stay in two separate groups by default, with a divider marking the split — flip "Mix Pinned & Running" in Settings to drag any icon anywhere instead.
 
 <div align="center">
-<img src="docs/screenshots/dock.png" width="480" alt="Nectar dock close-up" />
+<img src="docs/screenshots/dock.png" width="480" alt="Nectar dock close-up" style="border-radius: 16px;" />
 </div>
 
 ## Under the Hood

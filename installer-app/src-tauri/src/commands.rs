@@ -10,6 +10,7 @@ pub struct InitialState {
     pub prefill_all_users: bool,
     pub prefill_desktop_shortcut: bool,
     pub auto_install: bool,
+    pub auto_uninstall: bool,
     pub app_version: String,
     pub payload_present: bool,
 }
@@ -29,6 +30,7 @@ pub fn get_initial_state() -> InitialState {
         prefill_all_users: launch.prefill_all_users,
         prefill_desktop_shortcut: launch.prefill_desktop_shortcut,
         auto_install: launch.auto_install,
+        auto_uninstall: launch.auto_uninstall,
         app_version: env!("CARGO_PKG_VERSION").to_string(),
         payload_present: crate::payload::payload_present(),
     }
@@ -147,8 +149,6 @@ pub async fn start_install(
     let self_exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let _ = std::fs::copy(&self_exe, &uninstall_exe);
 
-    // Uninstall needs to know its own install scope (HKLM vs HKCU) later, without
-    // being able to infer it reliably from the path alone.
     let _ = std::fs::write(
         install_path.join(".install-scope"),
         if all_users { "all-users" } else { "user" },
@@ -157,7 +157,7 @@ pub async fn start_install(
     let size_kb = dir_size_kb(&install_path);
     let uninstall_string = format!("\"{}\" --uninstall", uninstall_exe.to_string_lossy());
     let install_location = install_path.to_string_lossy().to_string();
-    let icon_str = exe_path.to_string_lossy().to_string();
+    let icon_str = format!("{},0", exe_path.to_string_lossy());
     let info = crate::registry::UninstallInfo {
         display_name: "Nectar",
         display_icon: &icon_str,
@@ -167,12 +167,6 @@ pub async fn start_install(
         uninstall_string: &uninstall_string,
         estimated_size_kb: size_kb,
     };
-    // Unlike the shortcuts above, a failure here is fatal and must surface: this
-    // registry entry is the only thing that makes Nectar show up in Add/Remove
-    // Programs at all. Swallowing this error (as it was before) let all-users
-    // installs silently finish "successfully" with files on disk but no way to
-    // uninstall them through Windows — exactly the orphaned-install bug this
-    // fixes.
     crate::registry::write_uninstall_entry(all_users, &info)
         .map_err(|e| format!("Files were installed, but registering with Windows failed: {e}. Try running the installer as Administrator."))?;
 
@@ -186,7 +180,11 @@ pub async fn start_install(
 
 #[tauri::command]
 pub fn launch_app(exe_path: String) -> Result<(), String> {
-    std::process::Command::new(&exe_path).spawn().map_err(|e| e.to_string())?;
+    if crate::elevate::is_elevated() {
+        std::process::Command::new("explorer.exe").arg(&exe_path).spawn().map_err(|e| e.to_string())?;
+    } else {
+        std::process::Command::new(&exe_path).spawn().map_err(|e| e.to_string())?;
+    }
     Ok(())
 }
 
@@ -196,14 +194,6 @@ pub fn open_install_folder(path: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Opens a URL in the default browser — used for the optional uninstall-feedback
-/// link (a pre-filled GitHub issue) so submitting feedback is an explicit, visible
-/// action the person takes in their own browser, not something the installer sends.
-/// Uses ShellExecuteW's "open" verb rather than spawning explorer.exe directly —
-/// the same pattern already used for opening ms-settings:/ms-availablenetworks:
-/// links elsewhere in this codebase; explorer.exe as a plain child process is not
-/// reliable for arbitrary URLs (in particular ones with query strings) on current
-/// Windows builds.
 #[tauri::command]
 pub fn open_url(url: String) -> Result<(), String> {
     unsafe {
@@ -235,6 +225,15 @@ pub async fn start_uninstall(app: tauri::AppHandle) -> Result<(), String> {
     let self_exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let install_dir = self_exe.parent().ok_or("no parent dir")?.to_path_buf();
 
+    let scope = std::fs::read_to_string(install_dir.join(".install-scope")).unwrap_or_default();
+    let all_users_install = scope.trim() == "all-users";
+    if all_users_install && !crate::elevate::is_elevated() {
+        crate::elevate::relaunch_elevated(&["--uninstall".to_string(), "--auto-uninstall".to_string()])
+            .map_err(|_| "Uninstalling an all-users install needs administrator permission.".to_string())?;
+        app.exit(0);
+        return Ok(());
+    }
+
     let _ = app.emit(
         "uninstall-progress",
         ProgressEvent { stage: "removing".into(), percent: 0.3, message: "Removing shortcuts...".into() },
@@ -243,6 +242,9 @@ pub async fn start_uninstall(app: tauri::AppHandle) -> Result<(), String> {
     let mut shortcuts = Vec::new();
     for all_users in [false, true] {
         if let Some(dir) = crate::known_folders::start_menu_programs_dir(all_users) {
+            shortcuts.push(dir.join("Nectar.lnk"));
+        }
+        if let Some(dir) = crate::known_folders::legacy_start_menu_dir(all_users) {
             shortcuts.push(dir.join("Nectar.lnk"));
         }
         if let Some(dir) = crate::known_folders::desktop_dir(all_users) {
@@ -254,9 +256,6 @@ pub async fn start_uninstall(app: tauri::AppHandle) -> Result<(), String> {
         "uninstall-progress",
         ProgressEvent { stage: "removing".into(), percent: 0.6, message: "Removing registry entries...".into() },
     );
-
-    let scope = std::fs::read_to_string(install_dir.join(".install-scope")).unwrap_or_default();
-    let all_users_install = scope.trim() == "all-users";
 
     crate::uninstall::uninstall(&install_dir, all_users_install, &shortcuts)?;
 
@@ -276,4 +275,10 @@ pub fn window_minimize(window: tauri::WebviewWindow) {
 #[tauri::command]
 pub fn window_close(window: tauri::WebviewWindow) {
     let _ = window.close();
+}
+
+#[tauri::command]
+pub fn ui_ready(window: tauri::WebviewWindow) {
+    let _ = window.show();
+    let _ = window.set_focus();
 }

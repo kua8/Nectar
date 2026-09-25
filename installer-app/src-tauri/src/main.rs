@@ -26,6 +26,7 @@ fn main() {
             commands::start_uninstall,
             commands::window_minimize,
             commands::window_close,
+            commands::ui_ready,
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
@@ -33,6 +34,11 @@ fn main() {
             {
                 let _ = window_vibrancy::apply_mica(&window, None);
             }
+            let fallback = window.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(2500));
+                let _ = fallback.show();
+            });
             Ok(())
         })
         .run(tauri::generate_context!())

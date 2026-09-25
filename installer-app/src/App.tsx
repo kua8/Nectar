@@ -188,7 +188,11 @@ export default function App() {
     getInitialState().then((s) => {
       setState(s);
       if (s.uninstallMode) {
-        setScreen("uninstall-confirm");
+        if (s.autoUninstall) {
+          handleConfirmUninstall();
+        } else {
+          setScreen("uninstall-confirm");
+        }
         return;
       }
       const dir = s.prefillInstallDir ?? s.defaultInstallDirUser;

@@ -7,9 +7,6 @@ fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
-/// Creates a .lnk shortcut. Mirrors the read side already used for taskbar-pin
-/// import (`utils.rs::resolve_shortcut`) via the same IShellLinkW/IPersistFile
-/// COM interfaces, just the inverse Set*/Save calls instead of Load/Resolve/Get*.
 pub fn create_shortcut(
     lnk_path: &Path,
     target: &Path,

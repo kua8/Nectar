@@ -28,17 +28,6 @@ dist-ssr
 *.key
 *.key.pub
 
-#skills
-.agents/*
-skills-lock.json
-
-#agents
-.mimocode
-# Claude Code session/worktree data — never publish this
-.claude/
-
 # Marketing site — hosted separately (Apache, own domain), not part of this repo
 /website/
 
-# Internal dev-process tracking, not user-facing docs
-/TODO.md

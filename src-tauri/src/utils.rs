@@ -47,12 +47,81 @@ pub fn init_taskbar_marker(app: &tauri::AppHandle) {
     }
 }
 
-/// True if a previous Nectar session died without restoring the native taskbar.
 pub fn taskbar_marker_exists() -> bool {
     TASKBAR_MARKER.get().is_some_and(|p| p.exists())
 }
 
+fn rect_is_on_screen(r: &windows::Win32::Foundation::RECT) -> bool {
+    r.left > -5000 && r.top > -5000
+}
+
+unsafe fn monitor_rects() -> Vec<(windows::Win32::Foundation::RECT, bool)> {
+    use windows::Win32::Foundation::{LPARAM, RECT};
+    use windows::Win32::Graphics::Gdi::{EnumDisplayMonitors, GetMonitorInfoW, HDC, HMONITOR, MONITORINFO};
+
+    unsafe extern "system" fn collect(hmon: HMONITOR, _: HDC, _: *mut RECT, lparam: LPARAM) -> windows::core::BOOL {
+        let list = &mut *(lparam.0 as *mut Vec<(RECT, bool)>);
+        let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
+        if GetMonitorInfoW(hmon, &mut mi).as_bool() {
+            list.push((mi.rcMonitor, mi.dwFlags & 1 != 0));
+        }
+        windows::core::BOOL(1)
+    }
+    let mut monitors: Vec<(RECT, bool)> = Vec::new();
+    let _ = EnumDisplayMonitors(None, None, Some(collect), LPARAM(&mut monitors as *mut _ as isize));
+    monitors
+}
+
+fn taskbar_monitor(monitors: &[(windows::Win32::Foundation::RECT, bool)], primary: bool, width: i32) -> Option<windows::Win32::Foundation::RECT> {
+    if primary {
+        monitors.iter().find(|(_, is_primary)| *is_primary).map(|(r, _)| *r)
+    } else {
+        monitors.iter().find(|(r, is_primary)| !*is_primary && r.right - r.left == width)
+            .or_else(|| monitors.iter().find(|(_, is_primary)| !*is_primary))
+            .map(|(r, _)| *r)
+    }
+}
+
+unsafe fn park_below_monitor(hwnd: windows::Win32::Foundation::HWND, primary: bool) {
+    use windows::Win32::Foundation::RECT;
+    use windows::Win32::UI::WindowsAndMessaging::{GetWindowRect, SetWindowPos, SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER};
+    let mut cur = RECT::default();
+    let _ = GetWindowRect(hwnd, &mut cur);
+    let (x, y) = match taskbar_monitor(&monitor_rects(), primary, cur.right - cur.left) {
+        Some(m) => (m.left, m.bottom),
+        None => (-10000, -10000),
+    };
+    let _ = SetWindowPos(hwnd, None, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+unsafe fn restore_tray_position(hwnd: windows::Win32::Foundation::HWND, primary: bool, saved: Option<windows::Win32::Foundation::RECT>) {
+    use windows::Win32::Foundation::RECT;
+    use windows::Win32::UI::WindowsAndMessaging::{GetWindowRect, SetWindowPos, SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER};
+
+    if let Some(r) = saved {
+        if rect_is_on_screen(&r) {
+            let _ = SetWindowPos(hwnd, None, r.left, r.top, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+            return;
+        }
+    }
+
+    let mut cur = RECT::default();
+    let _ = GetWindowRect(hwnd, &mut cur);
+    let (w, h) = (cur.right - cur.left, cur.bottom - cur.top);
+    let monitors = monitor_rects();
+    let inside_a_monitor = monitors.iter().any(|(m, _)| cur.left >= m.left && cur.top >= m.top && cur.right <= m.right && cur.bottom <= m.bottom);
+    if inside_a_monitor { return; }
+
+    if let Some(mon) = taskbar_monitor(&monitors, primary, w) {
+        let _ = SetWindowPos(hwnd, None, mon.left, mon.bottom - h, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+}
+
 pub fn set_taskbar_visibility(visible: bool, always_on_top: bool) {
+    if visible {
+        crate::state::NATIVE_TASKBAR_HIDDEN.store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+
     // Crash-recovery marker: a hidden taskbar is persisted so the next launch can
     // undo it if we're ever force-killed (Task Manager / TerminateProcess skips cleanup).
     if visible {
@@ -96,7 +165,7 @@ pub fn set_taskbar_visibility(visible: bool, always_on_top: bool) {
 
         // 2. Control visibility of the primary taskbar
         if let Ok(tray_hwnd) = FindWindowA(tray_class, windows::core::PCSTR::null()) {
-            use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOSIZE, SWP_NOZORDER, SWP_NOACTIVATE, GetWindowLongA, SetWindowLongA, GWL_EXSTYLE, WS_EX_LAYERED, WS_EX_TRANSPARENT, SetLayeredWindowAttributes, LWA_ALPHA};
+            use windows::Win32::UI::WindowsAndMessaging::{IsWindowVisible, GetWindowLongA, SetWindowLongA, GWL_EXSTYLE, WS_EX_LAYERED, WS_EX_TRANSPARENT, SetLayeredWindowAttributes, LWA_ALPHA};
             if visible {
                 // Revert any lingering WS_EX_LAYERED / WS_EX_TRANSPARENT left by
                 // open_system_tray if the user quit before the tray thread cleaned up.
@@ -106,20 +175,10 @@ pub fn set_taskbar_visibility(visible: bool, always_on_top: bool) {
                     let _ = SetWindowLongA(tray_hwnd, GWL_EXSTYLE, cleaned);
                     let _ = SetLayeredWindowAttributes(tray_hwnd, windows::Win32::Foundation::COLORREF(0), 255, LWA_ALPHA);
                 }
-                if let Ok(guard) = ORIGINAL_TRAY_RECT.lock() {
-                    if let Some(rect) = *guard {
-                        let _ = SetWindowPos(tray_hwnd, None, rect.left, rect.top, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
-                    }
-                }
+                let saved = ORIGINAL_TRAY_RECT.lock().ok().and_then(|g| *g);
+                restore_tray_position(tray_hwnd, true, saved);
                 let _ = ShowWindow(tray_hwnd, SW_SHOW);
 
-                // ShowWindow/SetWindowPos can put the taskbar back in the right place
-                // without Explorer actually repainting it, since this is raw window
-                // manipulation entirely outside Explorer's own visibility bookkeeping
-                // (that's driven by the AppBar API, which auto-hide state changes
-                // normally go through). Force a repaint and nudge Explorer's
-                // tray-settings listener directly instead of relying on it noticing
-                // on its own, so a restart of Explorer is never required.
                 {
                     use windows::Win32::Graphics::Gdi::{RedrawWindow, RDW_INVALIDATE, RDW_ALLCHILDREN, RDW_UPDATENOW, RDW_FRAME, RDW_ERASE};
                     let _ = RedrawWindow(Some(tray_hwnd), None, None, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW | RDW_FRAME | RDW_ERASE);
@@ -135,25 +194,24 @@ pub fn set_taskbar_visibility(visible: bool, always_on_top: bool) {
                 if !has_rect {
                     let mut rect = windows::Win32::Foundation::RECT::default();
                     let _ = GetWindowRect(tray_hwnd, &mut rect);
-                    if let Ok(mut guard) = ORIGINAL_TRAY_RECT.lock() {
-                        *guard = Some(rect);
+                    if rect_is_on_screen(&rect) && IsWindowVisible(tray_hwnd).as_bool() {
+                        if let Ok(mut guard) = ORIGINAL_TRAY_RECT.lock() {
+                            *guard = Some(rect);
+                        }
                     }
                 }
                 let _ = ShowWindow(tray_hwnd, SW_HIDE);
                 // Move it far off-screen to prevent any "thin line" artifacts or flashes
-                let _ = SetWindowPos(tray_hwnd, None, -10000, -10000, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+                park_below_monitor(tray_hwnd, true);
             }
         }
 
         // 3. Control visibility of secondary taskbars (multi-monitor)
         if let Ok(secondary_tray_hwnd) = FindWindowA(secondary_tray_class, windows::core::PCSTR::null()) {
-            use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOSIZE, SWP_NOZORDER, SWP_NOACTIVATE};
+            use windows::Win32::UI::WindowsAndMessaging::{IsWindowVisible};
             if visible {
-                if let Ok(guard) = ORIGINAL_SEC_TRAY_RECT.lock() {
-                    if let Some(rect) = *guard {
-                        let _ = SetWindowPos(secondary_tray_hwnd, None, rect.left, rect.top, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
-                    }
-                }
+                let saved = ORIGINAL_SEC_TRAY_RECT.lock().ok().and_then(|g| *g);
+                restore_tray_position(secondary_tray_hwnd, false, saved);
                 let _ = ShowWindow(secondary_tray_hwnd, SW_SHOW);
                 {
                     use windows::Win32::Graphics::Gdi::{RedrawWindow, RDW_INVALIDATE, RDW_ALLCHILDREN, RDW_UPDATENOW, RDW_FRAME, RDW_ERASE};
@@ -164,20 +222,17 @@ pub fn set_taskbar_visibility(visible: bool, always_on_top: bool) {
                 if !has_sec_rect {
                     let mut rect = windows::Win32::Foundation::RECT::default();
                     let _ = GetWindowRect(secondary_tray_hwnd, &mut rect);
-                    if let Ok(mut guard) = ORIGINAL_SEC_TRAY_RECT.lock() {
-                        *guard = Some(rect);
+                    if rect_is_on_screen(&rect) && IsWindowVisible(secondary_tray_hwnd).as_bool() {
+                        if let Ok(mut guard) = ORIGINAL_SEC_TRAY_RECT.lock() {
+                            *guard = Some(rect);
+                        }
                     }
                 }
                 let _ = ShowWindow(secondary_tray_hwnd, SW_HIDE);
-                let _ = SetWindowPos(secondary_tray_hwnd, None, -10000, -10000, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+                park_below_monitor(secondary_tray_hwnd, false);
             }
         }
 
-        // Belt-and-suspenders alongside the RedrawWindow calls above: broadcast
-        // the same "TraySettings" WM_SETTINGCHANGE other shell-tweaking tools
-        // use to get Explorer to resync itself, in case any part of its stale
-        // state isn't just a paint issue. SendMessageTimeout (not SendMessage)
-        // so a non-responding top-level window can't hang this call.
         if visible {
             use windows::Win32::UI::WindowsAndMessaging::{SendMessageTimeoutW, HWND_BROADCAST, WM_SETTINGCHANGE, SMTO_ABORTIFHUNG};
             let setting: Vec<u16> = "TraySettings".encode_utf16().chain(std::iter::once(0)).collect();
@@ -194,6 +249,78 @@ pub fn set_taskbar_visibility(visible: bool, always_on_top: bool) {
     }
 }
 
+pub fn exe_description(path: &str) -> Option<String> {
+    use windows::Win32::Storage::FileSystem::{GetFileVersionInfoSizeW, GetFileVersionInfoW, VerQueryValueW};
+    static CACHE: OnceLock<std::sync::Mutex<std::collections::HashMap<String, Option<String>>>> = OnceLock::new();
+    let cache = CACHE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+    if let Some(hit) = cache.lock().ok().and_then(|c| c.get(path).cloned()) {
+        return hit;
+    }
+
+    let result = unsafe {
+        let wide = |s: &str| -> Vec<u16> { s.encode_utf16().chain(std::iter::once(0)).collect() };
+        let path_w = wide(path);
+        let size = GetFileVersionInfoSizeW(windows::core::PCWSTR(path_w.as_ptr()), None);
+        if size == 0 {
+            None
+        } else {
+            let mut buf = vec![0u8; size as usize];
+            if GetFileVersionInfoW(windows::core::PCWSTR(path_w.as_ptr()), None, size, buf.as_mut_ptr() as *mut _).is_err() {
+                None
+            } else {
+                let query = |sub: &str| -> Option<(*mut std::ffi::c_void, u32)> {
+                    let sub_w = wide(sub);
+                    let mut ptr: *mut std::ffi::c_void = std::ptr::null_mut();
+                    let mut len = 0u32;
+                    let ok = VerQueryValueW(buf.as_ptr() as *const _, windows::core::PCWSTR(sub_w.as_ptr()), &mut ptr, &mut len);
+                    if ok.as_bool() && !ptr.is_null() && len > 0 { Some((ptr, len)) } else { None }
+                };
+                query("\\VarFileInfo\\Translation").and_then(|(ptr, _)| {
+                    let lang = *(ptr as *const u16);
+                    let codepage = *(ptr as *const u16).add(1);
+                    let (desc, _) = query(&format!("\\StringFileInfo\\{:04x}{:04x}\\FileDescription", lang, codepage))?;
+                    let s = String::from_utf16_lossy(windows::core::PCWSTR(desc as *const u16).as_wide()).trim().to_string();
+                    if s.is_empty() { None } else { Some(s) }
+                })
+            }
+        }
+    };
+
+    if let Ok(mut c) = cache.lock() { c.insert(path.to_string(), result.clone()); }
+    result
+}
+
+pub unsafe fn icon_from_absolute_pidl(pidl: *const windows::Win32::UI::Shell::Common::ITEMIDLIST) -> Option<String> {
+    use windows::Win32::UI::Shell::{SHGetFileInfoW, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON, SHGFI_PIDL};
+    use windows::Win32::UI::WindowsAndMessaging::DestroyIcon;
+    let mut shfi: SHFILEINFOW = std::mem::zeroed();
+    let res = SHGetFileInfoW(
+        windows::core::PCWSTR(pidl as *const u16),
+        Default::default(),
+        Some(&mut shfi),
+        std::mem::size_of::<SHFILEINFOW>() as u32,
+        SHGFI_ICON | SHGFI_LARGEICON | SHGFI_PIDL,
+    );
+    if res != 0 && !shfi.hIcon.is_invalid() {
+        let b64 = icon_to_base64(shfi.hIcon);
+        let _ = DestroyIcon(shfi.hIcon);
+        b64
+    } else {
+        None
+    }
+}
+
+pub unsafe fn icon_from_parsing_name(name: &str) -> Option<String> {
+    use windows::Win32::System::Com::CoTaskMemFree;
+    use windows::Win32::UI::Shell::SHParseDisplayName;
+    let wide: Vec<u16> = name.encode_utf16().chain(std::iter::once(0)).collect();
+    let mut pidl = std::ptr::null_mut();
+    SHParseDisplayName(windows::core::PCWSTR(wide.as_ptr()), None, &mut pidl, 0, None).ok()?;
+    if pidl.is_null() { return None; }
+    let icon = icon_from_absolute_pidl(pidl);
+    CoTaskMemFree(Some(pidl as *const _));
+    icon
+}
 
 pub unsafe fn icon_to_base64(hicon: HICON) -> Option<String> {
     let factory: IWICImagingFactory = CoCreateInstance(&CLSID_WICImagingFactory, None, CLSCTX_INPROC_SERVER).ok()?;
@@ -234,13 +361,6 @@ pub unsafe fn icon_to_base64(hicon: HICON) -> Option<String> {
     Some(format!("data:image/png;base64,{}", base64_str))
 }
 
-/// Many extracted app icons fill their square canvas almost edge-to-edge,
-/// unlike Nectar's own mark which has deliberate breathing
-/// room baked in. Rendered at the same dock-tile size, those icons look
-/// cramped next to ones with real padding. Trim to the icon's actual visible
-/// content and re-center it on a canvas sized so the content never exceeds
-/// TARGET_FILL_RATIO of it — icons that already have enough padding are just
-/// re-centered (which also fixes off-center source art), never shrunk further.
 fn normalize_icon_padding(png_bytes: &[u8]) -> Option<Vec<u8>> {
     const TARGET_FILL_RATIO: f64 = 0.82;
 

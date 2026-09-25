@@ -68,17 +68,6 @@ the user redo the wizard after the UAC prompt.
    at `installer-app/src-tauri/target/release/nectar-installer.exe` **is**
    the shippable `Nectar-Setup.exe`; rename/upload it as-is.
 
-## Known gaps / first-build risk
+## Known limitations
 
-This was written without a Rust toolchain available in the authoring
-environment (no `cargo`/`rustc`), so none of `src-tauri/src/*.rs` here has
-been compiled. The logic and Win32 API usage were modeled closely on patterns
-already working elsewhere in this repo (`src-tauri/src/utils.rs`,
-`commands.rs`), but expect some signature mismatches on the first
-`cargo build` — report them back and they'll get fixed.
-
-Not implemented (acceptable gaps for a first version, not silent bugs):
-- No rollback if install is interrupted partway through.
-- Uninstall doesn't check whether Nectar is currently running before deleting
-  files — if it's running, some files may fail to delete; the shortcuts and
-  registry entry are still removed either way.
+- No rollback if an install is interrupted partway through.

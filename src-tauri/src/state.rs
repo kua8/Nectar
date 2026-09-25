@@ -117,12 +117,6 @@ pub static MONITOR_SYNC_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
 
 pub static MENU_IS_OPEN: AtomicBool = AtomicBool::new(false);
 pub static MENU_RECT: Mutex<Option<IntRect>> = Mutex::new(None);
-// Set while the user is drag-reordering a pinned dock icon. The mouse hook's
-// click-through hit-test region is tight (icon-sized + small hysteresis), and a
-// real drag gesture can easily carry the cursor outside it — if that happens
-// mid-drag, the dock window goes click-through and stops receiving mouse
-// events entirely, silently killing the drag with no pointerup ever delivered.
-// This flag forces the dock fully interactive for the gesture's duration.
 pub static DOCK_IS_DRAGGING: AtomicBool = AtomicBool::new(false);
 pub static ICON_CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
 

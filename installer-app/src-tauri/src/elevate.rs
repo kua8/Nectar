@@ -31,8 +31,6 @@ fn wide(s: &std::ffi::OsStr) -> Vec<u16> {
     s.encode_wide().chain(std::iter::once(0)).collect()
 }
 
-/// Relaunches the current executable with the "runas" verb (triggers the UAC prompt)
-/// and the given args, then returns — caller is responsible for exiting this instance.
 pub fn relaunch_elevated(args: &[String]) -> windows::core::Result<()> {
     unsafe {
         let exe = std::env::current_exe().map_err(|_| windows::core::Error::from_win32())?;
@@ -50,8 +48,6 @@ pub fn relaunch_elevated(args: &[String]) -> windows::core::Result<()> {
             SW_SHOWNORMAL,
         );
 
-        // ShellExecuteW returns a pseudo-HINSTANCE; values <= 32 signal failure
-        // (this includes ERROR_CANCELLED when the user dismisses the UAC prompt).
         if (result.0 as isize) <= 32 {
             return Err(windows::core::Error::from_win32());
         }

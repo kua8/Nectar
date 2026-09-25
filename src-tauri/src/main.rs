@@ -8,6 +8,9 @@ mod commands;
 mod monitors;
 mod updater;
 mod uninstall_registry;
+mod native_uninstall;
+mod taskbar_pins;
+mod tray_icons;
 
 use tauri::Manager;
 use windows::Win32::System::Console::SetConsoleCtrlHandler;
@@ -30,6 +33,11 @@ unsafe extern "system" fn ctrl_handler(ctrl_type: u32) -> BOOL {
 }
 
 fn main() {
+    if native_uninstall::requested() {
+        native_uninstall::run();
+        return;
+    }
+
     unsafe {
         let _ = SetConsoleCtrlHandler(Some(ctrl_handler), true);
     }
@@ -73,10 +81,10 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             hide_native_osd,
             open_settings_window,
+            open_tray_window,
             open_wifi_settings,
             open_sound_settings,
             open_notification_center,
-            open_system_tray,
             set_ignore_cursor_events,
             set_window_height,
             resize_settings_window,
@@ -112,6 +120,7 @@ fn main() {
             set_menu_open,
             focus_window,
             close_window,
+            end_task,
             quit_nectar,
             restart_nectar,
             uninstall_nectar,
@@ -138,6 +147,8 @@ fn main() {
             get_ram_usage,
             get_disk_space,
             get_network_speed,
+            get_running_processes,
+            kill_process,
             export_settings,
             import_settings,
             reset_settings,
@@ -152,7 +163,9 @@ fn main() {
             // Crash-recovery: if a previous session was force-killed while the native
             // taskbar was hidden, restore it now. Runs before the frontend re-hides it
             // (init_dock fires after a delay), so the flag must be removed first.
-            if taskbar_marker_exists() {
+            if std::env::var_os("NECTAR_RESTARTING").is_some() {
+                std::env::remove_var("NECTAR_RESTARTING");
+            } else if taskbar_marker_exists() {
                 set_taskbar_visibility(true, true);
                 NATIVE_TASKBAR_HIDDEN.store(false, Ordering::Relaxed);
             }
@@ -215,6 +228,7 @@ fn main() {
             let _ = COMMAND_SENDER.set(tx.clone());
             let _hook = services::setup_keyboard_hook();
             setup_taskbar_hook();
+            start_window_style_guard(app.handle().clone());
             setup_audio_visualization(app.handle().clone());
             setup_settings_watcher(app.handle().clone());
 
@@ -265,9 +279,6 @@ fn main() {
                     .menu(&menu)
                     .on_menu_event(move |_, event| match event.id().as_ref() {
                         "quit" => {
-                            // Route through the shared restore-and-exit path (also used by
-                            // CloseRequested and the in-app Quit button) so the tray menu
-                            // doesn't drift out of sync with taskbar-restore fixes again.
                             crate::commands::restore_taskbar_and_exit(&ah);
                         }
                         "restart" => {
@@ -277,8 +288,7 @@ fn main() {
                                 }
                             }
                             if let Some(w) = ah.get_webview_window("settings") { let _ = w.destroy(); }
-                            set_taskbar_visibility(true, true);
-                            NATIVE_TASKBAR_HIDDEN.store(false, Ordering::Relaxed);
+                            std::env::set_var("NECTAR_RESTARTING", "1");
                             close_single_instance_handles();
 
                             ah.restart();

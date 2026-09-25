@@ -1,14 +1,8 @@
-// Lets the installer UI run in a plain browser (no Tauri runtime) so the design
-// can be previewed/iterated on without a full Rust build. Only ever used when
-// `isTauri()` is false — inside the real installer this file's exports besides
-// `isTauri` are unreachable.
 import type { InitialState, ProgressPayload } from "./api";
 
 export const isTauri = () =>
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
-// `?uninstall=1` in the preview URL lets uninstall-flow screens be checked without
-// a real install to uninstall — preview convenience only, unreachable in the real app.
 const previewUninstallMode =
   typeof window !== "undefined" && new URLSearchParams(window.location.search).get("uninstall") === "1";
 
@@ -20,6 +14,7 @@ export const mockInitialState: InitialState = {
   prefillAllUsers: false,
   prefillDesktopShortcut: true,
   autoInstall: false,
+  autoUninstall: false,
   appVersion: "1.0.0",
   payloadPresent: true,
 };

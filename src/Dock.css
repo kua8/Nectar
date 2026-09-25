@@ -50,9 +50,6 @@ body {
   transition: opacity 0.1s ease !important;
 }
 
-/* Custom hover tooltip, used in place of the native title="" attribute (which
-   renders as the OS's own yellow/system tooltip) — content comes straight from
-   data-tooltip so no JS is needed. */
 [data-tooltip] {
   position: relative;
 }
@@ -130,9 +127,6 @@ body {
   max-width: 100%;
   overflow-x: auto;
   padding: 4px;
-  /* Scrolls when an app has enough windows to overflow, but the native
-     scrollbar chrome looked like a random slider bolted onto the popup —
-     keep the scroll behavior, hide the bar itself. */
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -274,9 +268,6 @@ body {
   gap: 12px;
 }
 
-/* Marks the pinned/running split as intentional (Settings > Dock > "Mix
-   Pinned & Running" off) rather than looking like icons just can't be
-   dragged past some invisible line. */
 .dock-group-divider {
   width: 1px;
   align-self: stretch;
@@ -359,11 +350,6 @@ body {
   user-select: none;
 }
 
-/* The Nectar mark is thin line-art with a lot of negative space, unlike the
-   solid-fill app icons (Spotify's circle, Discord's badge, etc.) it sits
-   next to. At the same 28px it renders as mostly-empty, so the shared
-   .dock-icon tile background behind it reads as a plain dark box instead of
-   an icon. Sizing it closer to the full tile reduces that visible margin. */
 .dock-icon .nectar-icon-img {
   width: 32px;
   height: 32px;

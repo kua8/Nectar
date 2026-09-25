@@ -119,6 +119,7 @@ export function useSettings() {
   const [importStatus, setImportStatus] = useState<"idle" | "importing" | "success" | "error">("idle");
   const [resetStatus, setResetStatus] = useState<"idle" | "confirm" | "resetting">("idle");
   const [uninstallStatus, setUninstallStatus] = useState<"idle" | "confirm" | "uninstalling" | "error">("idle");
+  const [uninstallError, setUninstallError] = useState("");
 
   // ── Load all settings from backend + localStorage ──
   const loadAllSettings = useCallback(async () => {
@@ -675,16 +676,6 @@ export function useSettings() {
     }
   };
 
-  // ── Reset to Defaults ──
-  // Two-stage: first click arms a confirmation (auto-disarms after 4s), second
-  // click actually resets. A restart (not just re-running loadAllSettings, and
-  // not just reloading this one window) is required afterward: settings like
-  // theme/dock mode are read by every window (dock, notch, overlay), not just
-  // Settings, and loadAllSettings only calls a setter when it finds a value —
-  // with both the backend and localStorage now empty it would leave every
-  // setting sitting at its current in-memory value instead of its hardcoded
-  // default. A full app restart forces every window's useState initializers
-  // to re-run from scratch against the now-cleared storage.
   const handleResetSettings = async () => {
     if (resetStatus === "idle") {
       setResetStatus("confirm");
@@ -717,8 +708,9 @@ export function useSettings() {
       await invoke("uninstall_nectar");
     } catch (e) {
       console.error("Uninstall failed:", e);
+      setUninstallError(typeof e === "string" ? e : String((e as Error)?.message ?? e));
       setUninstallStatus("error");
-      setTimeout(() => setUninstallStatus((s) => (s === "error" ? "idle" : s)), 4000);
+      setTimeout(() => setUninstallStatus((s) => (s === "error" ? "idle" : s)), 12000);
     }
   };
 
@@ -826,7 +818,6 @@ export function useSettings() {
     checkForUpdates,
     installUpdate,
 
-    // Import / Export / Reset
     exportStatus,
     importStatus,
     handleExportSettings,
@@ -834,6 +825,7 @@ export function useSettings() {
     resetStatus,
     handleResetSettings,
     uninstallStatus,
+    uninstallError,
     handleUninstallNectar,
 
     // Utilities
