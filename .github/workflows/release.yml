@@ -87,7 +87,7 @@ jobs:
           else
             RANGE="HEAD"
           fi
-          COMMIT_COUNT=$(git log "$RANGE" --pretty=format:"%H" --no-merges | wc -l)
+          COMMIT_COUNT=$(git rev-list --count --no-merges "$RANGE")
 
           # A single commit since the last tag (e.g. this release's own hand-written,
           # multi-paragraph commit) gets its full body used verbatim as the release
@@ -95,7 +95,10 @@ jobs:
           # commits fall back to the feat:/fix: digest below, built for a run of many
           # small conventional-commit-style messages.
           if [ "$COMMIT_COUNT" -eq 1 ]; then
-            BODY=$(git log "$RANGE" -1 --pretty=format:"%B" --no-merges)
+            BODY=$(git log "$RANGE" -1 --pretty=format:"%b" --no-merges)
+            if [ -z "$(printf "%s" "$BODY" | tr -d "[:space:]")" ]; then
+              BODY=$(git log "$RANGE" -1 --pretty=format:"%s" --no-merges)
+            fi
             NOTES=$(printf "## Nectar %s\n\n%s\n" "$VERSION" "$BODY")
             echo "body<<EOF" >> "$GITHUB_OUTPUT"
             echo "$NOTES" >> "$GITHUB_OUTPUT"

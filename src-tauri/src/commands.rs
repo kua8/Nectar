@@ -157,6 +157,7 @@ pub async fn init_dock_window(app: &AppHandle, dock_win: tauri::WebviewWindow, m
     // 3. Hide taskbar after showing dock (not before, so user always has something)
     set_taskbar_visibility(false, false);
     NATIVE_TASKBAR_HIDDEN.store(true, Ordering::Relaxed);
+    crate::tray_icons::schedule_taskbar_layout_refresh();
 
     // 4. Reset overlap state so the overlap thread re-syncs cleanly
     crate::state::set_overlap(crate::state::dock_overlap(), &label, 0);
@@ -1195,9 +1196,12 @@ pub fn hide_overlay(app: AppHandle) {
 
 #[tauri::command]
 pub fn set_splash_fullscreen(app: AppHandle, fullscreen: bool) {
-    crate::state::OVERLAY_IN_SPLASH.store(fullscreen, Ordering::Relaxed);
+    let already_fullscreen = crate::state::OVERLAY_IN_SPLASH.swap(fullscreen, Ordering::Relaxed);
     if let Some(win) = app.get_webview_window("overlay") {
         if fullscreen {
+            if already_fullscreen && win.is_visible().unwrap_or(false) {
+                return;
+            }
             let _ = win.hide();
             if let Ok(Some(monitor)) = win.primary_monitor() {
                 let size = monitor.size();

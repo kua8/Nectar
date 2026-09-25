@@ -197,6 +197,7 @@ function OverlayApp() {
   const splashActiveRef = useRef(false);
   const splashDoneRef = useRef(false);
   const splashPlayingRef = useRef(false);
+  const updatingRef = useRef(false);
   const pendingUpdateRef = useRef<{ status: string; progress?: number } | null>(null);
   const applyUpdateStatusRef = useRef<(p: { status: string; progress?: number }) => void>(() => {});
   const onSplashCompleteRef = useRef<() => void>(() => {});
@@ -310,10 +311,14 @@ function OverlayApp() {
       if (progress !== undefined) setUpdateProgress(progress);
 
       if (status === 'checking' || status === 'downloading' || status === 'installing') {
-        splashActiveRef.current = true;
-        setMode('updating');
-        invoke('set_splash_fullscreen', { fullscreen: true });
+        if (!updatingRef.current) {
+          updatingRef.current = true;
+          splashActiveRef.current = true;
+          setMode('updating');
+          invoke('set_splash_fullscreen', { fullscreen: true });
+        }
       } else if (status === 'done') {
+        updatingRef.current = false;
         splashActiveRef.current = false;
         setMode('idle');
         invoke('set_splash_fullscreen', { fullscreen: false });

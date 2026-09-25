@@ -9,7 +9,7 @@ use windows::Win32::UI::Accessibility::{
     UIA_InvokePatternId,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    FindWindowA, GetCursorPos, GetWindowLongA, GetWindowRect, IsWindowVisible, SetForegroundWindow,
+    FindWindowA, FindWindowExA, GetCursorPos, GetWindowLongA, GetWindowRect, IsWindowVisible, SetForegroundWindow,
     SetLayeredWindowAttributes, SetWindowLongA, SetWindowPos, ShowWindow, GWL_EXSTYLE, HWND_TOPMOST, LWA_ALPHA,
     SWP_NOSIZE, SWP_SHOWWINDOW, SW_HIDE, SW_SHOWNA, WS_EX_LAYERED, WS_EX_TRANSPARENT,
 };
@@ -152,4 +152,61 @@ pub fn open_native_tray(anchor: Option<(i32, i32)>) {
             crate::state::NATIVE_TASKBAR_HIDDEN.store(true, Ordering::SeqCst);
         }
     }
+}
+
+fn all_taskbars() -> Vec<HWND> {
+    let mut taskbars = Vec::new();
+    if let Ok(primary) = find_window(c"Shell_TrayWnd") {
+        taskbars.push(primary);
+    }
+    let mut previous = None;
+    loop {
+        let next = unsafe {
+            FindWindowExA(None, previous, windows::core::PCSTR(c"Shell_SecondaryTrayWnd".as_ptr() as *const u8), windows::core::PCSTR::null())
+        };
+        match next {
+            Ok(hwnd) if !hwnd.0.is_null() => {
+                taskbars.push(hwnd);
+                previous = Some(hwnd);
+            }
+            _ => break,
+        }
+    }
+    taskbars
+}
+
+pub fn schedule_taskbar_layout_refresh() {
+    static SCHEDULED: AtomicBool = AtomicBool::new(false);
+    if SCHEDULED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    std::thread::spawn(|| {
+        std::thread::sleep(std::time::Duration::from_millis(2500));
+        let Ok(_guard) = AUTOMATION_LOCK.try_lock() else { return };
+        if !crate::state::NATIVE_TASKBAR_HIDDEN.swap(false, Ordering::SeqCst) {
+            return;
+        }
+
+        let taskbars = all_taskbars();
+        let originals: Vec<(HWND, i32)> = taskbars
+            .iter()
+            .map(|&hwnd| (hwnd, unsafe { GetWindowLongA(hwnd, GWL_EXSTYLE) }))
+            .collect();
+        for &(hwnd, ex) in &originals {
+            unsafe {
+                SetWindowLongA(hwnd, GWL_EXSTYLE, ex | WS_EX_LAYERED.0 as i32 | WS_EX_TRANSPARENT.0 as i32);
+                let _ = SetLayeredWindowAttributes(hwnd, windows::Win32::Foundation::COLORREF(0), 0, LWA_ALPHA);
+                let _ = ShowWindow(hwnd, SW_SHOWNA);
+            }
+        }
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        for &(hwnd, ex) in &originals {
+            unsafe {
+                let _ = ShowWindow(hwnd, SW_HIDE);
+                SetWindowLongA(hwnd, GWL_EXSTYLE, ex);
+            }
+        }
+        crate::utils::set_taskbar_visibility(false, false);
+        crate::state::NATIVE_TASKBAR_HIDDEN.store(true, Ordering::SeqCst);
+    });
 }
