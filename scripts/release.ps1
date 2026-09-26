@@ -56,7 +56,8 @@ if ($NotesFile) {
 } else {
     $notes = (git log -1 --pretty=format:"%b" --no-merges | Out-String).Trim()
     if (-not $notes) { $notes = (git log -1 --pretty=format:"%s" --no-merges | Out-String).Trim() }
-    $notes = $notes -replace "(?m)^(What's New|Changed|Bug Fixes|Other):?\s*$", '### $1'
+    $notes = $notes -replace "(?m)^(What's New|Improvements|Changed|Bug Fixes|Other):?\s*$", '### $1'
+    git fetch --tags --quiet
     $prev = git tag --sort=-version:refname | Where-Object { $_ -like "v*" -and $_ -ne $tag } | Select-Object -First 1
     if ($prev) { $notes += "`n`n**Full Changelog**: https://github.com/$repo/compare/$prev...$tag" }
 }
