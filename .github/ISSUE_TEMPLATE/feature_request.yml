@@ -1,0 +1,61 @@
+name: Feature request
+description: Suggest an idea or improvement for Nectar
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideas are welcome. Please check [existing issues](https://github.com/kua8/Nectar/issues) first so we don't duplicate a request.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Describe the situation or frustration behind the request, not just the solution.
+      placeholder: "I often drag files between apps and have to..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would you like to see?
+      description: How do you imagine it working?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of Nectar?
+      options:
+        - Dock
+        - Notch
+        - Calendar / calendar sync
+        - Timer / stopwatch
+        - Settings
+        - Installer
+        - Something new
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+      description: Other ways you handle this today, or similar features in other apps.
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Mockups, screenshots or links are welcome.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this hasn't been requested
+          required: true

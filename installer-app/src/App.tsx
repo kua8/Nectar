@@ -155,16 +155,13 @@ function Toggle({
 }
 
 function buildFeedbackUrl(reason: string, comment: string, appVersion: string): string {
-  const title = `Uninstall feedback: ${reason}`;
-  const bodyLines = [
-    `**Reason:** ${reason}`,
-    "",
-    comment.trim() ? comment.trim() : "_(no additional comments)_",
-    "",
-    `---`,
-    `Nectar version: ${appVersion || "unknown"}`,
-  ];
-  const params = new URLSearchParams({ title, body: bodyLines.join("\n") });
+  const params = new URLSearchParams({
+    template: "uninstall_feedback.yml",
+    title: `Uninstall feedback: ${reason}`,
+    reason,
+    comment: comment.trim(),
+    version: appVersion || "unknown",
+  });
   return `https://github.com/kua8/Nectar/issues/new?${params.toString()}`;
 }
 

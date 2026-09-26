@@ -1,0 +1,23 @@
+name: Uninstall feedback
+description: Tell us why you removed Nectar (opened from the uninstaller)
+title: "Uninstall feedback"
+labels: ["feedback"]
+body:
+  - type: input
+    id: reason
+    attributes:
+      label: Reason
+      description: Why did you uninstall?
+    validations:
+      required: true
+
+  - type: textarea
+    id: comment
+    attributes:
+      label: Anything else you'd like to add?
+      description: Optional, but the more specific, the more useful.
+
+  - type: input
+    id: version
+    attributes:
+      label: Nectar version

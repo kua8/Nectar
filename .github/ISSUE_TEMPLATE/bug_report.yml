@@ -1,0 +1,96 @@
+name: Bug report
+description: Something in Nectar isn't working the way it should
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. The more detail you give, the faster it can be fixed.
+        Please search [existing issues](https://github.com/kua8/Nectar/issues) first in case it's already reported.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the bug and what you expected to happen instead.
+      placeholder: "The notch stays collapsed when I hover it on my second monitor..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps that trigger the problem, starting from a fresh launch if possible.
+      placeholder: |
+        1. Open Nectar
+        2. Move the mouse over the notch
+        3. ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of Nectar?
+      options:
+        - Dock
+        - Notch
+        - Calendar / calendar sync
+        - Timer / stopwatch
+        - Settings
+        - Installer / uninstaller
+        - Auto-update
+        - Tray
+        - Something else
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Nectar version
+      description: Shown in Settings › About.
+      placeholder: "1.3.1"
+    validations:
+      required: true
+
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      description: Press Win+R, type `winver`, and paste the version and build.
+      placeholder: "Windows 11 24H2 (build 26100)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: displays
+    attributes:
+      label: Monitor setup
+      description: Only needed for display, dock or notch problems. Number of monitors, resolution, scaling %, and whether Nectar is set to one monitor or all monitors.
+      placeholder: "2 monitors, 1920x1080 at 100% and 2560x1440 at 150%, All Monitors on"
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: In Settings › About, click **Copy Diagnostics** and paste the result here. For logs, use **Open Log Folder** and attach `nectar.log`.
+      render: text
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or screen recording
+      description: Drag and drop images or videos here. Especially helpful for visual glitches.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this hasn't been reported
+          required: true
+        - label: I'm on the latest version of Nectar
+          required: true
