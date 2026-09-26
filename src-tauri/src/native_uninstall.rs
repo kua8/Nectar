@@ -36,7 +36,7 @@ fn message(text: &str, flags: windows::Win32::UI::WindowsAndMessaging::MESSAGEBO
     unsafe { MessageBoxW(None, PCWSTR(text_w.as_ptr()), PCWSTR(title_w.as_ptr()), flags | MB_TOPMOST) }
 }
 
-fn is_elevated() -> bool {
+pub fn is_elevated() -> bool {
     unsafe {
         let mut token = HANDLE::default();
         if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token).is_err() {
@@ -166,9 +166,17 @@ pub fn run() {
            Remove-Item -LiteralPath '{dir}' -Recurse -Force -ErrorAction SilentlyContinue -ErrorVariable failed; \
            if (Test-Path -LiteralPath '{dir}') {{ Start-Sleep -Milliseconds 500 }} \
          }}; \
-         if (Test-Path -LiteralPath '{dir}') {{ Add-Content (Join-Path $env:TEMP 'nectar-uninstall.log') (\"Could not remove {dir}: \" + ($failed | Out-String)) }}",
+         if (Test-Path -LiteralPath '{dir}') {{ \
+           Add-Content (Join-Path $env:TEMP 'nectar-uninstall.log') (\"Could not remove {dir}: \" + ($failed | Out-String)); \
+           New-ItemProperty -Path '{run_once}' -Name 'NectarCleanup' -Value 'cmd /c rd /s /q \"{dir}\"' -Force -ErrorAction SilentlyContinue | Out-Null \
+         }}",
         pid = std::process::id(),
-        dir = dir_str
+        dir = dir_str,
+        run_once = if all_users {
+            r"HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce"
+        } else {
+            r"HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce"
+        }
     );
     let spawn = |flags: u32| {
         std::process::Command::new("powershell")

@@ -423,17 +423,20 @@ function App() {
   }, [isNotchHovered, isNotchWindow]);
 
   useEffect(() => {
+    let lastSent = "";
     const updateRect = () => {
       if (nectarRef.current && isNotchWindow) {
         const rect = nectarRef.current.getBoundingClientRect();
-        invoke('update_notch_rect', {
-          rect: {
-            x: Math.round(rect.x),
-            y: Math.round(rect.y),
-            width: Math.round(rect.width),
-            height: Math.round(rect.height)
-          }
-        }).catch(() => { });
+        const next = {
+          x: Math.round(rect.x),
+          y: Math.round(rect.y),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height)
+        };
+        const key = `${next.x},${next.y},${next.width},${next.height}`;
+        if (key === lastSent) return;
+        lastSent = key;
+        invoke('update_notch_rect', { rect: next }).catch(() => { lastSent = ""; });
       }
     };
 
@@ -441,10 +444,12 @@ function App() {
     window.addEventListener('resize', updateRect);
     const observer = new ResizeObserver(updateRect);
     if (nectarRef.current) observer.observe(nectarRef.current);
+    const poll = setInterval(updateRect, 500);
 
     return () => {
       window.removeEventListener('resize', updateRect);
       observer.disconnect();
+      clearInterval(poll);
     };
   }, [isExpanded, isHidden, windowLabel, scale]);
 

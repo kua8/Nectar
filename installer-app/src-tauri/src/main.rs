@@ -11,6 +11,18 @@ mod uninstall;
 
 use tauri::Manager;
 
+fn fit_to_screen(window: &tauri::WebviewWindow) {
+    const WIDTH: f64 = 620.0;
+    const HEIGHT: f64 = 560.0;
+    const MARGIN: f64 = 0.9;
+    let Ok(Some(monitor)) = window.primary_monitor() else { return };
+    let scale = monitor.scale_factor();
+    let avail_w = monitor.size().width as f64 / scale * MARGIN;
+    let avail_h = monitor.size().height as f64 / scale * MARGIN;
+    let _ = window.set_size(tauri::LogicalSize::new(WIDTH.min(avail_w), HEIGHT.min(avail_h)));
+    let _ = window.center();
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -30,6 +42,7 @@ fn main() {
         ])
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
+            fit_to_screen(&window);
             #[cfg(target_os = "windows")]
             {
                 let _ = window_vibrancy::apply_mica(&window, None);

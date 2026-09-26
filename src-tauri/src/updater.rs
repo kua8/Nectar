@@ -171,6 +171,9 @@ pub async fn install(app: &AppHandle) -> Result<(), String> {
     }
     let result = install_inner(app).await;
     UPDATE_BUSY.store(false, Ordering::SeqCst);
+    if let Err(e) = &result {
+        crate::diagnostics::log(&format!("update install failed: {e}"));
+    }
     result
 }
 

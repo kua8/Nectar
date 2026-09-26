@@ -9,6 +9,7 @@ mod monitors;
 mod updater;
 mod uninstall_registry;
 mod native_uninstall;
+mod diagnostics;
 mod taskbar_pins;
 mod tray_icons;
 mod caldav;
@@ -41,6 +42,8 @@ fn main() {
         native_uninstall::run();
         return;
     }
+
+    diagnostics::init();
 
     unsafe {
         let _ = SetConsoleCtrlHandler(Some(ctrl_handler), true);
@@ -129,6 +132,10 @@ fn main() {
             quit_nectar,
             restart_nectar,
             uninstall_nectar,
+            get_diagnostics,
+            open_log_folder,
+            set_hitbox_logging,
+            get_hitbox_logging,
             get_volume,
             get_brightness,
             set_volume,

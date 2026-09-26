@@ -1446,6 +1446,33 @@ pub async fn uninstall_nectar(handle: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub async fn get_diagnostics(app: AppHandle) -> String {
+    tauri::async_runtime::spawn_blocking(move || crate::diagnostics::build_report(&app))
+        .await
+        .unwrap_or_else(|e| format!("Couldn't build the report: {e}"))
+}
+
+#[tauri::command]
+pub fn open_log_folder() -> Result<(), String> {
+    let dir = crate::diagnostics::log_dir().ok_or_else(|| "No log folder yet".to_string())?;
+    std::process::Command::new("explorer")
+        .arg(&dir)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_hitbox_logging(enabled: bool) {
+    crate::diagnostics::set_hitbox_logging(enabled);
+}
+
+#[tauri::command]
+pub fn get_hitbox_logging() -> bool {
+    crate::diagnostics::hitbox_logging()
+}
+
+#[tauri::command]
 pub async fn restart_nectar(handle: AppHandle) {
     #[cfg(debug_assertions)]
     {

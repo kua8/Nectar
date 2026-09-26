@@ -110,15 +110,16 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 0 32px 28px;
-  overflow: hidden;
+  padding: 0 36px 28px;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .screen {
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  min-height: min-content;
 }
 
 .welcome-screen {
@@ -131,7 +132,6 @@ body {
   align-items: center;
   text-align: center;
   padding-top: 4px;
-  overflow-y: auto;
 }
 
 .centered {
@@ -198,7 +198,7 @@ p {
 
 .spacer {
   flex: 1;
-  min-height: 12px;
+  min-height: 16px;
 }
 
 .spacer-sm {
@@ -210,7 +210,8 @@ p {
   gap: 10px;
   width: 100%;
   justify-content: flex-end;
-  padding-top: 8px;
+  padding-top: 16px;
+  flex-shrink: 0;
 }
 
 .btn {
@@ -275,7 +276,7 @@ p {
 .path-row {
   display: flex;
   gap: 8px;
-  margin-bottom: 18px;
+  margin-bottom: 20px;
 }
 
 .path-input {
@@ -299,15 +300,15 @@ p {
 .radio-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
+  gap: 10px;
+  margin-bottom: 18px;
 }
 
 .radio-option {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: 12px;
+  padding: 12px 14px;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.04);
@@ -519,4 +520,16 @@ p {
   font-size: 10.5px;
   margin-top: 10px;
   line-height: 1.4;
+}
+
+@media (max-height: 520px) {
+  .title-bar { height: 30px; }
+  .content { padding: 0 28px 18px; }
+  h1 { margin: 8px 0 2px; font-size: 17px; }
+  h2 { margin: 0 0 12px; }
+  .path-row { margin-bottom: 12px; }
+  .radio-group { gap: 6px; margin-bottom: 10px; }
+  .radio-option { padding: 8px 12px; }
+  .actions { padding-top: 10px; }
+  .welcome-screen { padding-top: 0; }
 }

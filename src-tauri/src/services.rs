@@ -11,8 +11,16 @@ use windows::Win32::Foundation::CloseHandle;
 use std::path::Path;
 use wmi::{COMLibrary, WMIConnection};
 
-pub fn setup_keyboard_hook() -> windows::Win32::UI::WindowsAndMessaging::HHOOK {
-    unsafe { windows::Win32::UI::WindowsAndMessaging::SetWindowsHookExA(windows::Win32::UI::WindowsAndMessaging::WH_KEYBOARD_LL, Some(keyboard_hook_proc), None, 0).expect("Failed") }
+pub fn setup_keyboard_hook() -> Option<windows::Win32::UI::WindowsAndMessaging::HHOOK> {
+    unsafe {
+        match windows::Win32::UI::WindowsAndMessaging::SetWindowsHookExA(windows::Win32::UI::WindowsAndMessaging::WH_KEYBOARD_LL, Some(keyboard_hook_proc), None, 0) {
+            Ok(h) => Some(h),
+            Err(e) => {
+                crate::diagnostics::log(&format!("keyboard hook install failed: {e}"));
+                None
+            }
+        }
+    }
 }
 
 unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: windows::Win32::Foundation::WPARAM, lparam: windows::Win32::Foundation::LPARAM) -> windows::Win32::Foundation::LRESULT {
@@ -1175,7 +1183,7 @@ static CAPTURE_UI_ACTIVE: AtomicBool = AtomicBool::new(false);
 static CAPTURE_RECHECK: AtomicBool = AtomicBool::new(true);
 static CAPTURE_LAST_SCAN_MS: AtomicI64 = AtomicI64::new(0);
 
-fn now_ms() -> i64 {
+pub fn now_ms() -> i64 {
     SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_millis() as i64
 }
 
@@ -1255,16 +1263,60 @@ fn apply_capture_ui_state(app: &AppHandle, active: bool) {
     if let Ok(mut m) = crate::state::notch_extra_last_ignore().lock() { for v in m.values_mut() { *v = -1; } }
 }
 
-pub fn setup_mouse_hook(app_handle: AppHandle) {
-    let _ = MOUSE_HOOK_APP_HANDLE.set(app_handle);
+static MOUSE_HOOK_HANDLE: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new(0);
+
+fn install_mouse_hook() {
+    use windows::Win32::UI::WindowsAndMessaging::UnhookWindowsHookEx;
     unsafe {
-        SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_hook_proc), None, 0)
-            .expect("Failed to install mouse hook");
+        let old = MOUSE_HOOK_HANDLE.swap(0, Ordering::Relaxed);
+        if old != 0 {
+            let _ = UnhookWindowsHookEx(windows::Win32::UI::WindowsAndMessaging::HHOOK(old as *mut _));
+        }
+        match SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_hook_proc), None, 0) {
+            Ok(h) => MOUSE_HOOK_HANDLE.store(h.0 as isize, Ordering::Relaxed),
+            Err(e) => crate::diagnostics::log(&format!("mouse hook install failed: {e}")),
+        }
     }
+}
+
+fn start_mouse_hook_watchdog(app_handle: AppHandle) {
+    use windows::Win32::Foundation::POINT;
+    use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
+    std::thread::spawn(move || {
+        let mut last_pos = (i32::MIN, i32::MIN);
+        let mut last_reinstall_ms = 0i64;
+        loop {
+            std::thread::sleep(Duration::from_secs(2));
+            let mut p = POINT::default();
+            if unsafe { GetCursorPos(&mut p) }.is_err() {
+                continue;
+            }
+            let moved = (p.x, p.y) != last_pos;
+            last_pos = (p.x, p.y);
+            let now = now_ms();
+            let last_event = crate::diagnostics::HOOK_LAST_EVENT_MS.load(Ordering::Relaxed);
+            let silent = last_event == 0 || now - last_event > 3000;
+            if moved && silent && now - last_reinstall_ms > 10_000 {
+                last_reinstall_ms = now;
+                crate::diagnostics::HOOK_REINSTALLS.fetch_add(1, Ordering::Relaxed);
+                crate::diagnostics::log("mouse hook silent while the cursor moved, reinstalling it");
+                let _ = app_handle.run_on_main_thread(install_mouse_hook);
+            }
+        }
+    });
+}
+
+pub fn setup_mouse_hook(app_handle: AppHandle) {
+    let _ = MOUSE_HOOK_APP_HANDLE.set(app_handle.clone());
+    install_mouse_hook();
+    start_mouse_hook_watchdog(app_handle);
 }
 
 unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> windows::Win32::Foundation::LRESULT {
     if code >= 0 && wparam.0 == WM_MOUSEMOVE as usize {
+        crate::diagnostics::HOOK_EVENTS.fetch_add(1, Ordering::Relaxed);
+        crate::diagnostics::HOOK_LAST_EVENT_MS.store(now_ms(), Ordering::Relaxed);
+
         // Throttle to ~30fps (32ms) to match old polling cadence.
         // Without this, state checks and set_ignore_cursor_events fire on
         // every pixel of cursor movement, causing notch flicker at edges.
@@ -1350,6 +1402,9 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
                     let mut is_click_interactive = false;
                     let mut is_hovered = false;
                     let mut dock_span: Option<(i32, i32)> = None;
+                    let mut dbg_box: Option<(i32, i32, i32, i32)> = None;
+                    let mut dbg_rect: Option<crate::types::IntRect> = None;
+                    let mut dbg_scale = 1.0;
 
                     let dock_rect_val = crate::state::dock_window_rects().lock().ok().and_then(|m| m.get("dock").copied());
 
@@ -1376,6 +1431,9 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
                                         is_click_interactive = true;
                                     }
                                     dock_span = Some((rx, rx + rw));
+                                    dbg_box = Some((rx, ry, rw, rh));
+                                    dbg_rect = Some(r);
+                                    dbg_scale = scale;
                                 }
                             }
 
@@ -1426,6 +1484,14 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
                         MH_LAST_EDGE_HOVER.store(new_val, Ordering::Relaxed);
                     }
 
+                    crate::diagnostics::hitbox_log(0, now, || format!(
+                        "hit dock cursor=({},{}) window={:?} css_rect={:?} scale={} box={:?} interactive={} ignore_before={}",
+                        cursor.x, cursor.y,
+                        dock_rect_val.map(|(p, sz)| (p.x, p.y, sz.width, sz.height)),
+                        dbg_rect.map(|r| (r.x, r.y, r.width, r.height)),
+                        dbg_scale, dbg_box, is_click_interactive, MH_LAST_DOCK_IGNORE.load(Ordering::Relaxed),
+                    ));
+
                     let should_ignore = !is_click_interactive
                         && !MENU_IS_OPEN.load(Ordering::Relaxed)
                         && !DOCK_IS_DRAGGING.load(Ordering::Relaxed);
@@ -1462,6 +1528,8 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
                         }
 
                         let mut is_click_interactive = false;
+                        let mut dbg_box: Option<(i32, i32, i32, i32)> = None;
+                        let mut dbg_rect: Option<crate::types::IntRect> = None;
                         let main_rect_val = crate::state::main_window_rects().lock().ok().and_then(|m| m.get("main").copied());
 
                         if let Some((win_pos, _)) = main_rect_val {
@@ -1482,6 +1550,8 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
                                     if cursor.x >= rx && cursor.x <= (rx + rw) && cursor.y >= ry_top && cursor.y <= ry_bottom {
                                         is_click_interactive = true;
                                     }
+                                    dbg_box = Some((rx, ry_top, rw, ry_bottom - ry_top));
+                                    dbg_rect = Some(r);
 
                                     // Approaching along the top edge keeps the window
                                     // interactive while near the notch's horizontal
@@ -1502,6 +1572,14 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
                             let _ = app_handle.emit("notch-edge-hover", final_notch_hover);
                             MH_LAST_TOP_EDGE_HOVER.store(new_val, Ordering::Relaxed);
                         }
+
+                        crate::diagnostics::hitbox_log(1, now, || format!(
+                            "hit notch cursor=({},{}) window={:?} css_rect={:?} scale={} box={:?} interactive={} at_top_edge={} ignore_before={}",
+                            cursor.x, cursor.y,
+                            main_rect_val.map(|(p, sz)| (p.x, p.y, sz.width, sz.height)),
+                            dbg_rect.map(|r| (r.x, r.y, r.width, r.height)),
+                            scale, dbg_box, is_click_interactive, at_top_edge, MH_LAST_MAIN_IGNORE.load(Ordering::Relaxed),
+                        ));
 
                         let final_ignore = !is_click_interactive && !MENU_IS_OPEN.load(Ordering::Relaxed);
                         let prev_ignore = MH_LAST_MAIN_IGNORE.load(Ordering::Relaxed);

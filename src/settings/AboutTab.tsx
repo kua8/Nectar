@@ -1,4 +1,6 @@
-import { Download, RefreshCw, FileDown, Upload, RotateCcw, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { Download, RefreshCw, FileDown, Upload, RotateCcw, Trash2, ClipboardCopy, FolderOpen, Crosshair } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 
 interface AboutTabProps {
@@ -38,6 +40,38 @@ export function AboutTab({
   uninstallError,
   handleUninstallNectar,
 }: AboutTabProps) {
+  const [diagStatus, setDiagStatus] = useState<"idle" | "working" | "copied" | "error">("idle");
+  const [hitboxLogging, setHitboxLogging] = useState(false);
+
+  useEffect(() => {
+    invoke<boolean>("get_hitbox_logging").then(setHitboxLogging).catch(() => {});
+  }, []);
+
+  const copyDiagnostics = async () => {
+    setDiagStatus("working");
+    try {
+      const report = await invoke<string>("get_diagnostics");
+      await navigator.clipboard.writeText(report);
+      setDiagStatus("copied");
+    } catch {
+      setDiagStatus("error");
+    }
+    setTimeout(() => setDiagStatus("idle"), 2500);
+  };
+
+  const toggleHitboxLogging = () => {
+    const next = !hitboxLogging;
+    setHitboxLogging(next);
+    invoke("set_hitbox_logging", { enabled: next }).catch(() => setHitboxLogging(!next));
+  };
+
+  const getDiagLabel = () => {
+    if (diagStatus === "working") return "Collecting...";
+    if (diagStatus === "copied") return "Copied to clipboard!";
+    if (diagStatus === "error") return "Couldn't copy — open the log folder instead";
+    return "Copy Diagnostics";
+  };
+
   const getUpdateLabel = () => {
     switch (updateStatus) {
       case "checking":
@@ -165,6 +199,31 @@ export function AboutTab({
           danger={resetStatus === "confirm"}
           onClick={handleResetSettings}
         />
+      </div>
+
+      <div className="setting-group-label setting-group-label--spaced">
+        Diagnostics
+      </div>
+      <div className="setting-group">
+        <SettingRow
+          icon={ClipboardCopy}
+          label={getDiagLabel()}
+          desc="System info and recent log, to paste into a bug report"
+          action
+          onClick={copyDiagnostics}
+        />
+        <SettingRow icon={FolderOpen} label="Open Log Folder" desc="nectar.log and diagnostics.txt" action onClick={() => invoke("open_log_folder").catch(() => {})} />
+        <SettingRow
+          icon={Crosshair}
+          label="Log Dock and Notch Clicks"
+          desc="Turn on, move over the dock and notch for a few seconds, then copy diagnostics. Resets on restart"
+          divider={false}
+        >
+          <label className="toggle-switch">
+            <input type="checkbox" checked={hitboxLogging} onChange={toggleHitboxLogging} />
+            <span className="slider"></span>
+          </label>
+        </SettingRow>
       </div>
 
       <div className="setting-group-label setting-group-label--spaced">

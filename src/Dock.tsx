@@ -155,18 +155,21 @@ const Dock = memo(function Dock() {
   }, []);
 
   useEffect(() => {
+    let lastSent = "";
     const updateRect = () => {
       if (dockRef.current) {
         const rect = dockRef.current.getBoundingClientRect();
         const hasPreview = !!previewData;
-        invoke('update_dock_rect', {
-          rect: {
-            x: Math.round(rect.x) - (hasPreview ? 500 : 0),
-            y: Math.round(rect.y) - (hasPreview ? 320 : 0),
-            width: Math.round(rect.width) + (hasPreview ? 1000 : 0),
-            height: Math.round(rect.height) + (hasPreview ? 320 : 0)
-          }
-        }).catch(() => {});
+        const next = {
+          x: Math.round(rect.x) - (hasPreview ? 500 : 0),
+          y: Math.round(rect.y) - (hasPreview ? 320 : 0),
+          width: Math.round(rect.width) + (hasPreview ? 1000 : 0),
+          height: Math.round(rect.height) + (hasPreview ? 320 : 0)
+        };
+        const key = `${next.x},${next.y},${next.width},${next.height}`;
+        if (key === lastSent) return;
+        lastSent = key;
+        invoke('update_dock_rect', { rect: next }).catch(() => { lastSent = ""; });
       }
     };
 
@@ -174,10 +177,12 @@ const Dock = memo(function Dock() {
     window.addEventListener('resize', updateRect);
     const observer = new ResizeObserver(updateRect);
     if (dockRef.current) observer.observe(dockRef.current);
+    const poll = setInterval(updateRect, 500);
 
     return () => {
       window.removeEventListener('resize', updateRect);
       observer.disconnect();
+      clearInterval(poll);
     };
   }, [pinnedApps, activeApps, isHidden, previewData, scale]);
 
