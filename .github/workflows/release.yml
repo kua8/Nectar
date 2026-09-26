@@ -106,7 +106,7 @@ jobs:
             if [ -z "$(printf "%s" "$BODY" | tr -d "[:space:]")" ]; then
               BODY=$(git log "$RANGE" -1 --pretty=format:"%s" --no-merges)
             fi
-            BODY=$(printf "%s" "$BODY" | sed -E "s/^(What's New|Bug Fixes|Other):?$/### /")
+            BODY=$(printf "%s" "$BODY" | sed -E "s/^(What's New|Bug Fixes|Other):?$/### \1/")
             NOTES=$(printf "%s%s\n" "$BODY" "$COMPARE")
             echo "body<<EOF" >> "$GITHUB_OUTPUT"
             echo "$NOTES" >> "$GITHUB_OUTPUT"
