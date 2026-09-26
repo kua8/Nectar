@@ -94,12 +94,6 @@ jobs:
             COMPARE=$(printf "\n\n**Full Changelog**: https://github.com/%s/compare/%s...%s" "$GITHUB_REPOSITORY" "$PREV_TAG" "$TAG")
           fi
 
-          # The tagged commit's body is used as the notes when it is the only commit since
-          # the last tag, or when it has "What's New" / "Bug Fixes" sections (the
-          # hand-written release commit, even with docs commits before it). Section
-          # titles written as plain lines become "### " headings here, so commit
-          # messages stay free of markdown. Otherwise fall back to the feat:/fix:
-          # digest below, built for a run of small commits.
           HEAD_BODY=$(git log -1 --pretty=format:"%b" --no-merges)
           if [ "$COMMIT_COUNT" -eq 1 ] || printf "%s" "$HEAD_BODY" | grep -qE "^(### |What's New:?$|Bug Fixes:?$)"; then
             BODY=$(git log "$RANGE" -1 --pretty=format:"%b" --no-merges)
