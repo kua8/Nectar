@@ -99,10 +99,31 @@ Function NectarMinimizeClick
   System::Call 'user32::ShowWindow(i $HWNDPARENT, i ${SW_MINIMIZE_VAL})'
 FunctionEnd
 
-; Tauri also supports NSIS_HOOK_PREINSTALL/POSTINSTALL/PREUNINSTALL/
-; POSTUNINSTALL macros in this same file for install/uninstall-time actions,
-; wrapped in `!ifmacrodef` so they're optional — intentionally not used here
-; since this file is only about window styling, not install behavior.
+!macro NSIS_HOOK_PREINSTALL
+  ${GetSize} "$INSTDIR" "/M=uninstall.exe /S=0K /G=0" $0 $1 $2
+  ${If} $0 > 1024
+    CopyFiles /SILENT "$INSTDIR\uninstall.exe" "$TEMP\nectar-uninstall.keep"
+  ${EndIf}
+!macroend
+
+!macro NSIS_HOOK_POSTINSTALL
+  ${If} ${FileExists} "$TEMP\nectar-uninstall.keep"
+    CopyFiles /SILENT "$TEMP\nectar-uninstall.keep" "$INSTDIR\uninstall.exe"
+    Delete "$TEMP\nectar-uninstall.keep"
+    WriteRegStr SHCTX "${UNINSTKEY}" "UninstallString" "$\"$INSTDIR\uninstall.exe$\" --uninstall"
+  ${Else}
+    Delete "$INSTDIR\uninstall.exe"
+    WriteRegStr SHCTX "${UNINSTKEY}" "UninstallString" "$\"$INSTDIR\${MAINBINARYNAME}.exe$\" --uninstall"
+  ${EndIf}
+  FileOpen $0 "$INSTDIR\.install-scope" w
+  ${If} $MultiUser.InstallMode == "AllUsers"
+    FileWrite $0 "all-users"
+  ${Else}
+    FileWrite $0 "user"
+  ${EndIf}
+  FileClose $0
+!macroend
+
 ;
 ; The uninstaller's window isn't styled to match — MUI2's equivalent hook
 ; for the uninstaller's GUI init isn't something this environment could

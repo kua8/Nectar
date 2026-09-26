@@ -1438,6 +1438,7 @@ pub async fn uninstall_nectar(handle: AppHandle) -> Result<(), String> {
 
     std::process::Command::new(&uninstaller)
         .arg("--uninstall")
+        .current_dir(std::env::temp_dir())
         .spawn()
         .map_err(|e| format!("Couldn't launch {}: {}", uninstaller.display(), e))?;
 

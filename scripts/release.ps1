@@ -1,5 +1,3 @@
-# Usage: ./scripts/release.ps1 -Version 1.3.1 [-DryRun] [-NotesFile notes.md]
-
 param(
     [Parameter(Mandatory = $true)][string]$Version,
     [switch]$DryRun,

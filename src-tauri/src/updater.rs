@@ -177,6 +177,15 @@ pub async fn install(app: &AppHandle) -> Result<(), String> {
     result
 }
 
+fn installer_scope_args() -> Vec<String> {
+    let Some(dir) = std::env::current_exe().ok().and_then(|p| p.parent().map(PathBuf::from)) else { return Vec::new() };
+    let Some(all_users) = crate::uninstall_registry::install_scope(&dir) else { return Vec::new() };
+    vec![
+        if all_users { "/ALLUSERS" } else { "/CURRENTUSER" }.to_string(),
+        format!("/D={}", dir.display()),
+    ]
+}
+
 async fn install_inner(app: &AppHandle) -> Result<(), String> {
     // Hold the check lock so a concurrent check cannot mutate state mid-install.
     let _guard = CHECK_LOCK.lock().await;
@@ -184,6 +193,7 @@ async fn install_inner(app: &AppHandle) -> Result<(), String> {
     let hook_handle = app.clone();
     let updater = app
         .updater_builder()
+        .installer_args(installer_scope_args())
         .on_before_exit(move || {
             let _ = hook_handle.emit("auto-update-status", serde_json::json!({ "status": "installing" }));
             hook_handle.cleanup_before_exit();

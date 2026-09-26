@@ -123,6 +123,8 @@ fn remove_registry(all_users: bool) {
         let root = if all_users { HKEY_LOCAL_MACHINE } else { HKEY_CURRENT_USER };
         let subkey_w = wide(UNINSTALL_SUBKEY);
         let _ = RegDeleteTreeW(root, PCWSTR(subkey_w.as_ptr()));
+        let install_key = wide(r"Software\kua8\nectar");
+        let _ = RegDeleteTreeW(root, PCWSTR(install_key.as_ptr()));
 
         let run_key = wide(r"Software\Microsoft\Windows\CurrentVersion\Run");
         let approved_key = wide(r"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run");
@@ -136,8 +138,7 @@ pub fn run() {
     let Ok(exe) = std::env::current_exe() else { return };
     let Some(install_dir) = exe.parent().map(Path::to_path_buf) else { return };
 
-    let scope = std::fs::read_to_string(install_dir.join(".install-scope")).unwrap_or_default();
-    let all_users = scope.trim() == "all-users";
+    let all_users = crate::uninstall_registry::install_scope(&install_dir).unwrap_or(false);
 
     if all_users && !is_elevated() {
         if !relaunch_elevated(&exe) {
@@ -181,6 +182,7 @@ pub fn run() {
     let spawn = |flags: u32| {
         std::process::Command::new("powershell")
             .args(["-NoProfile", "-WindowStyle", "Hidden", "-Command", &ps_command])
+            .current_dir(std::env::temp_dir())
             .creation_flags(flags)
             .spawn()
     };

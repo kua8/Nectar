@@ -220,13 +220,21 @@ pub fn open_url(url: String) -> Result<(), String> {
     Ok(())
 }
 
+fn install_is_all_users(install_dir: &std::path::Path) -> bool {
+    if let Ok(scope) = std::fs::read_to_string(install_dir.join(".install-scope")) {
+        return scope.trim() == "all-users";
+    }
+    crate::known_folders::program_files_dir().is_some_and(|pf| {
+        install_dir.to_string_lossy().to_lowercase().starts_with(&pf.to_string_lossy().to_lowercase())
+    })
+}
+
 #[tauri::command]
 pub async fn start_uninstall(app: tauri::AppHandle) -> Result<(), String> {
     let self_exe = std::env::current_exe().map_err(|e| e.to_string())?;
     let install_dir = self_exe.parent().ok_or("no parent dir")?.to_path_buf();
 
-    let scope = std::fs::read_to_string(install_dir.join(".install-scope")).unwrap_or_default();
-    let all_users_install = scope.trim() == "all-users";
+    let all_users_install = install_is_all_users(&install_dir);
     if all_users_install && !crate::elevate::is_elevated() {
         crate::elevate::relaunch_elevated(&["--uninstall".to_string(), "--auto-uninstall".to_string()])
             .map_err(|_| "Uninstalling an all-users install needs administrator permission.".to_string())?;

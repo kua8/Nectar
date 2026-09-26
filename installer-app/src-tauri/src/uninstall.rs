@@ -74,6 +74,7 @@ pub fn uninstall(install_dir: &Path, all_users: bool, shortcuts: &[PathBuf]) -> 
     let spawn = |flags: u32| {
         std::process::Command::new("powershell")
             .args(["-NoProfile", "-WindowStyle", "Hidden", "-Command", &ps_command])
+            .current_dir(std::env::temp_dir())
             .creation_flags(flags)
             .spawn()
     };

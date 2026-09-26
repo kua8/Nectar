@@ -144,13 +144,32 @@ fn repair_uninstaller(exe: &Path, uninstall_exe: &Path) {
     let _ = std::fs::copy(exe, uninstall_exe);
 }
 
+pub fn install_scope(install_dir: &Path) -> Option<bool> {
+    if let Ok(scope) = std::fs::read_to_string(install_dir.join(".install-scope")) {
+        return Some(scope.trim() == "all-users");
+    }
+    let dir = format!("{}\\", install_dir.to_string_lossy().to_lowercase());
+    let under = |var: &str, sub: &str| {
+        std::env::var(var).is_ok_and(|base| dir.starts_with(&format!("{}\\{}", base.to_lowercase(), sub)))
+    };
+    if under("ProgramFiles", "") || under("ProgramW6432", "") || under("ProgramFiles(x86)", "") {
+        Some(true)
+    } else if under("LOCALAPPDATA", "programs\\") {
+        Some(false)
+    } else {
+        None
+    }
+}
+
 pub fn heal_uninstall_registration() {
     let Ok(current_exe) = std::env::current_exe() else { return };
     let Some(install_dir) = current_exe.parent() else { return };
 
+    let Some(all_users) = install_scope(install_dir) else { return };
     let scope_file = install_dir.join(".install-scope");
-    let Ok(scope) = std::fs::read_to_string(&scope_file) else { return };
-    let all_users = scope.trim() == "all-users";
+    if !scope_file.exists() {
+        let _ = std::fs::write(&scope_file, if all_users { "all-users" } else { "user" });
+    }
 
     let uninstall_exe = install_dir.join("uninstall.exe");
     repair_uninstaller(&current_exe, &uninstall_exe);
