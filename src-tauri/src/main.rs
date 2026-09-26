@@ -212,6 +212,12 @@ fn main() {
             crate::services::wire_window_events(app.handle(), &window, crate::types::WindowKind::Notch, false);
             crate::services::wire_window_events(app.handle(), &dock_win, crate::types::WindowKind::Dock, false);
 
+            for label in ["main", "dock", "overlay"] {
+                if let Some(w) = app.get_webview_window(label) {
+                    let _ = w.set_ignore_cursor_events(true);
+                }
+            }
+
             sync_overlays(app.handle());
 
             {

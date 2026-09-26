@@ -101,6 +101,8 @@ function SettingsApp() {
               toggleTimeFormat24h={settings.toggleTimeFormat24h}
               showUpdateIndicator={settings.showUpdateIndicator}
               toggleUpdateIndicator={settings.toggleUpdateIndicator}
+              hideInFullscreen={settings.hideInFullscreen}
+              toggleHideInFullscreen={settings.toggleHideInFullscreen}
               lowBatteryThreshold={settings.lowBatteryThreshold}
               handleThresholdChange={settings.handleThresholdChange}
               restartNectar={settings.restartNectar}

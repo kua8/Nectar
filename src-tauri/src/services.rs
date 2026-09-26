@@ -771,6 +771,8 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
         let mut last_notch_overlap: Option<bool> = None;
         let mut last_hwnd = HWND(std::ptr::null_mut());
         let mut last_emit = Instant::now();
+        let mut last_hide_fs: Option<bool> = None;
+        let mut last_hide_emit = Instant::now();
         let mut is_known_shell = false;
         let my_process_id = std::process::id();
         let mut last_monitor_update = Instant::now() - Duration::from_secs(5);
@@ -941,6 +943,15 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                 crate::state::set_overlap(crate::state::dock_overlap(), "dock", if effective_dock_overlap { 1 } else { 0 });
                 crate::state::set_overlap(crate::state::notch_overlap(), "main", if should_notch_overlap { 1 } else { 0 });
                 CURRENT_FOREGROUND_FULLSCREEN.store(current_is_fs, Ordering::Relaxed);
+
+                let hide_fs = current_is_fs
+                    && crate::utils::get_setting_str(&handle_visibility, "nectar-hide-in-fullscreen").as_deref() != Some("false");
+                crate::state::HIDE_FOR_FULLSCREEN.store(hide_fs, Ordering::Relaxed);
+                if Some(hide_fs) != last_hide_fs || last_hide_emit.elapsed() >= Duration::from_secs(3) {
+                    let _ = handle_visibility.emit("fullscreen-app", hide_fs);
+                    last_hide_fs = Some(hide_fs);
+                    last_hide_emit = Instant::now();
+                }
 
                 if Some(effective_dock_overlap) != last_dock_overlap || last_emit.elapsed() >= Duration::from_secs(3) {
                     let _ = handle_visibility.emit_to("dock", "dock-overlap", effective_dock_overlap);
@@ -1159,7 +1170,6 @@ pub fn setup_brightness_worker() {
 }
 
 
-static MOUSE_HOOK_APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 static MH_LAST_MAIN_IGNORE: AtomicI32 = AtomicI32::new(-1);
 static MH_LAST_DOCK_IGNORE: AtomicI32 = AtomicI32::new(-1);
 static MH_LAST_OV_IGNORE: AtomicI32 = AtomicI32::new(-1);
@@ -1178,7 +1188,6 @@ static MH_CACHED_DOCK_MON_POS: Mutex<Option<(i32, i32)>> = Mutex::new(None);
 static MH_CACHED_DOCK_MON_SIZE: Mutex<Option<(u32, u32)>> = Mutex::new(None);
 static MH_CACHED_NOTCH_MON_POS: Mutex<Option<(i32, i32)>> = Mutex::new(None);
 static MH_CACHED_NOTCH_MON_SIZE: Mutex<Option<(u32, u32)>> = Mutex::new(None);
-static MH_LAST_PROCESS_MS: AtomicI64 = AtomicI64::new(0);
 static CAPTURE_UI_ACTIVE: AtomicBool = AtomicBool::new(false);
 static CAPTURE_RECHECK: AtomicBool = AtomicBool::new(true);
 static CAPTURE_LAST_SCAN_MS: AtomicI64 = AtomicI64::new(0);
@@ -1263,73 +1272,70 @@ fn apply_capture_ui_state(app: &AppHandle, active: bool) {
     if let Ok(mut m) = crate::state::notch_extra_last_ignore().lock() { for v in m.values_mut() { *v = -1; } }
 }
 
-static MOUSE_HOOK_HANDLE: std::sync::atomic::AtomicIsize = std::sync::atomic::AtomicIsize::new(0);
+static MOUSE_X: AtomicI32 = AtomicI32::new(0);
+static MOUSE_Y: AtomicI32 = AtomicI32::new(0);
+static MOUSE_DIRTY: AtomicBool = AtomicBool::new(false);
+static MOUSE_WORKER: OnceLock<std::thread::Thread> = OnceLock::new();
 
-fn install_mouse_hook() {
-    use windows::Win32::UI::WindowsAndMessaging::UnhookWindowsHookEx;
-    unsafe {
-        let old = MOUSE_HOOK_HANDLE.swap(0, Ordering::Relaxed);
-        if old != 0 {
-            let _ = UnhookWindowsHookEx(windows::Win32::UI::WindowsAndMessaging::HHOOK(old as *mut _));
-        }
-        match SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_hook_proc), None, 0) {
-            Ok(h) => MOUSE_HOOK_HANDLE.store(h.0 as isize, Ordering::Relaxed),
-            Err(e) => crate::diagnostics::log(&format!("mouse hook install failed: {e}")),
-        }
+fn start_mouse_worker(app_handle: AppHandle) {
+    let worker = std::thread::Builder::new()
+        .name("mouse-worker".into())
+        .spawn(move || loop {
+            std::thread::park();
+            if !MOUSE_DIRTY.swap(false, Ordering::Relaxed) {
+                continue;
+            }
+            let cursor = windows::Win32::Foundation::POINT {
+                x: MOUSE_X.load(Ordering::Relaxed),
+                y: MOUSE_Y.load(Ordering::Relaxed),
+            };
+            unsafe { process_mouse_move(&app_handle, cursor) };
+            std::thread::sleep(Duration::from_millis(32));
+        });
+    if let Ok(worker) = worker {
+        let _ = MOUSE_WORKER.set(worker.thread().clone());
     }
 }
 
-fn start_mouse_hook_watchdog(app_handle: AppHandle) {
-    use windows::Win32::Foundation::POINT;
-    use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
-    std::thread::spawn(move || {
-        let mut last_pos = (i32::MIN, i32::MIN);
-        let mut last_reinstall_ms = 0i64;
-        loop {
-            std::thread::sleep(Duration::from_secs(2));
-            let mut p = POINT::default();
-            if unsafe { GetCursorPos(&mut p) }.is_err() {
-                continue;
-            }
-            let moved = (p.x, p.y) != last_pos;
-            last_pos = (p.x, p.y);
-            let now = now_ms();
-            let last_event = crate::diagnostics::HOOK_LAST_EVENT_MS.load(Ordering::Relaxed);
-            let silent = last_event == 0 || now - last_event > 3000;
-            if moved && silent && now - last_reinstall_ms > 10_000 {
-                last_reinstall_ms = now;
-                crate::diagnostics::HOOK_REINSTALLS.fetch_add(1, Ordering::Relaxed);
-                crate::diagnostics::log("mouse hook silent while the cursor moved, reinstalling it");
-                let _ = app_handle.run_on_main_thread(install_mouse_hook);
-            }
+fn start_mouse_hook_thread() {
+    let _ = std::thread::Builder::new().name("mouse-hook".into()).spawn(|| unsafe {
+        use windows::Win32::UI::WindowsAndMessaging::{DispatchMessageW, GetMessageW, TranslateMessage, MSG};
+        if let Err(e) = SetWindowsHookExW(WH_MOUSE_LL, Some(mouse_hook_proc), None, 0) {
+            crate::diagnostics::log(&format!("mouse hook install failed: {e}"));
+            return;
+        }
+        let mut msg = MSG::default();
+        while GetMessageW(&mut msg, None, 0, 0).as_bool() {
+            let _ = TranslateMessage(&msg);
+            DispatchMessageW(&msg);
         }
     });
 }
 
 pub fn setup_mouse_hook(app_handle: AppHandle) {
-    let _ = MOUSE_HOOK_APP_HANDLE.set(app_handle.clone());
-    install_mouse_hook();
-    start_mouse_hook_watchdog(app_handle);
+    start_mouse_worker(app_handle);
+    start_mouse_hook_thread();
 }
 
 unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> windows::Win32::Foundation::LRESULT {
     if code >= 0 && wparam.0 == WM_MOUSEMOVE as usize {
         crate::diagnostics::HOOK_EVENTS.fetch_add(1, Ordering::Relaxed);
         crate::diagnostics::HOOK_LAST_EVENT_MS.store(now_ms(), Ordering::Relaxed);
-
-        // Throttle to ~30fps (32ms) to match old polling cadence.
-        // Without this, state checks and set_ignore_cursor_events fire on
-        // every pixel of cursor movement, causing notch flicker at edges.
-        let now = now_ms();
-        let last = MH_LAST_PROCESS_MS.load(Ordering::Relaxed);
-        if now - last < 32 {
-            return CallNextHookEx(None, code, wparam, lparam);
+        let pt = &*(lparam.0 as *const MSLLHOOKSTRUCT);
+        MOUSE_X.store(pt.pt.x, Ordering::Relaxed);
+        MOUSE_Y.store(pt.pt.y, Ordering::Relaxed);
+        MOUSE_DIRTY.store(true, Ordering::Relaxed);
+        if let Some(worker) = MOUSE_WORKER.get() {
+            worker.unpark();
         }
-        MH_LAST_PROCESS_MS.store(now, Ordering::Relaxed);
+    }
+    CallNextHookEx(None, code, wparam, lparam)
+}
 
-        if let Some(app_handle) = MOUSE_HOOK_APP_HANDLE.get() {
-            let pt = &*(lparam.0 as *const MSLLHOOKSTRUCT);
-            let cursor = pt.pt;
+unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Foundation::POINT) {
+    let now = now_ms();
+    {
+        {
 
             // click-through and skipped entirely so the tool owns the screen.
             if CAPTURE_UI_ACTIVE.load(Ordering::Relaxed) {
@@ -1351,7 +1357,7 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
                 if MH_LAST_TOP_EDGE_HOVER.swap(0, Ordering::Relaxed) != 0 {
                     let _ = app_handle.emit("notch-edge-hover", false);
                 }
-                return CallNextHookEx(None, code, wparam, lparam);
+                return;
             }
 
             // Refresh cached monitor info every 1s
@@ -1460,7 +1466,7 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
                     let at_bottom_edge = cursor.y >= (dock_mon_y + dock_mon_h - (8.0 * scale) as i32) &&
                                          cursor.x >= dock_mon_x && cursor.x <= (dock_mon_x + dock_mon_w);
 
-                    if at_bottom_edge || in_dock_hover {
+                    if (at_bottom_edge && !crate::state::HIDE_FOR_FULLSCREEN.load(Ordering::Relaxed)) || in_dock_hover {
                         is_hovered = true;
                         MH_DOCK_EXPIRY_MS.store(now + 500, Ordering::Relaxed);
                     }
@@ -1492,6 +1498,7 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
                         dbg_scale, dbg_box, is_click_interactive, MH_LAST_DOCK_IGNORE.load(Ordering::Relaxed),
                     ));
 
+                    if crate::state::HIDE_FOR_FULLSCREEN.load(Ordering::Relaxed) { is_click_interactive = false; }
                     let should_ignore = !is_click_interactive
                         && !MENU_IS_OPEN.load(Ordering::Relaxed)
                         && !DOCK_IS_DRAGGING.load(Ordering::Relaxed);
@@ -1699,7 +1706,6 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
             hit_test_extra_notch_windows(app_handle, cursor, now, fg_fs);
         }
     }
-    CallNextHookEx(None, code, wparam, lparam)
 }
 
 fn monitor_rect_for_hwnd(hwnd: HWND) -> Option<(i32, i32, i32, i32)> {
@@ -1778,7 +1784,7 @@ fn hit_test_extra_dock_windows(app_handle: &AppHandle, cursor: windows::Win32::F
                              cursor.x >= mon_x && cursor.x <= (mon_x + mon_w);
 
         let mut is_hovered = false;
-        if at_bottom_edge || in_dock_hover {
+        if (at_bottom_edge && !crate::state::HIDE_FOR_FULLSCREEN.load(Ordering::Relaxed)) || in_dock_hover {
             is_hovered = true;
             crate::state::set_i64(crate::state::dock_extra_expiry_ms(), &label, now + 500);
         }
@@ -1801,6 +1807,7 @@ fn hit_test_extra_dock_windows(app_handle: &AppHandle, cursor: windows::Win32::F
             crate::state::set_i32(crate::state::dock_extra_last_edge_hover(), &label, new_hover);
         }
 
+        if crate::state::HIDE_FOR_FULLSCREEN.load(Ordering::Relaxed) { is_click_interactive = false; }
         let should_ignore = !is_click_interactive
             && !MENU_IS_OPEN.load(Ordering::Relaxed)
             && !DOCK_IS_DRAGGING.load(Ordering::Relaxed);
@@ -2407,6 +2414,7 @@ pub fn create_monitor_window(app: &AppHandle, kind: crate::types::WindowKind, la
             Err(_) => return,
         };
 
+        let _ = window.set_ignore_cursor_events(true);
         wire_window_events(&app, &window, kind, true);
 
         match kind {

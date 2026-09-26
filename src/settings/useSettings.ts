@@ -46,6 +46,9 @@ export function useSettings() {
   const [showUpdateIndicator, setShowUpdateIndicator] = useState(
     () => localStorage.getItem("nectar-show-update-indicator") !== "false"
   );
+  const [hideInFullscreen, setHideInFullscreen] = useState(
+    () => localStorage.getItem("nectar-hide-in-fullscreen") !== "false"
+  );
   const [timeFormat24h, setTimeFormat24h] = useState(
     () => localStorage.getItem("nectar-time-format-24h") === "true"
   );
@@ -151,6 +154,7 @@ export function useSettings() {
       apply(getVal("nectar-corners-enabled"), setCornersEnabled, readBool);
       apply(getVal("nectar-time-format-24h"), setTimeFormat24h, readBool);
       apply(getVal("nectar-show-update-indicator"), setShowUpdateIndicator, readBool);
+      apply(getVal("nectar-hide-in-fullscreen"), setHideInFullscreen, readBool);
       apply(getVal("nectar-auto-update"), setAutoUpdate, readBool);
       apply(getVal("nectar-volume-edge-enabled"), setVolumeEdgeEnabled, readBool);
       apply(getVal("nectar-brightness-edge-enabled"), setBrightnessEdgeEnabled, readBool);
@@ -249,6 +253,7 @@ export function useSettings() {
     "nectar-media-layout": setMediaLayout,
     "nectar-corners-enabled": setCornersEnabled,
     "nectar-show-update-indicator": setShowUpdateIndicator,
+    "nectar-hide-in-fullscreen": setHideInFullscreen,
     "nectar-time-format-24h": setTimeFormat24h,
     "nectar-low-battery-threshold": setLowBatteryThreshold,
     "nectar-scale": setScale,
@@ -470,6 +475,12 @@ export function useSettings() {
     const next = !showUpdateIndicator;
     setShowUpdateIndicator(next);
     saveSetting("nectar-show-update-indicator", String(next));
+  };
+
+  const toggleHideInFullscreen = () => {
+    const next = !hideInFullscreen;
+    setHideInFullscreen(next);
+    saveSetting("nectar-hide-in-fullscreen", String(next));
   };
 
   const toggleTimeFormat24h = () => {
@@ -753,6 +764,8 @@ export function useSettings() {
     toggleTimeFormat24h,
     showUpdateIndicator,
     toggleUpdateIndicator,
+    hideInFullscreen,
+    toggleHideInFullscreen,
     scale,
     handleScaleChange,
     cornersEnabled,

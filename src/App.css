@@ -332,23 +332,6 @@ img {
     /* Optical adjustment for Inter font baseline */
 }
 
-.update-pill-indicator {
-    position: absolute;
-    top: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    margin-top: -4px;
-    width: 15px;
-    height: 8px;
-    border-radius: 4px;
-    background: #32D74B;
-    box-shadow: 0 0 6px rgba(50, 215, 75, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    pointer-events: none;
-}
-
 /* Music visualizer - horizontal bars (like iPhone Dynamic Island) */
 .music-visualizer {
     display: flex;

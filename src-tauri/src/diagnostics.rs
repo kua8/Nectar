@@ -2,7 +2,7 @@ use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::os::windows::process::CommandExt;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Mutex, OnceLock};
 use tauri::{AppHandle, Manager};
 
@@ -19,7 +19,6 @@ static LAST_HITBOX_MS: [AtomicI64; 2] = [AtomicI64::new(0), AtomicI64::new(0)];
 
 pub static HOOK_EVENTS: AtomicI64 = AtomicI64::new(0);
 pub static HOOK_LAST_EVENT_MS: AtomicI64 = AtomicI64::new(0);
-pub static HOOK_REINSTALLS: AtomicU32 = AtomicU32::new(0);
 
 pub fn init() {
     let Ok(appdata) = std::env::var("APPDATA") else { return };
@@ -220,7 +219,7 @@ pub fn build_report(app: &AppHandle) -> String {
          Elevated: {elevated}\n\
          Possibly conflicting apps running: {conflicts}\n\n\
          Monitors:\n{monitors}\n\
-         Mouse hook: {events} events, last {hook_age}, reinstalled {reinstalls}x\n\n\
+         Mouse hook: {events} events, last {hook_age}\n\n\
          Windows:\n{windows_info}\n\
          Settings:\n{settings}\n\n\
          Recent log:\n{log}\n",
@@ -234,7 +233,6 @@ pub fn build_report(app: &AppHandle) -> String {
         monitors = monitor_report(app),
         events = HOOK_EVENTS.load(Ordering::Relaxed),
         hook_age = hook_age,
-        reinstalls = HOOK_REINSTALLS.load(Ordering::Relaxed),
         windows_info = window_report(app),
         settings = settings_snapshot(),
         log = tail(24_000),

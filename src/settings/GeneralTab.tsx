@@ -1,4 +1,4 @@
-import { Power, Download, Clock, BatteryWarning, RefreshCw, LogOut } from "lucide-react";
+import { Power, Download, Clock, BatteryWarning, RefreshCw, LogOut, Maximize } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 
 interface GeneralTabProps {
@@ -8,6 +8,8 @@ interface GeneralTabProps {
   toggleTimeFormat24h: () => void;
   showUpdateIndicator: boolean;
   toggleUpdateIndicator: () => void;
+  hideInFullscreen: boolean;
+  toggleHideInFullscreen: () => void;
   lowBatteryThreshold: number;
   handleThresholdChange: (val: number) => void;
   restartNectar: () => void;
@@ -21,6 +23,8 @@ export function GeneralTab({
   toggleTimeFormat24h,
   showUpdateIndicator,
   toggleUpdateIndicator,
+  hideInFullscreen,
+  toggleHideInFullscreen,
   lowBatteryThreshold,
   handleThresholdChange,
   restartNectar,
@@ -40,6 +44,13 @@ export function GeneralTab({
         <SettingRow icon={Download} label="Update Indicator" desc="Show green dot when update available">
           <label className="toggle-switch">
             <input type="checkbox" checked={showUpdateIndicator} onChange={toggleUpdateIndicator} />
+            <span className="slider"></span>
+          </label>
+        </SettingRow>
+
+        <SettingRow icon={Maximize} label="Hide Dock in Fullscreen" desc="Keep the dock away in games and videos">
+          <label className="toggle-switch">
+            <input type="checkbox" checked={hideInFullscreen} onChange={toggleHideInFullscreen} />
             <span className="slider"></span>
           </label>
         </SettingRow>

@@ -1774,14 +1774,6 @@ function App() {
                                   )}
                                 </AnimatePresence>
                               </div>
-                              {updateAvailable && showUpdateIndicator && (
-                                <div className="update-pill-indicator">
-                                  <svg width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="#0b0b0c" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M12 5v11" />
-                                    <path d="M6 12l6 6 6-6" />
-                                  </svg>
-                                </div>
-                              )}
                             </div>
 
                             {/* Right: album art (music) or battery (command-center, calendar) */}

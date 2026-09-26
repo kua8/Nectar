@@ -74,6 +74,7 @@ const Dock = memo(function Dock() {
   const [isDockHovered, setIsDockHovered] = useState(false);
   const [isEdgeHovered, setIsEdgeHovered] = useState(false);
   const [isOverlapped, setIsOverlapped] = useState(false);
+  const [fullscreenApp, setFullscreenApp] = useState(false);
   const [showAddPopup, setShowAddPopup] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, app: AppInfo | null } | null>(null);
   const [contextMenuHeight, setContextMenuHeight] = useState(0);
@@ -115,6 +116,7 @@ const Dock = memo(function Dock() {
   }, [isAnyInteraction]);
 
   const isHidden = !startupAnimating && (
+    fullscreenApp ||
     (dockMode === 'smart' && isOverlapped && interactionState === 'none') ||
     (dockMode === 'peek' && interactionState === 'none')
   );
@@ -237,12 +239,17 @@ const Dock = memo(function Dock() {
       setIsOverlapped(event.payload);
     });
 
+    const unlistenFullscreen = listen<boolean>("fullscreen-app", (event) => {
+      setFullscreenApp(event.payload);
+    });
+
     const unlistenEdgeHover = listen<boolean>("dock-edge-hover", (event) => {
       setIsEdgeHovered(event.payload);
     });
 
     return () => {
       unlistenOverlap.then(f => f());
+      unlistenFullscreen.then(f => f());
       unlistenEdgeHover.then(f => f());
     };
   }, []);

@@ -591,27 +591,87 @@ pub async fn get_active_windows() -> Vec<AppInfo> {
 }
 
 unsafe fn force_set_foreground(hwnd: HWND) {
-    use windows::Win32::UI::Input::KeyboardAndMouse::{SendInput, INPUT, INPUT_0, KEYBDINPUT, VK_MENU, KEYEVENTF_KEYUP, INPUT_KEYBOARD};
     use windows::Win32::UI::WindowsAndMessaging::SetForegroundWindow;
 
-    let key_input = |flags| INPUT {
-        r#type: INPUT_KEYBOARD,
-        Anonymous: INPUT_0 {
-            ki: KEYBDINPUT { wVk: VK_MENU, wScan: 0, dwFlags: flags, time: 0, dwExtraInfo: 0 },
-        },
-    };
-    let inputs = [key_input(Default::default()), key_input(KEYEVENTF_KEYUP)];
-    SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
-
     let _ = SetForegroundWindow(hwnd);
+
+    use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, IsIconic, SwitchToThisWindow};
+    if GetForegroundWindow() != hwnd || IsIconic(hwnd).as_bool() {
+        SwitchToThisWindow(hwnd, true);
+    }
+}
+
+static PREVIOUS_FOREGROUND: std::sync::Mutex<Option<(isize, isize)>> = std::sync::Mutex::new(None);
+static LAST_FOCUS_CLICK: std::sync::Mutex<Option<(isize, i64)>> = std::sync::Mutex::new(None);
+
+fn is_repeat_click(hwnd: isize) -> bool {
+    let now = crate::utils::get_now_ms();
+    let Ok(mut guard) = LAST_FOCUS_CLICK.lock() else { return false };
+    let repeat = matches!(*guard, Some((last_hwnd, at)) if last_hwnd == hwnd && now - at < 350);
+    if !repeat {
+        *guard = Some((hwnd, now));
+    }
+    repeat
+}
+
+unsafe fn send_behind(hwnd: HWND) {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetWindow, GetWindowLongW, GetWindowTextLengthW, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible,
+        GWL_EXSTYLE, GW_HWNDNEXT, WS_EX_TOOLWINDOW,
+    };
+    let my_pid = std::process::id();
+    let usable = |h: HWND| {
+        if h == hwnd || !IsWindow(Some(h)).as_bool() || !IsWindowVisible(h).as_bool() || IsIconic(h).as_bool() {
+            return false;
+        }
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(h, Some(&mut pid));
+        pid != my_pid
+    };
+
+    let previous = PREVIOUS_FOREGROUND.lock().ok().and_then(|g| *g).filter(|(target, _)| *target == hwnd.0 as isize);
+    if let Some((_, prev)) = previous {
+        let prev = HWND(prev as *mut _);
+        if usable(prev) {
+            force_set_foreground(prev);
+            crate::diagnostics::log(&format!("focus: sent {:?} behind by activating the previous window {:?}", hwnd.0, prev.0));
+            return;
+        }
+    }
+
+    let mut next = GetWindow(hwnd, GW_HWNDNEXT);
+    while let Ok(candidate) = next {
+        let is_tool = (GetWindowLongW(candidate, GWL_EXSTYLE) as u32 & WS_EX_TOOLWINDOW.0) != 0;
+        if usable(candidate) && !is_tool && GetWindowTextLengthW(candidate) > 0 {
+            force_set_foreground(candidate);
+            crate::diagnostics::log(&format!("focus: sent {:?} behind by activating the next window {:?}", hwnd.0, candidate.0));
+            return;
+        }
+        next = GetWindow(candidate, GW_HWNDNEXT);
+    }
+    crate::diagnostics::log(&format!("focus: found no window to activate behind {:?}", hwnd.0));
 }
 
 #[tauri::command]
 pub async fn focus_window(hwnd: isize) {
+    if is_repeat_click(hwnd) {
+        return;
+    }
     tauri::async_runtime::spawn_blocking(move || unsafe {
         use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_RESTORE, SW_SHOW, SW_MINIMIZE, IsIconic, IsWindowVisible, GetForegroundWindow, GetWindowThreadProcessId};
         let hwnd = HWND(hwnd as *mut _);
         let my_pid = std::process::id();
+
+        let foreground_before = GetForegroundWindow();
+        if !foreground_before.is_invalid() && foreground_before != hwnd {
+            let mut before_pid = 0u32;
+            GetWindowThreadProcessId(foreground_before, Some(&mut before_pid));
+            if before_pid != my_pid {
+                if let Ok(mut guard) = PREVIOUS_FOREGROUND.lock() {
+                    *guard = Some((hwnd.0 as isize, foreground_before.0 as isize));
+                }
+            }
+        }
 
         if !IsWindowVisible(hwnd).as_bool() {
             let _ = ShowWindow(hwnd, SW_SHOW);
@@ -649,6 +709,23 @@ pub async fn focus_window(hwnd: isize) {
 
             if should_minimize {
                 let _ = ShowWindow(hwnd, SW_MINIMIZE);
+                if !IsIconic(hwnd).as_bool() {
+                    use windows::Win32::UI::WindowsAndMessaging::{SendMessageTimeoutW, SC_MINIMIZE, SMTO_ABORTIFHUNG, WM_SYSCOMMAND};
+                    let _ = SendMessageTimeoutW(
+                        hwnd,
+                        WM_SYSCOMMAND,
+                        windows::Win32::Foundation::WPARAM(SC_MINIMIZE as usize),
+                        windows::Win32::Foundation::LPARAM(0),
+                        SMTO_ABORTIFHUNG,
+                        300,
+                        None,
+                    );
+                }
+                let minimized = IsIconic(hwnd).as_bool();
+                crate::diagnostics::log(&format!("focus: minimize of {:?} worked: {minimized}", hwnd.0));
+                if !minimized {
+                    send_behind(hwnd);
+                }
             } else {
                 force_set_foreground(hwnd);
             }
@@ -1493,6 +1570,32 @@ pub async fn restart_nectar(handle: AppHandle) {
     }
 }
 
+fn terminate_process(pid: u32) -> Result<(), bool> {
+    use windows::Win32::Foundation::{CloseHandle, ERROR_ACCESS_DENIED};
+    use windows::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
+    match unsafe { OpenProcess(PROCESS_TERMINATE, false, pid) } {
+        Ok(handle) => {
+            let terminated = unsafe { TerminateProcess(handle, 1).is_ok() };
+            unsafe { let _ = CloseHandle(handle); }
+            if terminated { Ok(()) } else { Err(false) }
+        }
+        Err(e) => Err(e.code() == windows::core::HRESULT::from_win32(ERROR_ACCESS_DENIED.0)),
+    }
+}
+
+fn kill_elevated(pid: u32) -> bool {
+    use windows::core::PCWSTR;
+    use windows::Win32::UI::Shell::ShellExecuteW;
+    use windows::Win32::UI::WindowsAndMessaging::SW_HIDE;
+    let verb = crate::uninstall_registry::wide("runas");
+    let file = crate::uninstall_registry::wide("taskkill");
+    let args = crate::uninstall_registry::wide(&format!("/F /T /PID {pid}"));
+    let result = unsafe {
+        ShellExecuteW(None, PCWSTR(verb.as_ptr()), PCWSTR(file.as_ptr()), PCWSTR(args.as_ptr()), None, SW_HIDE)
+    };
+    (result.0 as isize) > 32
+}
+
 #[tauri::command]
 pub async fn end_task(hwnd: isize, all_hwnds: Option<Vec<isize>>) {
     use std::os::windows::process::CommandExt;
@@ -1544,21 +1647,40 @@ pub async fn end_task(hwnd: isize, all_hwnds: Option<Vec<isize>>) {
         handles.extend(all_hwnds.unwrap_or_default());
 
         let own_pid = std::process::id();
-        let mut pids = std::collections::BTreeSet::new();
+        let mut by_pid: std::collections::BTreeMap<u32, Vec<isize>> = std::collections::BTreeMap::new();
         let mut politely = Vec::new();
         for h in handles {
             match app_pid(HWND(h as *mut _)) {
-                Some(pid) if pid != own_pid => { pids.insert(pid); }
+                Some(pid) if pid != own_pid => by_pid.entry(pid).or_default().push(h),
                 Some(_) => {}
                 None => politely.push(h),
             }
         }
 
-        for pid in pids {
-            let _ = std::process::Command::new("taskkill")
+        for (pid, hwnds) in by_pid {
+            let killed = std::process::Command::new("taskkill")
                 .args(["/F", "/T", "/PID", &pid.to_string()])
                 .creation_flags(0x0800_0000)
-                .output();
+                .output()
+                .is_ok_and(|o| o.status.success());
+            if killed {
+                crate::diagnostics::log(&format!("end task: taskkill ended pid {pid}"));
+                continue;
+            }
+            match terminate_process(pid) {
+                Ok(()) => {
+                    crate::diagnostics::log(&format!("end task: terminated pid {pid} directly"));
+                    continue;
+                }
+                Err(denied) => {
+                    crate::diagnostics::log(&format!("end task: could not terminate pid {pid}, access denied: {denied}"));
+                    if denied {
+                        let asked = kill_elevated(pid);
+                        crate::diagnostics::log(&format!("end task: elevation prompt for pid {pid} started: {asked}"));
+                    }
+                }
+            }
+            politely.extend(hwnds);
         }
         for h in politely {
             let _ = PostMessageW(Some(HWND(h as *mut _)), WM_CLOSE, windows::Win32::Foundation::WPARAM(0), windows::Win32::Foundation::LPARAM(0));
