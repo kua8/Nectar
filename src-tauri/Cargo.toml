@@ -1,6 +1,6 @@
 [package]
 name = "nectar"
-version = "1.2.1"
+version = "1.3.0"
 description = ""
 authors = ["kua8"]
 edition = "2021"
@@ -69,4 +69,10 @@ image = "0.25"
 tauri-plugin-drag = "2.1.1"
 tauri-plugin-dialog = "2"
 rustfft = "6"
+reqwest = { version = "0.12", default-features = false, features = ["native-tls"] }
+roxmltree = "0.20"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+keyring = { version = "3", features = ["windows-native"] }
+rrule = "0.14"
+chrono-tz = "0.10"
 

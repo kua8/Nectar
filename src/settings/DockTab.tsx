@@ -1,4 +1,4 @@
-import { Monitor, Eye, EyeOff, Circle, Search, Shuffle, MonitorCheck } from "lucide-react";
+import { Monitor, Eye, EyeOff, Circle, Search, Shuffle, MonitorCheck, CalendarDays } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import type { MonitorInfo, MonitorMode } from "./types";
 
@@ -11,6 +11,8 @@ interface DockTabProps {
   toggleDockPreview: () => void;
   dockSearchEnabled: boolean;
   toggleDockSearch: () => void;
+  dockCalendarEnabled: boolean;
+  toggleDockCalendar: () => void;
   dockIconOnly: boolean;
   toggleDockIconOnly: () => void;
   dockMixedReorder: boolean;
@@ -31,6 +33,8 @@ export function DockTab({
   toggleDockPreview,
   dockSearchEnabled,
   toggleDockSearch,
+  dockCalendarEnabled,
+  toggleDockCalendar,
   dockIconOnly,
   toggleDockIconOnly,
   dockMixedReorder,
@@ -105,6 +109,13 @@ export function DockTab({
             <SettingRow icon={Search} label="Search Icon" desc="Show a Windows Search shortcut next to Start">
               <label className="toggle-switch">
                 <input type="checkbox" checked={dockSearchEnabled} onChange={toggleDockSearch} />
+                <span className="slider"></span>
+              </label>
+            </SettingRow>
+
+            <SettingRow icon={CalendarDays} label="Calendar Icon" desc="Show a shortcut that opens the Calendar window">
+              <label className="toggle-switch">
+                <input type="checkbox" checked={dockCalendarEnabled} onChange={toggleDockCalendar} />
                 <span className="slider"></span>
               </label>
             </SettingRow>

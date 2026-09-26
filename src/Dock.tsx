@@ -39,6 +39,17 @@ function SearchIcon() {
   );
 }
 
+function CalendarIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4.5" width="18" height="16" rx="3" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+      <line x1="8" y1="2.5" x2="8" y2="6.5" />
+      <line x1="16" y1="2.5" x2="16" y2="6.5" />
+    </svg>
+  );
+}
+
 const Dock = memo(function Dock() {
   useEffect(() => {
     return initTheme();
@@ -55,6 +66,7 @@ const Dock = memo(function Dock() {
   });
   const [dockPreviewEnabled, setDockPreviewEnabled] = useState(() => localStorage.getItem("nectar-dock-preview-enabled") !== "false");
   const [dockSearchEnabled, setDockSearchEnabled] = useState(() => localStorage.getItem("nectar-dock-search-enabled") !== "false");
+  const [dockCalendarEnabled, setDockCalendarEnabled] = useState(() => localStorage.getItem("nectar-dock-calendar-enabled") !== "false");
   const [dockIconOnly, setDockIconOnly] = useState(() => localStorage.getItem("nectar-dock-icon-only") === "true");
   const [dockMixedReorder, setDockMixedReorder] = useState(() => localStorage.getItem("nectar-dock-mixed-reorder") === "true");
   const [mixedOrder, setMixedOrder] = useState<string[]>([]);
@@ -192,6 +204,9 @@ const Dock = memo(function Dock() {
       const searchEnabled = getVal("nectar-dock-search-enabled", "true");
       setDockSearchEnabled(searchEnabled === "true");
 
+      const calendarEnabled = getVal("nectar-dock-calendar-enabled", "true");
+      setDockCalendarEnabled(calendarEnabled === "true");
+
       const iconOnly = getVal("nectar-dock-icon-only", "false");
       setDockIconOnly(iconOnly === "true");
 
@@ -232,6 +247,7 @@ const Dock = memo(function Dock() {
       "nectar-dock-mode": setDockMode,
       "nectar-dock-preview-enabled": setDockPreviewEnabled,
       "nectar-dock-search-enabled": setDockSearchEnabled,
+      "nectar-dock-calendar-enabled": setDockCalendarEnabled,
       "nectar-dock-icon-only": setDockIconOnly,
       "nectar-dock-mixed-reorder": setDockMixedReorder,
       "nectar-scale": setScale,
@@ -468,6 +484,7 @@ const Dock = memo(function Dock() {
     }
 
     invoke('set_menu_open', { open, rect }).catch(() => {});
+
   }, [contextMenu, showAddPopup, pinnedApps, activeApps, activeSubmenu, scale]);
 
   const dockItems = useMemo(() => {
@@ -786,6 +803,35 @@ const Dock = memo(function Dock() {
                     }}
                   >
                     <SearchIcon />
+                  </motion.div>
+                </motion.div>
+              )}
+
+              {dockCalendarEnabled && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ opacity: { duration: 0.15, delay: 0.2 }, scale: { type: "spring", stiffness: 400, damping: 25, delay: 0.2 } }}
+                  className="dock-icon-wrapper"
+                  onMouseEnter={() => setHoveredApp('calendar')}
+                  onMouseLeave={() => { setHoveredApp(null); setPressedApp(null); }}
+                >
+                  {(!dockPreviewEnabled || (dockPreviewEnabled && hoveredApp === 'calendar')) && (
+                    <div className="tooltip">Calendar</div>
+                  )}
+                  <motion.div
+                    className="dock-icon"
+                    variants={iconVariants}
+                    animate={pressedApp === 'calendar' ? "tap" : (hoveredApp === 'calendar' ? "hover" : "idle")}
+                    onPointerDown={() => setPressedApp('calendar')}
+                    onPointerUp={() => setPressedApp(null)}
+                    onPointerCancel={() => setPressedApp(null)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      invoke('open_calendar_window').catch((err) => console.error('Failed to open calendar:', err));
+                    }}
+                  >
+                    <CalendarIcon />
                   </motion.div>
                 </motion.div>
               )}
@@ -1155,6 +1201,7 @@ const Dock = memo(function Dock() {
                 Nectar Options
                 <span className="submenu-arrow">▶</span>
                 <div className="submenu">
+                  <div className="menu-item" onClick={() => { invoke('open_calendar_window'); closeMenu(); }}>Open Calendar</div>
                   <div className="menu-item" onClick={() => { invoke('open_settings_window'); closeMenu(); }}>Open Settings</div>
                   <div className="menu-item" onClick={() => invoke('restart_nectar')}>Restart Nectar</div>
                   <div className="menu-item" onClick={() => { handleClearIconCache(); closeMenu(); }}>Clear Icon Cache</div>
@@ -1192,6 +1239,7 @@ const Dock = memo(function Dock() {
                 Nectar Options
                 <span className="submenu-arrow">▶</span>
                 <div className="submenu">
+                  <div className="menu-item" onClick={() => { invoke('open_calendar_window'); closeMenu(); }}>Open Calendar</div>
                   <div className="menu-item" onClick={() => { invoke('open_settings_window'); closeMenu(); }}>Open Settings</div>
                   <div className="menu-item" onClick={() => invoke('restart_nectar')}>Restart Nectar</div>
                   <div className="menu-item" onClick={() => { handleClearIconCache(); closeMenu(); }}>Clear Icon Cache</div>

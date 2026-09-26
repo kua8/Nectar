@@ -1,14 +1,17 @@
 import { StrictMode, useState, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { Effect } from "@tauri-apps/api/window";
+import { Effect, EffectState } from "@tauri-apps/api/window";
 import { invoke } from "@tauri-apps/api/core";
-import { X, Settings, Palette, PanelTop, Monitor, Layers, Info } from "lucide-react";
+import { listen } from "@tauri-apps/api/event";
+import { Settings, Palette, PanelTop, Monitor, Layers, Info } from "lucide-react";
+import { WindowControls } from "./components/WindowControls";
 import {
   useSettings,
   GeneralTab,
   AppearanceTab,
   NotchTab,
+  CalendarSyncPage,
   DockTab,
   OverlaysTab,
   AboutTab,
@@ -37,13 +40,19 @@ function SettingsApp() {
   }, []);
 
   useEffect(() => {
+    const unlisten = listen<string>("settings-navigate", (e) => {
+      if (e.payload === "calendar-sync") setActiveTab("calendar-sync");
+    });
+    return () => {
+      unlisten.then((fn) => fn());
+    };
+  }, []);
+
+  useEffect(() => {
     const preventContext = (e: MouseEvent) => e.preventDefault();
     document.addEventListener("contextmenu", preventContext as any);
 
-    appWindow.setEffects({
-      effects: ["mica" as Effect],
-      state: "active" as any,
-    }).catch(() => {});
+    appWindow.setEffects({ effects: [Effect.Acrylic], state: EffectState.Active, color: [10, 10, 15, 20] }).catch(() => {});
 
     return () => {
       document.removeEventListener("contextmenu", preventContext as any);
@@ -57,23 +66,14 @@ function SettingsApp() {
     }).catch(console.error);
   }, [settings.scale]);
 
-  const handleClose = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    try {
-      await appWindow.hide();
-    } catch {}
-  };
-
   return (
     <div className="settings-container" style={{ zoom: settings.scale }}>
       <div className="title-bar" data-tauri-drag-region>
+        <WindowControls canZoom />
         <span className="title-text" data-tauri-drag-region>
           Settings
         </span>
-        <button className="close-btn" onClick={handleClose} title="Close Settings">
-          <X size={12} strokeWidth={1.5} className="close-btn-icon" />
-        </button>
+        <span className="title-spacer" />
       </div>
 
       <div className="settings-body">
@@ -81,7 +81,7 @@ function SettingsApp() {
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
-              className={`sidebar-tab ${activeTab === id ? "active" : ""}`}
+              className={`sidebar-tab ${activeTab === id || (id === "notch" && activeTab === "calendar-sync") ? "active" : ""}`}
               onClick={() => setActiveTab(id)}
             >
               <div className="sidebar-tab-icon">
@@ -125,8 +125,10 @@ function SettingsApp() {
               handleScaleChange={settings.handleScaleChange}
             />
           )}
+          {activeTab === "calendar-sync" && <CalendarSyncPage onBack={() => setActiveTab("notch")} />}
           {activeTab === "notch" && (
             <NotchTab
+              onOpenCalendarSync={() => setActiveTab("calendar-sync")}
               notchMode={settings.notchMode}
               setNotchModeValue={settings.setNotchModeValue}
               monitors={settings.monitors}
@@ -136,6 +138,10 @@ function SettingsApp() {
               setNotchMonitorIdValue={settings.setNotchMonitorIdValue}
               calendarEnabled={settings.calendarEnabled}
               toggleCalendar={settings.toggleCalendar}
+              timerEnabled={settings.timerEnabled}
+              toggleTimerEnabled={settings.toggleTimerEnabled}
+              stopwatchEnabled={settings.stopwatchEnabled}
+              toggleStopwatchEnabled={settings.toggleStopwatchEnabled}
               musicModeEnabled={settings.musicModeEnabled}
               toggleMusicMode={settings.toggleMusicMode}
               musicCompactNotch={settings.musicCompactNotch}
@@ -172,6 +178,8 @@ function SettingsApp() {
               toggleDockPreview={settings.toggleDockPreview}
               dockSearchEnabled={settings.dockSearchEnabled}
               toggleDockSearch={settings.toggleDockSearch}
+              dockCalendarEnabled={settings.dockCalendarEnabled}
+              toggleDockCalendar={settings.toggleDockCalendar}
               dockIconOnly={settings.dockIconOnly}
               toggleDockIconOnly={settings.toggleDockIconOnly}
               dockMixedReorder={settings.dockMixedReorder}

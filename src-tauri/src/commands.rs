@@ -1144,9 +1144,8 @@ pub fn hide_native_osd() {
     }
 }
 
-#[tauri::command]
-pub fn open_settings_window(app: AppHandle) {
-    if let Some(win) = app.get_webview_window("settings") {
+fn bring_window_to_front(app: &AppHandle, label: &str) {
+    if let Some(win) = app.get_webview_window(label) {
         let _ = win.show();
         let _ = win.unminimize();
         let _ = win.set_focus();
@@ -1159,6 +1158,16 @@ pub fn open_settings_window(app: AppHandle) {
             }
         }
     }
+}
+
+#[tauri::command]
+pub fn open_settings_window(app: AppHandle) {
+    bring_window_to_front(&app, "settings");
+}
+
+#[tauri::command]
+pub fn open_calendar_window(app: AppHandle) {
+    bring_window_to_front(&app, "calendar");
 }
 
 #[tauri::command]

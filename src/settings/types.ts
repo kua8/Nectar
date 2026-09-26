@@ -17,7 +17,7 @@ export interface MonitorInfo {
 
 export type MonitorMode = "primary" | "all" | "specific";
 
-export type SettingsTab = "general" | "appearance" | "notch" | "dock" | "overlays" | "about";
+export type SettingsTab = "general" | "appearance" | "notch" | "dock" | "overlays" | "about" | "calendar-sync";
 
 export interface SettingRowProps {
   icon: ComponentType<SVGProps<SVGSVGElement> & { size?: number; strokeWidth?: number }>;

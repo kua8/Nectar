@@ -10,6 +10,10 @@ import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, VolumeLowIcon, Volu
 import { CompactMediaPlayer } from "./CompactMediaPlayer";
 import { useWeather } from "./hooks/useWeather";
 import { useSettingsSync } from "./hooks/useSettingsSync";
+import { useCaldav } from "./hooks/useCaldav";
+import { NotchCalendar } from "./components/NotchCalendar";
+import { NotchClock, StopwatchReadout } from "./components/NotchClock";
+import { useStopwatch } from "./hooks/useStopwatch";
 import type { WidgetConfig } from "./components/StatusWidgetConfig";
 import {
   Cpu,
@@ -514,6 +518,14 @@ function App() {
   // Settings state
   const [settingsWeatherEnabled, setSettingsWeatherEnabled] = useState(() => localStorage.getItem("nectar-weather-enabled") !== "false");
   const [settingsCalendarEnabled, setSettingsCalendarEnabled] = useState(() => localStorage.getItem("nectar-calendar-enabled") !== "false");
+  const [settingsTimerEnabled, setSettingsTimerEnabled] = useState(
+    () => (localStorage.getItem("nectar-timer-enabled") ?? localStorage.getItem("nectar-calendar-enabled")) !== "false",
+  );
+  const [settingsStopwatchEnabled, setSettingsStopwatchEnabled] = useState(
+    () => (localStorage.getItem("nectar-stopwatch-enabled") ?? localStorage.getItem("nectar-calendar-enabled")) !== "false",
+  );
+  const showClockColumn = settingsTimerEnabled || settingsStopwatchEnabled;
+  const productivityEnabled = settingsCalendarEnabled || showClockColumn;
   const [settingsMusicModeEnabled, setSettingsMusicModeEnabled] = useState(() => localStorage.getItem("nectar-music-mode-enabled") !== "false");
   const [settingsMusicCompactNotch, setSettingsMusicCompactNotch] = useState(() => localStorage.getItem("nectar-music-compact-notch") !== "false");
   const [settingsVisualizerEnabled, setSettingsVisualizerEnabled] = useState(() => localStorage.getItem("nectar-visualizer-enabled") !== "false");
@@ -541,6 +553,8 @@ function App() {
 
       setSettingsWeatherEnabled(getVal("nectar-weather-enabled", "true") !== "false");
       setSettingsCalendarEnabled(getVal("nectar-calendar-enabled", "true") !== "false");
+      setSettingsTimerEnabled((getVal("nectar-timer-enabled") ?? getVal("nectar-calendar-enabled", "true")) !== "false");
+      setSettingsStopwatchEnabled((getVal("nectar-stopwatch-enabled") ?? getVal("nectar-calendar-enabled", "true")) !== "false");
       setSettingsMusicModeEnabled(getVal("nectar-music-mode-enabled", "true") !== "false");
       setSettingsMusicCompactNotch(getVal("nectar-music-compact-notch", "true") !== "false");
       const viz = getVal("nectar-media-visualizer-enabled") ?? getVal("nectar-visualizer-enabled", "true");
@@ -665,6 +679,8 @@ function App() {
     {
       "nectar-weather-enabled": setSettingsWeatherEnabled,
       "nectar-calendar-enabled": setSettingsCalendarEnabled,
+      "nectar-timer-enabled": setSettingsTimerEnabled,
+      "nectar-stopwatch-enabled": setSettingsStopwatchEnabled,
       "nectar-music-mode-enabled": setSettingsMusicModeEnabled,
       "nectar-music-compact-notch": setSettingsMusicCompactNotch,
       "nectar-media-visualizer-enabled": setSettingsVisualizerEnabled,
@@ -721,6 +737,7 @@ function App() {
   }, [notchMode, windowLabel]);
 
   const [nectarMode, setNectarMode] = useState<'music' | 'calendar' | 'command-center' | 'status'>('status');
+  const caldav = useCaldav();
 
   // Window height is now kept constant to prevent rendering layout lag and sharp corners
 
@@ -731,7 +748,7 @@ function App() {
 
   const handleWheel = (e: React.WheelEvent) => {
     const target = e.target as HTMLElement;
-    if (target.closest('.calendar-grid') || target.closest('.timer-column')) {
+    if (target.closest('.calendar-grid') || target.closest('.timer-column') || target.closest('.cal-scroll')) {
       return;
     }
 
@@ -758,7 +775,7 @@ function App() {
       : ['command-center', 'status', 'music', 'calendar'];
     const availableModes = modes.filter(m => {
       if (m === 'music' && (!settingsMusicModeEnabled || !mediaInfo.has_media)) return false;
-      if (m === 'calendar' && !settingsCalendarEnabled) return false;
+      if (m === 'calendar' && !productivityEnabled) return false;
       return true;
     });
 
@@ -786,8 +803,8 @@ function App() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const startTimer = (mins: number) => {
-    setTimerSeconds(mins * 60);
+  const startTimerSeconds = (seconds: number) => {
+    setTimerSeconds(seconds);
     setIsTimerRunning(true);
     setIsTimerFinished(false);
   };
@@ -798,6 +815,16 @@ function App() {
     setTimerSeconds(0);
     setIsTimerFinished(false);
   };
+
+  const stopwatch = useStopwatch();
+
+  useEffect(() => {
+    if (!settingsTimerEnabled) resetTimer();
+  }, [settingsTimerEnabled]);
+
+  useEffect(() => {
+    if (!settingsStopwatchEnabled) stopwatch.reset();
+  }, [settingsStopwatchEnabled]);
 
   useEffect(() => {
     if (isTimerRunning && timerSeconds > 0) {
@@ -854,10 +881,10 @@ function App() {
   }, [isPlaying, nectarMode]);
 
   useEffect(() => {
-    if (!settingsCalendarEnabled && nectarMode === 'calendar') {
+    if (!productivityEnabled && nectarMode === 'calendar') {
       setNectarMode('status');
     }
-  }, [settingsCalendarEnabled, nectarMode]);
+  }, [productivityEnabled, nectarMode]);
 
   useEffect(() => {
     if (!settingsMusicModeEnabled && nectarMode === 'music') {
@@ -895,7 +922,7 @@ function App() {
 
     // Toggle compact timer view every 5 seconds if running
     let timerToggleInterval: any;
-    if (isTimerRunning && nectarMode !== 'calendar') {
+    if ((isTimerRunning || stopwatch.running) && nectarMode !== 'calendar') {
       timerToggleInterval = setInterval(() => {
         setIsCompactTimerVisible(prev => !prev);
       }, 5000);
@@ -907,7 +934,7 @@ function App() {
       clearInterval(interval);
       if (timerToggleInterval) clearInterval(timerToggleInterval);
     };
-  }, [isTimerRunning, nectarMode, timeFormat24h]);
+  }, [isTimerRunning, stopwatch.running, nectarMode, timeFormat24h]);
 
   // Battery API
   useEffect(() => {
@@ -1207,7 +1234,7 @@ function App() {
       resetTimer();
       return;
     }
-    if (!settingsCalendarEnabled) return;
+    if (!productivityEnabled) return;
 
     setNectarMode(prev => {
       if (prev === 'calendar') {
@@ -1281,7 +1308,7 @@ function App() {
 
   // Calculate width dynamically based on enabled features
   const getDynamicWidth = () => {
-    if (isCalendarMode) return 480;
+    if (isCalendarMode) return settingsCalendarEnabled && showClockColumn ? 480 : settingsCalendarEnabled ? 310 : 270;
     if (nectarMode === 'command-center' && isHovered) {
       const totalWidgets = statusWidgets.left.length + statusWidgets.right.length;
       return Math.max(350, Math.min(200 + totalWidgets * 65, 460));
@@ -1311,7 +1338,7 @@ function App() {
     if (!isExpanded || isHidden) {
       return isImpacted ? 28.9 : 44.2;
     }
-    if (nectarMode === 'calendar') return 310;
+    if (nectarMode === 'calendar') return settingsCalendarEnabled ? (caldav.connected ? 350 : 310) : 262;
     if (nectarMode === 'command-center') return isHovered ? 230 : 36;
     if (nectarMode === 'status') return 36;
     if (isMusicMode && isHovered) {
@@ -1724,7 +1751,9 @@ function App() {
                                       exit={{ rotateX: 90, opacity: 0 }}
                                       transition={{ type: "spring", stiffness: 600, damping: 30 }}
                                     >
-                                      {formatTimerTime(timerSeconds)}
+                                      {isTimerRunning || isTimerFinished
+                                        ? formatTimerTime(timerSeconds)
+                                        : <StopwatchReadout base={stopwatch.base} startedAt={stopwatch.startedAt} precise={false} />}
                                     </motion.span>
                                   ) : (
                                     <motion.span
@@ -2009,7 +2038,7 @@ function App() {
 
               {/* Calendar & Timer Split View */}
               <AnimatePresence>
-                {settingsCalendarEnabled && isCalendarMode && (
+                {productivityEnabled && isCalendarMode && (
                   <motion.div
                     className="calendar-timer-content split-view"
                     onClick={e => e.stopPropagation()} /* Block mode switches when clicking inside */
@@ -2018,32 +2047,26 @@ function App() {
                     exit={{ opacity: 0, filter: "blur(4px)", transition: { duration: 0.1 } }}
                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                   >
-                    <div className="calendar-column">
-                      <Calendar />
-                    </div>
-
-                    <div className="timer-column">
-                      <div className="timer-section-new">
-                        <div className="timer-display-large">
-                          <span className="timer-time-large">{formatTimerTime(timerSeconds)}</span>
-                        </div>
-
-                        <div className="timer-controls-new">
-                          <button onClick={toggleTimer} className="timer-btn primary">
-                            {isTimerRunning ? 'Pause' : 'Start'}
-                          </button>
-                          <button onClick={resetTimer} className="timer-btn secondary">Reset</button>
-                        </div>
-
-                        <div className="timer-presets-new">
-                          {[5, 15, 25, 50].map(mins => (
-                            <button key={mins} onClick={() => startTimer(mins)} className="preset-btn-small">
-                              {mins}m
-                            </button>
-                          ))}
-                        </div>
+                    {settingsCalendarEnabled && (
+                      <div className="calendar-column">
+                        <NotchCalendar caldav={caldav} hour12={!timeFormat24h} />
                       </div>
-                    </div>
+                    )}
+
+                    {showClockColumn && (
+                      <NotchClock
+                        timerEnabled={settingsTimerEnabled}
+                        stopwatchEnabled={settingsStopwatchEnabled}
+                        solo={!settingsCalendarEnabled}
+                        timerSeconds={timerSeconds}
+                        isTimerRunning={isTimerRunning}
+                        formatTimerTime={formatTimerTime}
+                        onStartTimer={startTimerSeconds}
+                        onToggleTimer={toggleTimer}
+                        onResetTimer={resetTimer}
+                        stopwatch={stopwatch}
+                      />
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -2055,52 +2078,6 @@ function App() {
       </motion.div>
     </div>
 
-    </div>
-  );
-}
-
-function Calendar() {
-  const [date] = useState(new Date());
-
-  const daysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
-  const firstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
-
-  const currentMonth = date.getMonth();
-  const currentYear = date.getFullYear();
-  const monthName = date.toLocaleString('default', { month: 'long' });
-
-  const totalDays = daysInMonth(currentYear, currentMonth);
-  const startDay = firstDayOfMonth(currentYear, currentMonth);
-  const days = [];
-
-  // Padding for start of month
-  for (let i = 0; i < startDay; i++) {
-    days.push(<div key={`empty-${i}`} className="calendar-day empty" />);
-  }
-
-  // Actual days
-  const today = new Date().getDate();
-  const isCurrentMonth = new Date().getMonth() === currentMonth && new Date().getFullYear() === currentYear;
-
-  for (let i = 1; i <= totalDays; i++) {
-    days.push(
-      <div key={i} className={`calendar-day ${isCurrentMonth && i === today ? 'today' : ''}`}>
-        {i}
-      </div>
-    );
-  }
-
-  return (
-    <div className="calendar-container">
-      <div className="calendar-header">
-        <span className="month-year">{monthName} {currentYear}</span>
-      </div>
-      <div className="calendar-grid">
-        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-          <div key={`${d}-${i}`} className="day-name">{d}</div>
-        ))}
-        {days}
-      </div>
     </div>
   );
 }

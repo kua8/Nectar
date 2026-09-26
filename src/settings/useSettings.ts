@@ -21,6 +21,8 @@ export function useSettings() {
   const [autostart, setAutostart] = useState(false);
   const [weatherEnabled, setWeatherEnabled] = useState(true);
   const [calendarEnabled, setCalendarEnabled] = useState(true);
+  const [timerEnabled, setTimerEnabled] = useState(true);
+  const [stopwatchEnabled, setStopwatchEnabled] = useState(true);
   const [musicModeEnabled, setMusicModeEnabled] = useState(true);
   const [musicCompactNotch, setMusicCompactNotch] = useState(true);
   const [volumeOverlayEnabled, setVolumeOverlayEnabled] = useState(true);
@@ -60,6 +62,7 @@ export function useSettings() {
   const [dockEnabled, setDockEnabled] = useState(true);
   const [dockPreviewEnabled, setDockPreviewEnabled] = useState(true);
   const [dockSearchEnabled, setDockSearchEnabled] = useState(true);
+  const [dockCalendarEnabled, setDockCalendarEnabled] = useState(true);
   const [dockIconOnly, setDockIconOnly] = useState(
     () => localStorage.getItem("nectar-dock-icon-only") === "true"
   );
@@ -137,6 +140,8 @@ export function useSettings() {
 
       apply(getVal("nectar-weather-enabled"), setWeatherEnabled, readBool);
       apply(getVal("nectar-calendar-enabled"), setCalendarEnabled, readBool);
+      apply(getVal("nectar-timer-enabled") ?? getVal("nectar-calendar-enabled"), setTimerEnabled, readBool);
+      apply(getVal("nectar-stopwatch-enabled") ?? getVal("nectar-calendar-enabled"), setStopwatchEnabled, readBool);
       apply(getVal("nectar-music-mode-enabled"), setMusicModeEnabled, readBool);
       apply(getVal("nectar-music-compact-notch"), setMusicCompactNotch, readBool);
       apply(getVal("nectar-volume-overlay-enabled"), setVolumeOverlayEnabled, readBool);
@@ -152,6 +157,7 @@ export function useSettings() {
       apply(getVal("nectar-dock-enabled"), setDockEnabled, readBool);
       apply(getVal("nectar-dock-preview-enabled"), setDockPreviewEnabled, readBool);
       apply(getVal("nectar-dock-search-enabled"), setDockSearchEnabled, readBool);
+      apply(getVal("nectar-dock-calendar-enabled"), setDockCalendarEnabled, readBool);
       apply(getVal("nectar-dock-icon-only"), setDockIconOnly, readBool);
       apply(getVal("nectar-dock-mixed-reorder"), setDockMixedReorder, readBool);
 
@@ -230,9 +236,12 @@ export function useSettings() {
     "nectar-dock-icon-only": setDockIconOnly,
     "nectar-dock-preview-enabled": setDockPreviewEnabled,
     "nectar-dock-search-enabled": setDockSearchEnabled,
+    "nectar-dock-calendar-enabled": setDockCalendarEnabled,
     "nectar-dock-mixed-reorder": setDockMixedReorder,
     "nectar-weather-enabled": setWeatherEnabled,
     "nectar-calendar-enabled": setCalendarEnabled,
+    "nectar-timer-enabled": setTimerEnabled,
+    "nectar-stopwatch-enabled": setStopwatchEnabled,
     "nectar-music-mode-enabled": setMusicModeEnabled,
     "nectar-music-compact-notch": setMusicCompactNotch,
     "nectar-media-ambience-enabled": setMediaAmbienceEnabled,
@@ -386,6 +395,18 @@ export function useSettings() {
     saveSetting("nectar-calendar-enabled", String(next));
   };
 
+  const toggleTimerEnabled = () => {
+    const next = !timerEnabled;
+    setTimerEnabled(next);
+    saveSetting("nectar-timer-enabled", String(next));
+  };
+
+  const toggleStopwatchEnabled = () => {
+    const next = !stopwatchEnabled;
+    setStopwatchEnabled(next);
+    saveSetting("nectar-stopwatch-enabled", String(next));
+  };
+
   const toggleMusicMode = () => {
     const next = !musicModeEnabled;
     setMusicModeEnabled(next);
@@ -479,6 +500,12 @@ export function useSettings() {
     const next = !dockSearchEnabled;
     setDockSearchEnabled(next);
     saveSetting("nectar-dock-search-enabled", String(next));
+  };
+
+  const toggleDockCalendar = () => {
+    const next = !dockCalendarEnabled;
+    setDockCalendarEnabled(next);
+    saveSetting("nectar-dock-calendar-enabled", String(next));
   };
 
   const toggleDockMixedReorder = () => {
@@ -748,6 +775,10 @@ export function useSettings() {
     setNotchModeValue,
     calendarEnabled,
     toggleCalendar,
+    timerEnabled,
+    toggleTimerEnabled,
+    stopwatchEnabled,
+    toggleStopwatchEnabled,
     musicModeEnabled,
     toggleMusicMode,
     musicCompactNotch,
@@ -786,6 +817,8 @@ export function useSettings() {
     toggleDockPreview,
     dockSearchEnabled,
     toggleDockSearch,
+    dockCalendarEnabled,
+    toggleDockCalendar,
     dockIconOnly,
     toggleDockIconOnly,
     dockMixedReorder,

@@ -1,0 +1,47 @@
+.wc {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 52px;
+  -webkit-app-region: no-drag;
+}
+
+.wc-btn {
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  cursor: default;
+  transition: background-color 0.15s ease, filter 0.15s ease;
+}
+
+.wc-btn.close {
+  background: #ff5f57;
+}
+
+.wc-btn.minimize {
+  background: #febc2e;
+}
+
+.wc-btn.zoom {
+  background: #28c840;
+}
+
+.wc-btn:not(:disabled):hover {
+  filter: brightness(1.1);
+}
+
+.wc-btn:not(:disabled):active {
+  filter: brightness(0.75);
+}
+
+.wc-btn:disabled,
+.wc.blurred .wc-btn {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.light-mode .wc-btn:disabled,
+.light-mode .wc.blurred .wc-btn {
+  background: rgba(0, 0, 0, 0.14);
+}

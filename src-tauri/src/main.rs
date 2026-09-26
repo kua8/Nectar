@@ -11,6 +11,10 @@ mod uninstall_registry;
 mod native_uninstall;
 mod taskbar_pins;
 mod tray_icons;
+mod caldav;
+mod calendar_sync;
+mod ics;
+mod active_look;
 
 use tauri::Manager;
 use windows::Win32::System::Console::SetConsoleCtrlHandler;
@@ -81,6 +85,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             hide_native_osd,
             open_settings_window,
+            open_calendar_window,
             open_tray_window,
             open_wifi_settings,
             open_sound_settings,
@@ -156,7 +161,14 @@ fn main() {
             write_settings_to_path,
             updater::check_for_updates,
             updater::install_update,
-            updater::get_update_state
+            updater::get_update_state,
+            caldav::caldav_connect,
+            caldav::caldav_disconnect,
+            calendar_sync::caldav_sync_now,
+            calendar_sync::caldav_get_cache,
+            ics::ics_add_link,
+            ics::ics_remove_link,
+            ics::ics_detect
         ])
         .setup(|app| {
             init_taskbar_marker(app.handle());
@@ -184,6 +196,8 @@ fn main() {
                     updater::run_startup_check(app_handle).await;
                 });
             }
+
+            crate::calendar_sync::start_background_sync(app.handle().clone());
 
             let window = app.get_webview_window("main").unwrap();
             let dock_win = app.get_webview_window("dock").unwrap();
@@ -253,10 +267,29 @@ fn main() {
             if let Some(settings_win) = app.get_webview_window("settings") {
                 #[cfg(target_os = "windows")]
                 {
-                    let _ = window_vibrancy::apply_mica(&settings_win, None);
+                    let _ = window_vibrancy::apply_acrylic(&settings_win, Some((10, 10, 15, 20)));
+                }
+                if let Ok(hwnd) = settings_win.hwnd() {
+                    crate::active_look::keep_active_look(hwnd);
                 }
                 let win_clone = settings_win.clone();
                 settings_win.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = win_clone.hide();
+                    }
+                });
+            }
+            if let Some(calendar_win) = app.get_webview_window("calendar") {
+                #[cfg(target_os = "windows")]
+                {
+                    let _ = window_vibrancy::apply_acrylic(&calendar_win, Some((10, 10, 15, 20)));
+                }
+                if let Ok(hwnd) = calendar_win.hwnd() {
+                    crate::active_look::keep_active_look(hwnd);
+                }
+                let win_clone = calendar_win.clone();
+                calendar_win.on_window_event(move |event| {
                     if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                         api.prevent_close();
                         let _ = win_clone.hide();
@@ -271,7 +304,9 @@ fn main() {
                     MenuItem::with_id(app, "restart", "Restart Nectar", true, None::<&str>)?;
                 let settings_item =
                     MenuItem::with_id(app, "settings", "Open Settings", true, None::<&str>)?;
-                let menu = Menu::with_items(app, &[&settings_item, &restart_item, &quit_item])?;
+                let calendar_item =
+                    MenuItem::with_id(app, "calendar", "Open Calendar", true, None::<&str>)?;
+                let menu = Menu::with_items(app, &[&calendar_item, &settings_item, &restart_item, &quit_item])?;
                 let ah = app.handle().clone();
                 TrayIconBuilder::new()
                     .icon(app.default_window_icon().unwrap().clone())
@@ -288,6 +323,7 @@ fn main() {
                                 }
                             }
                             if let Some(w) = ah.get_webview_window("settings") { let _ = w.destroy(); }
+                            if let Some(w) = ah.get_webview_window("calendar") { let _ = w.destroy(); }
                             std::env::set_var("NECTAR_RESTARTING", "1");
                             close_single_instance_handles();
 
@@ -295,6 +331,9 @@ fn main() {
                         }
                         "settings" => {
                             crate::commands::open_settings_window(ah.clone());
+                        }
+                        "calendar" => {
+                            crate::commands::open_calendar_window(ah.clone());
                         }
                         _ => {}
                     })

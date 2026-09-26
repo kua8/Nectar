@@ -10,8 +10,13 @@ import {
   X,
   Monitor,
   MonitorCheck,
+  CloudCog,
+  ChevronRight,
+  Hourglass,
+  Timer,
 } from "lucide-react";
 import { SettingRow } from "./SettingRow";
+import { useCaldav } from "../hooks/useCaldav";
 import { StatusWidgetConfig } from "../components/StatusWidgetConfig";
 import type { WidgetConfig, MonitorInfo, MonitorMode } from "./types";
 
@@ -25,6 +30,10 @@ interface NotchTabProps {
   setNotchMonitorIdValue: (id: string) => void;
   calendarEnabled: boolean;
   toggleCalendar: () => void;
+  timerEnabled: boolean;
+  toggleTimerEnabled: () => void;
+  stopwatchEnabled: boolean;
+  toggleStopwatchEnabled: () => void;
   musicModeEnabled: boolean;
   toggleMusicMode: () => void;
   musicCompactNotch: boolean;
@@ -49,6 +58,7 @@ interface NotchTabProps {
   statusWidgets: WidgetConfig;
   handleWidgetsChange: (config: WidgetConfig) => void;
   hasBattery: boolean;
+  onOpenCalendarSync: () => void;
 }
 
 export function NotchTab({
@@ -61,6 +71,10 @@ export function NotchTab({
   setNotchMonitorIdValue,
   calendarEnabled,
   toggleCalendar,
+  timerEnabled,
+  toggleTimerEnabled,
+  stopwatchEnabled,
+  toggleStopwatchEnabled,
   musicModeEnabled,
   toggleMusicMode,
   musicCompactNotch,
@@ -85,7 +99,10 @@ export function NotchTab({
   statusWidgets,
   handleWidgetsChange,
   hasBattery,
+  onOpenCalendarSync,
 }: NotchTabProps) {
+  const caldav = useCaldav();
+  const sources = (caldav.account ? 1 : 0) + caldav.links.length;
   return (
     <>
       <div className="setting-group-label">Notch</div>
@@ -131,9 +148,35 @@ export function NotchTab({
           </SettingRow>
         )}
 
-        <SettingRow icon={Calendar} label="Calendar & Timer" desc="Enable productivity split-view">
+        <SettingRow icon={Calendar} label="Calendar" desc="Day, week, month and agenda views in the notch">
           <label className="toggle-switch">
             <input type="checkbox" checked={calendarEnabled} onChange={toggleCalendar} />
+            <span className="slider"></span>
+          </label>
+        </SettingRow>
+
+        {calendarEnabled && (
+          <SettingRow
+            icon={CloudCog}
+            label="Calendar Sync"
+            desc={sources ? `${sources} source${sources === 1 ? "" : "s"} connected` : "Show your real events from Google, iCloud, Nextcloud and more"}
+            action
+            onClick={onOpenCalendarSync}
+          >
+            <ChevronRight size={14} strokeWidth={1.5} />
+          </SettingRow>
+        )}
+
+        <SettingRow icon={Hourglass} label="Timer" desc="Countdown with presets and a custom time">
+          <label className="toggle-switch">
+            <input type="checkbox" checked={timerEnabled} onChange={toggleTimerEnabled} />
+            <span className="slider"></span>
+          </label>
+        </SettingRow>
+
+        <SettingRow icon={Timer} label="Stopwatch" desc="Count up with laps">
+          <label className="toggle-switch">
+            <input type="checkbox" checked={stopwatchEnabled} onChange={toggleStopwatchEnabled} />
             <span className="slider"></span>
           </label>
         </SettingRow>
