@@ -771,7 +771,11 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
         let mut last_notch_overlap: Option<bool> = None;
         let mut last_hwnd = HWND(std::ptr::null_mut());
         let mut last_emit = Instant::now();
-        let mut last_hide_fs: Option<bool> = None;
+        let mut last_fs_monitor_rect: Option<(i32, i32, i32, i32)> = None;
+        let mut debounced_fs_monitor_rect: Option<(i32, i32, i32, i32)> = None;
+        let mut last_fs_seen_at = Instant::now() - Duration::from_secs(10);
+        const FULLSCREEN_DEBOUNCE: Duration = Duration::from_millis(500);
+        let mut last_hide_by_label: std::collections::HashMap<String, bool> = std::collections::HashMap::new();
         let mut last_hide_emit = Instant::now();
         let mut is_known_shell = false;
         let my_process_id = std::process::id();
@@ -821,6 +825,7 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                 let mut should_overlap = false;
                 let mut should_notch_overlap = false;
                 let mut current_is_fs = false;
+                let mut current_fs_monitor_rect: Option<(i32, i32, i32, i32)> = None;
 
                 if !hwnd.is_invalid() && (hwnd != last_hwnd || last_emit.elapsed() >= Duration::from_secs(3)) {
                     last_hwnd = hwnd;
@@ -880,8 +885,10 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                                     let is_matches_screen = rect.left <= screen_rect.left && rect.top <= screen_rect.top && 
                                                             rect.right >= screen_rect.right && rect.bottom >= screen_rect.bottom;
                                     
-                                    // Truly fullscreen means client covers screen, OR window matches screen but is not just a standard maximized window
-                                    current_is_fs = (is_client_fullscreen || is_matches_screen) && !is_maximized_standard;
+                                    current_is_fs = is_client_fullscreen || (is_matches_screen && !is_maximized_standard);
+                                    if current_is_fs {
+                                        current_fs_monitor_rect = Some((screen_rect.left, screen_rect.top, screen_rect.right - screen_rect.left, screen_rect.bottom - screen_rect.top));
+                                    }
 
                                     if current_is_fs || is_maximized {
                                         should_overlap = true;
@@ -944,12 +951,38 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                 crate::state::set_overlap(crate::state::notch_overlap(), "main", if should_notch_overlap { 1 } else { 0 });
                 CURRENT_FOREGROUND_FULLSCREEN.store(current_is_fs, Ordering::Relaxed);
 
-                let hide_fs = current_is_fs
-                    && crate::utils::get_setting_str(&handle_visibility, "nectar-hide-in-fullscreen").as_deref() != Some("false");
-                crate::state::HIDE_FOR_FULLSCREEN.store(hide_fs, Ordering::Relaxed);
-                if Some(hide_fs) != last_hide_fs || last_hide_emit.elapsed() >= Duration::from_secs(3) {
-                    let _ = handle_visibility.emit("fullscreen-app", hide_fs);
-                    last_hide_fs = Some(hide_fs);
+                let hide_enabled = crate::utils::get_setting_str(&handle_visibility, "nectar-hide-in-fullscreen").as_deref() != Some("false");
+                let raw_fs_monitor_rect = if hide_enabled { current_fs_monitor_rect } else { None };
+                if raw_fs_monitor_rect.is_some() {
+                    debounced_fs_monitor_rect = raw_fs_monitor_rect;
+                    last_fs_seen_at = now;
+                } else if now.duration_since(last_fs_seen_at) >= FULLSCREEN_DEBOUNCE {
+                    debounced_fs_monitor_rect = None;
+                }
+                let fs_monitor_rect = debounced_fs_monitor_rect;
+                crate::state::set_fullscreen_monitor_rect(fs_monitor_rect);
+
+                if fs_monitor_rect != last_fs_monitor_rect {
+                    crate::diagnostics::log(&format!("fullscreen monitor changed: {fs_monitor_rect:?} (hide_enabled={hide_enabled})"));
+                }
+
+                let periodic_refresh = last_hide_emit.elapsed() >= Duration::from_secs(3);
+                if fs_monitor_rect != last_fs_monitor_rect || periodic_refresh {
+                    for (label, win) in handle_visibility.webview_windows() {
+                        if !(crate::state::is_dock_label(&label) || crate::state::is_notch_label(&label)) {
+                            continue;
+                        }
+                        let win_mon = win.hwnd().ok().and_then(monitor_rect_for_hwnd);
+                        let should_hide = win_mon.is_some() && win_mon == fs_monitor_rect;
+                        if last_hide_by_label.get(&label).copied() != Some(should_hide) {
+                            crate::diagnostics::log(&format!("fullscreen-app -> {label}: hide={should_hide} (window_monitor={win_mon:?}, fs_monitor={fs_monitor_rect:?})"));
+                        }
+                        if last_hide_by_label.get(&label).copied() != Some(should_hide) || periodic_refresh {
+                            let _ = handle_visibility.emit_to(label.as_str(), "fullscreen-app", should_hide);
+                            last_hide_by_label.insert(label, should_hide);
+                        }
+                    }
+                    last_fs_monitor_rect = fs_monitor_rect;
                     last_hide_emit = Instant::now();
                 }
 
@@ -1401,6 +1434,7 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
             let (notch_mon_w, _notch_mon_h) = (notch_cached_size.0 as i32, notch_cached_size.1 as i32);
 
             let fg_fs = CURRENT_FOREGROUND_FULLSCREEN.load(Ordering::Relaxed);
+            let dock_fs_hidden = crate::state::is_monitor_fullscreen_hidden((dock_mon_x, dock_mon_y, dock_mon_w, dock_mon_h));
 
             // --- Dock Interaction ---
             if let Some(dock_win) = app_handle.get_webview_window("dock") {
@@ -1466,14 +1500,14 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
                     let at_bottom_edge = cursor.y >= (dock_mon_y + dock_mon_h - (8.0 * scale) as i32) &&
                                          cursor.x >= dock_mon_x && cursor.x <= (dock_mon_x + dock_mon_w);
 
-                    if (at_bottom_edge && !crate::state::HIDE_FOR_FULLSCREEN.load(Ordering::Relaxed)) || in_dock_hover {
+                    if (at_bottom_edge && !dock_fs_hidden) || in_dock_hover {
                         is_hovered = true;
                         MH_DOCK_EXPIRY_MS.store(now + 500, Ordering::Relaxed);
                     }
 
                     // Approaching along the bottom edge keeps the dock interactive
                     // while near its horizontal span, so the reveal can't be clicked
-                    if at_bottom_edge && !fg_fs {
+                    if at_bottom_edge && !dock_fs_hidden {
                         if let Some((span_left, span_right)) = dock_span {
                             let edge_pad = (60.0 * scale) as i32;
                             if cursor.x >= span_left - edge_pad && cursor.x <= span_right + edge_pad {
@@ -1498,7 +1532,7 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
                         dbg_scale, dbg_box, is_click_interactive, MH_LAST_DOCK_IGNORE.load(Ordering::Relaxed),
                     ));
 
-                    if crate::state::HIDE_FOR_FULLSCREEN.load(Ordering::Relaxed) { is_click_interactive = false; }
+                    if dock_fs_hidden { is_click_interactive = false; }
                     let should_ignore = !is_click_interactive
                         && !MENU_IS_OPEN.load(Ordering::Relaxed)
                         && !DOCK_IS_DRAGGING.load(Ordering::Relaxed);
@@ -1702,7 +1736,7 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
                 }
             }
 
-            hit_test_extra_dock_windows(app_handle, cursor, now, fg_fs);
+            hit_test_extra_dock_windows(app_handle, cursor, now);
             hit_test_extra_notch_windows(app_handle, cursor, now, fg_fs);
         }
     }
@@ -1722,7 +1756,7 @@ fn monitor_rect_for_hwnd(hwnd: HWND) -> Option<(i32, i32, i32, i32)> {
     }
 }
 
-fn hit_test_extra_dock_windows(app_handle: &AppHandle, cursor: windows::Win32::Foundation::POINT, now: i64, fg_fs: bool) {
+fn hit_test_extra_dock_windows(app_handle: &AppHandle, cursor: windows::Win32::Foundation::POINT, now: i64) {
     let windows: Vec<(String, tauri::WebviewWindow)> = app_handle.webview_windows().into_iter()
         .filter(|(l, _)| is_dock_label(l) && crate::state::monitor_suffix(l).is_some())
         .collect();
@@ -1737,6 +1771,7 @@ fn hit_test_extra_dock_windows(app_handle: &AppHandle, cursor: windows::Win32::F
         }
         let Ok(hwnd) = dock_win.hwnd() else { continue };
         let Some((mon_x, mon_y, mon_w, mon_h)) = monitor_rect_for_hwnd(hwnd) else { continue };
+        let is_fs_hidden = crate::state::is_monitor_fullscreen_hidden((mon_x, mon_y, mon_w, mon_h));
 
         let mut is_click_interactive = false;
         let mut dock_span: Option<(i32, i32)> = None;
@@ -1784,12 +1819,12 @@ fn hit_test_extra_dock_windows(app_handle: &AppHandle, cursor: windows::Win32::F
                              cursor.x >= mon_x && cursor.x <= (mon_x + mon_w);
 
         let mut is_hovered = false;
-        if (at_bottom_edge && !crate::state::HIDE_FOR_FULLSCREEN.load(Ordering::Relaxed)) || in_dock_hover {
+        if (at_bottom_edge && !is_fs_hidden) || in_dock_hover {
             is_hovered = true;
             crate::state::set_i64(crate::state::dock_extra_expiry_ms(), &label, now + 500);
         }
 
-        if at_bottom_edge && !fg_fs {
+        if at_bottom_edge && !is_fs_hidden {
             if let Some((span_left, span_right)) = dock_span {
                 let edge_pad = (60.0 * scale) as i32;
                 if cursor.x >= span_left - edge_pad && cursor.x <= span_right + edge_pad {
@@ -1807,7 +1842,7 @@ fn hit_test_extra_dock_windows(app_handle: &AppHandle, cursor: windows::Win32::F
             crate::state::set_i32(crate::state::dock_extra_last_edge_hover(), &label, new_hover);
         }
 
-        if crate::state::HIDE_FOR_FULLSCREEN.load(Ordering::Relaxed) { is_click_interactive = false; }
+        if is_fs_hidden { is_click_interactive = false; }
         let should_ignore = !is_click_interactive
             && !MENU_IS_OPEN.load(Ordering::Relaxed)
             && !DOCK_IS_DRAGGING.load(Ordering::Relaxed);
@@ -2316,6 +2351,10 @@ pub fn unregister_appbar_native(hwnd: HWND) {
 
 pub fn wire_window_events(app: &AppHandle, window: &tauri::WebviewWindow, kind: crate::types::WindowKind, is_dynamic: bool) {
     let label = window.label().to_string();
+
+    if let Ok(hwnd) = window.hwnd() {
+        crate::active_look::prevent_minimize(hwnd);
+    }
 
     let win_for_rect = window.clone();
     let label_for_rect = label.clone();

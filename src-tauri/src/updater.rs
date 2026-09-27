@@ -186,6 +186,11 @@ fn installer_scope_args() -> Vec<String> {
     ]
 }
 
+fn install_needs_unavailable_elevation() -> bool {
+    let Some(dir) = std::env::current_exe().ok().and_then(|p| p.parent().map(PathBuf::from)) else { return false };
+    crate::uninstall_registry::install_scope(&dir) == Some(true) && !crate::native_uninstall::is_elevated()
+}
+
 async fn install_inner(app: &AppHandle) -> Result<(), String> {
     // Hold the check lock so a concurrent check cannot mutate state mid-install.
     let _guard = CHECK_LOCK.lock().await;
@@ -271,7 +276,10 @@ pub async fn run_startup_check(app: AppHandle) {
         return;
     }
 
-    if auto_update && release_is_old_enough(&result) {
+    if auto_update && release_is_old_enough(&result) && install_needs_unavailable_elevation() {
+        crate::diagnostics::log("auto-update: skipping silent install, all-users install needs elevation this process doesn't have; leaving update available for manual install");
+        let _ = app.emit("auto-update-status", serde_json::json!({ "status": "done" }));
+    } else if auto_update && release_is_old_enough(&result) {
         // On Windows this never returns: the installer exits the process.
         if install(&app).await.is_err() {
             let _ = app.emit("auto-update-status", serde_json::json!({ "status": "done" }));
