@@ -46,9 +46,6 @@ export function useSettings() {
   const [showUpdateIndicator, setShowUpdateIndicator] = useState(
     () => localStorage.getItem("nectar-show-update-indicator") !== "false"
   );
-  const [hideInFullscreen, setHideInFullscreen] = useState(
-    () => localStorage.getItem("nectar-hide-in-fullscreen") !== "false"
-  );
   const [timeFormat24h, setTimeFormat24h] = useState(
     () => localStorage.getItem("nectar-time-format-24h") === "true"
   );
@@ -89,6 +86,8 @@ export function useSettings() {
   const [notchMonitorId, setNotchMonitorId] = useState(
     () => localStorage.getItem("nectar-notch-monitor-id") || ""
   );
+  const [dockModeByMonitor, setDockModeByMonitor] = useState<Record<string, string>>({});
+  const [notchModeByMonitor, setNotchModeByMonitor] = useState<Record<string, string>>({});
   const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
   const [lowBatteryThreshold, setLowBatteryThreshold] = useState(20);
   const [hasBattery, setHasBattery] = useState(true);
@@ -154,7 +153,6 @@ export function useSettings() {
       apply(getVal("nectar-corners-enabled"), setCornersEnabled, readBool);
       apply(getVal("nectar-time-format-24h"), setTimeFormat24h, readBool);
       apply(getVal("nectar-show-update-indicator"), setShowUpdateIndicator, readBool);
-      apply(getVal("nectar-hide-in-fullscreen"), setHideInFullscreen, readBool);
       apply(getVal("nectar-auto-update"), setAutoUpdate, readBool);
       apply(getVal("nectar-volume-edge-enabled"), setVolumeEdgeEnabled, readBool);
       apply(getVal("nectar-brightness-edge-enabled"), setBrightnessEdgeEnabled, readBool);
@@ -176,6 +174,15 @@ export function useSettings() {
       apply(getVal("nectar-dock-monitor-id"), setDockMonitorId, (v) => v);
       apply(getVal("nectar-notch-monitor-mode"), setNotchMonitorMode, (v) => v as MonitorMode);
       apply(getVal("nectar-notch-monitor-id"), setNotchMonitorId, (v) => v);
+
+      const dockByMonVal = getVal("nectar-dock-mode-by-monitor");
+      if (dockByMonVal) {
+        try { setDockModeByMonitor(JSON.parse(dockByMonVal)); } catch {}
+      }
+      const notchByMonVal = getVal("nectar-notch-mode-by-monitor");
+      if (notchByMonVal) {
+        try { setNotchModeByMonitor(JSON.parse(notchByMonVal)); } catch {}
+      }
 
       const savedCity = getVal("nectar-weather-city");
       if (savedCity) setCityName(savedCity);
@@ -236,6 +243,8 @@ export function useSettings() {
     "nectar-dock-monitor-id": setDockMonitorId,
     "nectar-notch-monitor-mode": (v) => setNotchMonitorMode(v as MonitorMode),
     "nectar-notch-monitor-id": setNotchMonitorId,
+    "nectar-dock-mode-by-monitor": (v) => { try { setDockModeByMonitor(JSON.parse(v)); } catch {} },
+    "nectar-notch-mode-by-monitor": (v) => { try { setNotchModeByMonitor(JSON.parse(v)); } catch {} },
     "nectar-dock-enabled": setDockEnabled,
     "nectar-dock-icon-only": setDockIconOnly,
     "nectar-dock-preview-enabled": setDockPreviewEnabled,
@@ -253,7 +262,6 @@ export function useSettings() {
     "nectar-media-layout": setMediaLayout,
     "nectar-corners-enabled": setCornersEnabled,
     "nectar-show-update-indicator": setShowUpdateIndicator,
-    "nectar-hide-in-fullscreen": setHideInFullscreen,
     "nectar-time-format-24h": setTimeFormat24h,
     "nectar-low-battery-threshold": setLowBatteryThreshold,
     "nectar-scale": setScale,
@@ -477,12 +485,6 @@ export function useSettings() {
     saveSetting("nectar-show-update-indicator", String(next));
   };
 
-  const toggleHideInFullscreen = () => {
-    const next = !hideInFullscreen;
-    setHideInFullscreen(next);
-    saveSetting("nectar-hide-in-fullscreen", String(next));
-  };
-
   const toggleTimeFormat24h = () => {
     const next = !timeFormat24h;
     setTimeFormat24h(next);
@@ -566,6 +568,24 @@ export function useSettings() {
   const setNotchMonitorIdValue = (id: string) => {
     setNotchMonitorId(id);
     saveSetting("nectar-notch-monitor-id", id);
+  };
+
+  const setDockModeForMonitor = (monitorId: string, mode: string | null) => {
+    setDockModeByMonitor((prev) => {
+      const next = { ...prev };
+      if (mode === null) delete next[monitorId]; else next[monitorId] = mode;
+      saveSetting("nectar-dock-mode-by-monitor", JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const setNotchModeForMonitor = (monitorId: string, mode: string | null) => {
+    setNotchModeByMonitor((prev) => {
+      const next = { ...prev };
+      if (mode === null) delete next[monitorId]; else next[monitorId] = mode;
+      saveSetting("nectar-notch-mode-by-monitor", JSON.stringify(next));
+      return next;
+    });
   };
 
   const handleThresholdChange = (val: number) => {
@@ -764,8 +784,6 @@ export function useSettings() {
     toggleTimeFormat24h,
     showUpdateIndicator,
     toggleUpdateIndicator,
-    hideInFullscreen,
-    toggleHideInFullscreen,
     scale,
     handleScaleChange,
     cornersEnabled,
@@ -846,6 +864,10 @@ export function useSettings() {
     setNotchMonitorModeValue,
     notchMonitorId,
     setNotchMonitorIdValue,
+    dockModeByMonitor,
+    setDockModeForMonitor,
+    notchModeByMonitor,
+    setNotchModeForMonitor,
 
     // Overlays
     volumeOverlayEnabled,

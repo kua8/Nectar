@@ -1,5 +1,6 @@
 import { Palette, Droplet, Contrast, Droplets, Sun, Square, Maximize2 } from "lucide-react";
 import { SettingRow } from "./SettingRow";
+import { Dropdown } from "./Dropdown";
 
 interface AppearanceTabProps {
   themeMode: string;
@@ -42,16 +43,16 @@ export function AppearanceTab({
       <div className="setting-group-label">Theme</div>
       <div className="setting-group">
         <SettingRow icon={Palette} label="Theme Mode" desc="Configure visual styling">
-          <select
-            className="settings-select"
+          <Dropdown
             value={themeMode}
-            onChange={(e) => handleThemeModeChange(e.target.value)}
-          >
-            <option value="dark">Dark (Translucent)</option>
-            <option value="light">Light (Translucent)</option>
-            <option value="custom">Custom Color</option>
-            <option value="adaptive">Adaptive Accent</option>
-          </select>
+            onChange={handleThemeModeChange}
+            options={[
+              { value: "dark", label: "Dark (Translucent)" },
+              { value: "light", label: "Light (Translucent)" },
+              { value: "custom", label: "Custom Color" },
+              { value: "adaptive", label: "Adaptive Accent" },
+            ]}
+          />
         </SettingRow>
 
         {showCustomColor && (

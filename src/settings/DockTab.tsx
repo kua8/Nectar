@@ -1,5 +1,6 @@
 import { Monitor, Eye, EyeOff, Circle, Search, Shuffle, MonitorCheck, CalendarDays } from "lucide-react";
 import { SettingRow } from "./SettingRow";
+import { Dropdown } from "./Dropdown";
 import type { MonitorInfo, MonitorMode } from "./types";
 
 interface DockTabProps {
@@ -22,6 +23,8 @@ interface DockTabProps {
   setDockMonitorModeValue: (mode: MonitorMode) => void;
   dockMonitorId: string;
   setDockMonitorIdValue: (id: string) => void;
+  dockModeByMonitor: Record<string, string>;
+  setDockModeForMonitor: (monitorId: string, mode: string | null) => void;
 }
 
 export function DockTab({
@@ -44,6 +47,8 @@ export function DockTab({
   setDockMonitorModeValue,
   dockMonitorId,
   setDockMonitorIdValue,
+  dockModeByMonitor,
+  setDockModeForMonitor,
 }: DockTabProps) {
   return (
     <>
@@ -59,45 +64,57 @@ export function DockTab({
         {dockEnabled && (
           <>
             <SettingRow icon={dockMode === "fixed" ? EyeOff : Eye} label="Behavior" desc="Choose how the dock appears">
-              <select
-                className="settings-select"
+              <Dropdown
                 value={dockMode}
-                onChange={(e) => setDockModeValue(e.target.value)}
-              >
-                <option value="fixed">Fixed</option>
-                <option value="smart">Smart</option>
-                <option value="peek">Peek</option>
-              </select>
+                onChange={setDockModeValue}
+                options={[
+                  { value: "fixed", label: "Fixed" },
+                  { value: "smart", label: "Smart" },
+                  { value: "peek", label: "Peek" },
+                ]}
+              />
             </SettingRow>
 
             <SettingRow icon={MonitorCheck} label="Show On" desc="Choose which monitor(s) display the dock">
-              <select
-                className="settings-select"
+              <Dropdown
                 value={dockMonitorMode}
-                onChange={(e) => setDockMonitorModeValue(e.target.value as MonitorMode)}
-              >
-                <option value="primary">Primary Monitor</option>
-                <option value="all">All Monitors</option>
-                <option value="specific">Specific Monitor</option>
-              </select>
+                onChange={(v) => setDockMonitorModeValue(v as MonitorMode)}
+                options={[
+                  { value: "primary", label: "Primary Monitor" },
+                  { value: "all", label: "All Monitors" },
+                  { value: "specific", label: "Specific Monitor" },
+                ]}
+              />
             </SettingRow>
 
             {dockMonitorMode === "specific" && (
               <SettingRow icon={Monitor} label="Monitor" desc="Which display shows the dock">
-                <select
-                  className="settings-select"
+                <Dropdown
                   value={dockMonitorId}
-                  onChange={(e) => setDockMonitorIdValue(e.target.value)}
-                >
-                  {monitors.length === 0 && <option value="">Loading...</option>}
-                  {monitors.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.label}{m.is_primary ? " (Primary)" : ""}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setDockMonitorIdValue}
+                  placeholder={monitors.length === 0 ? "Loading..." : undefined}
+                  options={monitors.map((m) => ({
+                    value: m.id,
+                    label: `${m.label}${m.is_primary ? " (Primary)" : ""}`,
+                  }))}
+                />
               </SettingRow>
             )}
+
+            {dockMonitorMode === "all" && monitors.length > 1 && monitors.map((m) => (
+              <SettingRow key={m.id} icon={Monitor} label={`${m.label} Behavior`} desc={m.is_primary ? "Primary monitor" : undefined}>
+                <Dropdown
+                  value={dockModeByMonitor[m.id] || ""}
+                  onChange={(v) => setDockModeForMonitor(m.id, v || null)}
+                  options={[
+                    { value: "", label: `Use default (${dockMode === "fixed" ? "Fixed" : dockMode === "smart" ? "Smart" : "Peek"})` },
+                    { value: "fixed", label: "Fixed" },
+                    { value: "smart", label: "Smart" },
+                    { value: "peek", label: "Peek" },
+                  ]}
+                />
+              </SettingRow>
+            ))}
 
             <SettingRow icon={Eye} label="Show App Previews" desc="Show window thumbnails on hover">
               <label className="toggle-switch">

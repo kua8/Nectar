@@ -66,6 +66,44 @@ pub fn monitor_for_window_label(app: &AppHandle, kind: WindowKind, label: &str) 
     }
 }
 
+fn mode_setting_keys(kind: WindowKind) -> (&'static str, &'static str) {
+    match kind {
+        WindowKind::Dock => ("nectar-dock-mode", "nectar-dock-mode-by-monitor"),
+        WindowKind::Notch => ("nectar-notch-mode", "nectar-notch-mode-by-monitor"),
+    }
+}
+
+/// Resolves which mode (fixed/smart/peek) a specific dock or notch window
+/// should use. Per-monitor overrides live in a JSON map keyed by the same
+/// stable monitor id used elsewhere (`nectar-dock-mode-by-monitor` etc.);
+/// a monitor without an entry falls back to the plain global mode setting.
+pub fn resolve_mode_for_label(app: &AppHandle, kind: WindowKind, label: &str) -> String {
+    let (default_key, map_key) = mode_setting_keys(kind);
+    let normalize = |m: String| if m == "auto-hide" { "smart".to_string() } else { m };
+    let default_mode = normalize(get_setting_str(app, default_key).unwrap_or_else(|| "fixed".to_string()));
+
+    let Some(monitor) = monitor_for_window_label(app, kind, label) else { return default_mode };
+    let Some(monitor_id) = monitor.name().cloned() else { return default_mode };
+    let Some(map_json) = get_setting_str(app, map_key) else { return default_mode };
+    let Ok(map) = serde_json::from_str::<HashMap<String, String>>(&map_json) else { return default_mode };
+    map.get(&monitor_id).cloned().map(normalize).unwrap_or(default_mode)
+}
+
+/// Sets the mode override for whichever monitor a window is currently on,
+/// so an in-notch/in-dock mode switcher affects only that screen.
+pub fn set_mode_for_label(app: &AppHandle, kind: WindowKind, label: &str, mode: &str) -> Result<(), String> {
+    let (_, map_key) = mode_setting_keys(kind);
+    let monitor = monitor_for_window_label(app, kind, label).ok_or("no monitor for this window")?;
+    let monitor_id = monitor.name().cloned().ok_or("monitor has no stable id")?;
+
+    let mut map: HashMap<String, String> = get_setting_str(app, map_key)
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default();
+    map.insert(monitor_id, mode.to_string());
+    let json = serde_json::to_string(&map).map_err(|e| e.to_string())?;
+    crate::commands::save_setting(app.clone(), map_key.to_string(), serde_json::Value::String(json))
+}
+
 pub fn list_monitors(app: &AppHandle) -> Vec<MonitorInfo> {
     let monitors = app.available_monitors().unwrap_or_default();
     let primary_index = find_primary_index(app, &monitors);

@@ -74,7 +74,6 @@ const Dock = memo(function Dock() {
   const [isDockHovered, setIsDockHovered] = useState(false);
   const [isEdgeHovered, setIsEdgeHovered] = useState(false);
   const [isOverlapped, setIsOverlapped] = useState(false);
-  const [fullscreenApp, setFullscreenApp] = useState(false);
   const [showAddPopup, setShowAddPopup] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, app: AppInfo | null } | null>(null);
   const [contextMenuHeight, setContextMenuHeight] = useState(0);
@@ -116,7 +115,6 @@ const Dock = memo(function Dock() {
   }, [isAnyInteraction]);
 
   const isHidden = !startupAnimating && (
-    fullscreenApp ||
     (dockMode === 'smart' && isOverlapped && interactionState === 'none') ||
     (dockMode === 'peek' && interactionState === 'none')
   );
@@ -179,14 +177,30 @@ const Dock = memo(function Dock() {
     window.addEventListener('resize', updateRect);
     const observer = new ResizeObserver(updateRect);
     if (dockRef.current) observer.observe(dockRef.current);
+
+    let rafId: number;
+    const chaseStart = performance.now();
+    const chase = () => {
+      updateRect();
+      if (performance.now() - chaseStart < 700) {
+        rafId = requestAnimationFrame(chase);
+      }
+    };
+    rafId = requestAnimationFrame(chase);
+
     const poll = setInterval(updateRect, 500);
 
     return () => {
       window.removeEventListener('resize', updateRect);
       observer.disconnect();
       clearInterval(poll);
+      cancelAnimationFrame(rafId);
     };
   }, [pinnedApps, activeApps, isHidden, previewData, scale]);
+
+  const refreshDockMode = () => {
+    invoke<string>('get_dock_mode_for_window').then(setDockMode).catch(() => {});
+  };
 
   useEffect(() => {
     const init = async () => {
@@ -198,12 +212,8 @@ const Dock = memo(function Dock() {
         if (local !== null) return local;
         return fallback;
       };
-      
-      const dMode = getVal("nectar-dock-mode", "fixed");
-      if (dMode) {
-        const mapped = dMode === "auto-hide" ? "smart" : dMode;
-        setDockMode(mapped);
-      }
+
+      refreshDockMode();
 
       const preview = getVal("nectar-dock-preview-enabled", "true");
       setDockPreviewEnabled(preview === "true");
@@ -239,24 +249,25 @@ const Dock = memo(function Dock() {
       setIsOverlapped(event.payload);
     });
 
-    const unlistenFullscreen = listen<boolean>("fullscreen-app", (event) => {
-      setFullscreenApp(event.payload);
-    });
-
     const unlistenEdgeHover = listen<boolean>("dock-edge-hover", (event) => {
       setIsEdgeHovered(event.payload);
     });
 
+    const unlistenMonitors = listen("monitors-changed", refreshDockMode);
+
     return () => {
       unlistenOverlap.then(f => f());
-      unlistenFullscreen.then(f => f());
       unlistenEdgeHover.then(f => f());
+      unlistenMonitors.then(f => f());
     };
   }, []);
 
   useSettingsSync(
     {
-      "nectar-dock-mode": setDockMode,
+      "nectar-dock-mode": refreshDockMode,
+      "nectar-dock-mode-by-monitor": refreshDockMode,
+      "nectar-dock-monitor-mode": refreshDockMode,
+      "nectar-dock-monitor-id": refreshDockMode,
       "nectar-dock-preview-enabled": setDockPreviewEnabled,
       "nectar-dock-search-enabled": setDockSearchEnabled,
       "nectar-dock-calendar-enabled": setDockCalendarEnabled,

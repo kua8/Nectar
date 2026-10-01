@@ -101,8 +101,6 @@ function SettingsApp() {
               toggleTimeFormat24h={settings.toggleTimeFormat24h}
               showUpdateIndicator={settings.showUpdateIndicator}
               toggleUpdateIndicator={settings.toggleUpdateIndicator}
-              hideInFullscreen={settings.hideInFullscreen}
-              toggleHideInFullscreen={settings.toggleHideInFullscreen}
               lowBatteryThreshold={settings.lowBatteryThreshold}
               handleThresholdChange={settings.handleThresholdChange}
               restartNectar={settings.restartNectar}
@@ -138,6 +136,8 @@ function SettingsApp() {
               setNotchMonitorModeValue={settings.setNotchMonitorModeValue}
               notchMonitorId={settings.notchMonitorId}
               setNotchMonitorIdValue={settings.setNotchMonitorIdValue}
+              notchModeByMonitor={settings.notchModeByMonitor}
+              setNotchModeForMonitor={settings.setNotchModeForMonitor}
               calendarEnabled={settings.calendarEnabled}
               toggleCalendar={settings.toggleCalendar}
               timerEnabled={settings.timerEnabled}
@@ -191,6 +191,8 @@ function SettingsApp() {
               setDockMonitorModeValue={settings.setDockMonitorModeValue}
               dockMonitorId={settings.dockMonitorId}
               setDockMonitorIdValue={settings.setDockMonitorIdValue}
+              dockModeByMonitor={settings.dockModeByMonitor}
+              setDockModeForMonitor={settings.setDockModeForMonitor}
             />
           )}
           {activeTab === "overlays" && (

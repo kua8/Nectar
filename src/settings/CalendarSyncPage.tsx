@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { CalendarDays, ChevronLeft, CloudCog, Link2, Plus, RefreshCw, Timer, Trash2, Unplug } from "lucide-react";
 import { SettingRow } from "./SettingRow";
+import { Dropdown } from "./Dropdown";
 import { useCaldav } from "../hooks/useCaldav";
 
 function timeAgo(ms: number | null): string {
@@ -231,12 +232,16 @@ export function CalendarSyncPage({ onBack }: { onBack: () => void }) {
           desc={status}
           divider={false}
         >
-          <select className="settings-select" value={interval} onChange={(e) => changeInterval(e.target.value)}>
-            <option value="5">5 minutes</option>
-            <option value="15">15 minutes</option>
-            <option value="30">30 minutes</option>
-            <option value="60">Hourly</option>
-          </select>
+          <Dropdown
+            value={interval}
+            onChange={changeInterval}
+            options={[
+              { value: "5", label: "5 minutes" },
+              { value: "15", label: "15 minutes" },
+              { value: "30", label: "30 minutes" },
+              { value: "60", label: "Hourly" },
+            ]}
+          />
         </SettingRow>
       </div>
 

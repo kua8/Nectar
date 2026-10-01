@@ -16,6 +16,7 @@ import {
   Timer,
 } from "lucide-react";
 import { SettingRow } from "./SettingRow";
+import { Dropdown } from "./Dropdown";
 import { useCaldav } from "../hooks/useCaldav";
 import { StatusWidgetConfig } from "../components/StatusWidgetConfig";
 import type { WidgetConfig, MonitorInfo, MonitorMode } from "./types";
@@ -28,6 +29,8 @@ interface NotchTabProps {
   setNotchMonitorModeValue: (mode: MonitorMode) => void;
   notchMonitorId: string;
   setNotchMonitorIdValue: (id: string) => void;
+  notchModeByMonitor: Record<string, string>;
+  setNotchModeForMonitor: (monitorId: string, mode: string | null) => void;
   calendarEnabled: boolean;
   toggleCalendar: () => void;
   timerEnabled: boolean;
@@ -69,6 +72,8 @@ export function NotchTab({
   setNotchMonitorModeValue,
   notchMonitorId,
   setNotchMonitorIdValue,
+  notchModeByMonitor,
+  setNotchModeForMonitor,
   calendarEnabled,
   toggleCalendar,
   timerEnabled,
@@ -108,45 +113,57 @@ export function NotchTab({
       <div className="setting-group-label">Notch</div>
       <div className="setting-group">
         <SettingRow icon={PanelTop} label="Notch Behavior" desc="Choose how the notch appears">
-          <select
-            className="settings-select"
+          <Dropdown
             value={notchMode}
-            onChange={(e) => setNotchModeValue(e.target.value)}
-          >
-            <option value="fixed">Fixed</option>
-            <option value="smart">Smart</option>
-            <option value="peek">Peek</option>
-          </select>
+            onChange={setNotchModeValue}
+            options={[
+              { value: "fixed", label: "Fixed" },
+              { value: "smart", label: "Smart" },
+              { value: "peek", label: "Peek" },
+            ]}
+          />
         </SettingRow>
 
         <SettingRow icon={MonitorCheck} label="Show On" desc="Choose which monitor(s) display the notch">
-          <select
-            className="settings-select"
+          <Dropdown
             value={notchMonitorMode}
-            onChange={(e) => setNotchMonitorModeValue(e.target.value as MonitorMode)}
-          >
-            <option value="primary">Primary Monitor</option>
-            <option value="all">All Monitors</option>
-            <option value="specific">Specific Monitor</option>
-          </select>
+            onChange={(v) => setNotchMonitorModeValue(v as MonitorMode)}
+            options={[
+              { value: "primary", label: "Primary Monitor" },
+              { value: "all", label: "All Monitors" },
+              { value: "specific", label: "Specific Monitor" },
+            ]}
+          />
         </SettingRow>
 
         {notchMonitorMode === "specific" && (
           <SettingRow icon={Monitor} label="Monitor" desc="Which display shows the notch">
-            <select
-              className="settings-select"
+            <Dropdown
               value={notchMonitorId}
-              onChange={(e) => setNotchMonitorIdValue(e.target.value)}
-            >
-              {monitors.length === 0 && <option value="">Loading...</option>}
-              {monitors.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}{m.is_primary ? " (Primary)" : ""}
-                </option>
-              ))}
-            </select>
+              onChange={setNotchMonitorIdValue}
+              placeholder={monitors.length === 0 ? "Loading..." : undefined}
+              options={monitors.map((m) => ({
+                value: m.id,
+                label: `${m.label}${m.is_primary ? " (Primary)" : ""}`,
+              }))}
+            />
           </SettingRow>
         )}
+
+        {notchMonitorMode === "all" && monitors.length > 1 && monitors.map((m) => (
+          <SettingRow key={m.id} icon={Monitor} label={`${m.label} Behavior`} desc={m.is_primary ? "Primary monitor" : undefined}>
+            <Dropdown
+              value={notchModeByMonitor[m.id] || ""}
+              onChange={(v) => setNotchModeForMonitor(m.id, v || null)}
+              options={[
+                { value: "", label: `Use default (${notchMode === "fixed" ? "Fixed" : notchMode === "smart" ? "Smart" : "Peek"})` },
+                { value: "fixed", label: "Fixed" },
+                { value: "smart", label: "Smart" },
+                { value: "peek", label: "Peek" },
+              ]}
+            />
+          </SettingRow>
+        ))}
 
         <SettingRow icon={Calendar} label="Calendar" desc="Day, week, month and agenda views in the notch">
           <label className="toggle-switch">

@@ -1760,6 +1760,26 @@ pub fn get_monitors(app: AppHandle) -> Vec<crate::types::MonitorInfo> {
     crate::monitors::list_monitors(&app)
 }
 
+#[tauri::command]
+pub fn get_dock_mode_for_window(window: tauri::WebviewWindow, app: AppHandle) -> String {
+    crate::monitors::resolve_mode_for_label(&app, crate::types::WindowKind::Dock, window.label())
+}
+
+#[tauri::command]
+pub fn get_notch_mode_for_window(window: tauri::WebviewWindow, app: AppHandle) -> String {
+    crate::monitors::resolve_mode_for_label(&app, crate::types::WindowKind::Notch, window.label())
+}
+
+#[tauri::command]
+pub fn set_dock_mode_for_window(window: tauri::WebviewWindow, app: AppHandle, mode: String) -> Result<(), String> {
+    crate::monitors::set_mode_for_label(&app, crate::types::WindowKind::Dock, window.label(), &mode)
+}
+
+#[tauri::command]
+pub fn set_notch_mode_for_window(window: tauri::WebviewWindow, app: AppHandle, mode: String) -> Result<(), String> {
+    crate::monitors::set_mode_for_label(&app, crate::types::WindowKind::Notch, window.label(), &mode)
+}
+
 
 #[tauri::command]
 pub fn load_settings(app: AppHandle) -> Result<HashMap<String, serde_json::Value>, String> {

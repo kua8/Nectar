@@ -131,22 +131,6 @@ pub static ANY_MEDIA_PLAYING: AtomicBool = AtomicBool::new(false);
 pub static OVERLAY_IN_SPLASH: AtomicBool = AtomicBool::new(false);
 pub static CURRENT_FOREGROUND_FULLSCREEN: AtomicBool = AtomicBool::new(false);
 
-pub static FULLSCREEN_MONITOR_RECT: Mutex<Option<(i32, i32, i32, i32)>> = Mutex::new(None);
-
-pub fn fullscreen_monitor_rect() -> Option<(i32, i32, i32, i32)> {
-    FULLSCREEN_MONITOR_RECT.lock().ok().and_then(|g| *g)
-}
-
-pub fn set_fullscreen_monitor_rect(rect: Option<(i32, i32, i32, i32)>) {
-    if let Ok(mut g) = FULLSCREEN_MONITOR_RECT.lock() {
-        *g = rect;
-    }
-}
-
-pub fn is_monitor_fullscreen_hidden(mon: (i32, i32, i32, i32)) -> bool {
-    fullscreen_monitor_rect() == Some(mon)
-}
-
 pub static SINGLE_INSTANCE_MUTEX_HANDLE: OnceLock<isize> = OnceLock::new();
 pub static SINGLE_INSTANCE_EVENT_HANDLE: OnceLock<isize> = OnceLock::new();
 

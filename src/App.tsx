@@ -444,12 +444,24 @@ function App() {
     window.addEventListener('resize', updateRect);
     const observer = new ResizeObserver(updateRect);
     if (nectarRef.current) observer.observe(nectarRef.current);
+
+    let rafId: number;
+    const chaseStart = performance.now();
+    const chase = () => {
+      updateRect();
+      if (performance.now() - chaseStart < 700) {
+        rafId = requestAnimationFrame(chase);
+      }
+    };
+    rafId = requestAnimationFrame(chase);
+
     const poll = setInterval(updateRect, 500);
 
     return () => {
       window.removeEventListener('resize', updateRect);
       observer.disconnect();
       clearInterval(poll);
+      cancelAnimationFrame(rafId);
     };
   }, [isExpanded, isHidden, windowLabel, scale]);
 
@@ -544,6 +556,15 @@ function App() {
   // Weather hook
   const { temperature, weatherCondition, weatherIcon: WeatherIcon, cityName, tempUnit } = useWeather(settingsWeatherEnabled);
 
+  const refreshNotchMode = () => {
+    invoke<string>('get_notch_mode_for_window').then(setNotchMode).catch(() => {});
+  };
+
+  useEffect(() => {
+    const unlisten = listen("monitors-changed", refreshNotchMode);
+    return () => { unlisten.then(f => f()); };
+  }, []);
+
   useEffect(() => {
     if (!windowLabel) return;
 
@@ -573,11 +594,7 @@ function App() {
       const thresholdStr = getVal("nectar-low-battery-threshold", "20");
       if (thresholdStr) setLowBatteryThreshold(parseInt(thresholdStr as string));
 
-      const nMode = getVal("nectar-notch-mode", "fixed");
-      if (nMode) {
-        const mapped = nMode === "auto-hide" ? "smart" : nMode;
-        setNotchMode(mapped);
-      }
+      refreshNotchMode();
 
       if (windowLabel === 'main') {
         const firstRun = localStorage.getItem("nectar-first-run") === null;
@@ -593,9 +610,10 @@ function App() {
         const dockMode = rawDockMode === "auto-hide" ? "smart" : rawDockMode;
         const syncWindows = async () => {
           const dockEnabled = getVal("nectar-dock-enabled", "true") === "true";
+          const resolvedNotchMode = await invoke<string>('get_notch_mode_for_window').catch(() => "fixed");
           await Promise.all([
             dockEnabled ? invoke("init_dock", { mode: dockMode }) : Promise.resolve(),
-            invoke("change_notch_mode", { mode: nMode }),
+            invoke("change_notch_mode", { mode: resolvedNotchMode }),
           ]);
           await invoke("sync_appbar");
         };
@@ -699,7 +717,10 @@ function App() {
       "nectar-low-battery-threshold": setLowBatteryThreshold,
       "nectar-dock-enabled": setDockEnabled,
       "nectar-dock-mode": setDockMode,
-      "nectar-notch-mode": setNotchMode,
+      "nectar-notch-mode": refreshNotchMode,
+      "nectar-notch-mode-by-monitor": refreshNotchMode,
+      "nectar-notch-monitor-mode": refreshNotchMode,
+      "nectar-notch-monitor-id": refreshNotchMode,
       "nectar-status-widgets": (value) => {
         try {
           const parsed = JSON.parse(value);
@@ -1216,9 +1237,8 @@ function App() {
     e.stopPropagation();
     const nextMode = notchMode === "fixed" ? "smart" : notchMode === "smart" ? "peek" : "fixed";
     setNotchMode(nextMode);
-    localStorage.setItem("nectar-notch-mode", nextMode);
-    invoke("save_setting", { key: "nectar-notch-mode", value: nextMode }).catch(console.error);
     try {
+      await invoke("set_notch_mode_for_window", { mode: nextMode });
       await invoke("change_notch_mode", { mode: nextMode });
     } catch (err) {
       console.error("Failed to change notch mode:", err);
