@@ -27,6 +27,9 @@ Edit `settings.json` with any text editor while Nectar is running. Changes are a
 | `nectar-dock-search-enabled` | `"true"` / `"false"` | `"true"` | Show a search icon next to Start that opens Windows Search (Win+S). |
 | `nectar-dock-calendar-enabled` | `"true"` / `"false"` | `"true"` | Show a calendar icon next to the search icon that opens the Calendar window. The Calendar window is also in the dock's Nectar Options menu, the tray menu, and the notch calendar's open button. |
 | `nectar-dock-icon-only` | `"true"` / `"false"` | `"false"` | Minimal icon-only style (no background/padding around icons). |
+| `nectar-start-icon` | `"default"` / `"windows"` / `custom:<data URI>` | `"default"` | Start button icon in the dock: the Nectar logo, the Windows logo, or an uploaded image (`custom:` followed by its data URI). |
+| `nectar-dock-adaptive` | `"true"` / `"false"` | `"false"` | Fixed dock only. Stretch the dock to full width like a traditional taskbar while a window is maximized, and contract back when it's restored. |
+| `nectar-dock-win-number-enabled` | `"true"` / `"false"` | `"true"` | When the taskbar is replaced, Win+1 through Win+9 activate the matching pinned dock app (focus/minimize if running, launch otherwise) instead of the native taskbar slots. |
 | `nectar-dock-mixed-reorder` | `"true"` / `"false"` | `"false"` | `"false"` = pinned and running icons stay in two separate groups with a divider between them. `"true"` = a single group — any icon, pinned or not, can be dragged anywhere. |
 
 ### Notch
@@ -66,6 +69,7 @@ If the chosen monitor is unplugged, Nectar falls back to the primary display.
 |-----|------|---------|-------------|
 | `nectar-calendar-enabled` | `"true"` / `"false"` | `"true"` | Show the calendar in the notch's calendar panel. |
 | `nectar-timer-enabled` | `"true"` / `"false"` | follows `nectar-calendar-enabled` | Show the countdown timer (presets and a custom time) in the notch's calendar panel. |
+| `nectar-timer-sound-enabled` | `"true"` / `"false"` | `"true"` | Play a short chime when the countdown timer finishes. |
 | `nectar-stopwatch-enabled` | `"true"` / `"false"` | follows `nectar-calendar-enabled` | Show the stopwatch (with laps) next to the timer. |
 | `nectar-calendar-view` | `"day"` / `"week"` / `"month"` / `"agenda"` | `"month"` | Which view the notch calendar shows once a calendar source is connected. Set by the Day / Week / Month / Agenda switcher in the notch. |
 | `nectar-music-mode-enabled` | `"true"` / `"false"` | `"true"` | Enable interactive music media widget. |

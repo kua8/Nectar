@@ -10,6 +10,7 @@ import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, VolumeLowIcon, Volu
 import { CompactMediaPlayer } from "./CompactMediaPlayer";
 import { useWeather } from "./hooks/useWeather";
 import { useSettingsSync } from "./hooks/useSettingsSync";
+import { useTrailingThrottle } from "./hooks/useTrailingThrottle";
 import { useCaldav } from "./hooks/useCaldav";
 import { NotchCalendar } from "./components/NotchCalendar";
 import { NotchClock, StopwatchReadout } from "./components/NotchClock";
@@ -22,10 +23,62 @@ import {
   ArrowUpDown,
 } from "lucide-react";
 
+// Timer chime, synthesized with Web Audio so there's no asset. The context is made on the
+// Start click so autoplay lets it play when the timer ends.
+let timerChimeCtx: AudioContext | null = null;
+
+const getTimerChimeCtx = (): AudioContext | null => {
+  try {
+    if (!timerChimeCtx) timerChimeCtx = new AudioContext();
+    if (timerChimeCtx.state === "suspended") timerChimeCtx.resume().catch(() => {});
+    return timerChimeCtx;
+  } catch {
+    return null;
+  }
+};
+
+const playTimerChime = () => {
+  const ctx = getTimerChimeCtx();
+  if (!ctx) return;
+  const start = ctx.currentTime + 0.02;
+  const master = ctx.createGain();
+  master.gain.value = 0.45;
+  master.connect(ctx.destination);
+
+  // Rising bell (A5, C#6, E6) with a quiet harmonic.
+  const notes = [
+    { freq: 880.0, at: 0 },
+    { freq: 1108.73, at: 0.18 },
+    { freq: 1318.51, at: 0.36 },
+  ];
+  notes.forEach(({ freq, at }) => {
+    const osc = ctx.createOscillator();
+    const harmonic = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const harmonicGain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    harmonic.type = "sine";
+    harmonic.frequency.value = freq * 2.01;
+    harmonicGain.gain.value = 0.12;
+    gain.gain.setValueAtTime(0.0001, start + at);
+    gain.gain.exponentialRampToValueAtTime(0.32, start + at + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + at + 1.4);
+    osc.connect(gain);
+    harmonic.connect(harmonicGain);
+    harmonicGain.connect(gain);
+    gain.connect(master);
+    osc.start(start + at);
+    harmonic.start(start + at);
+    osc.stop(start + at + 1.5);
+    harmonic.stop(start + at + 1.5);
+  });
+};
+
 // Simple SVG icons
-function WifiIcon({ connected }: { connected: boolean }) {
+function WifiIcon({ enabled, connected }: { enabled: boolean; connected: boolean }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" opacity={connected ? 1 : 0.4}>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" opacity={!enabled ? 0.4 : connected ? 1 : 0.7}>
       <path d="M5 12.55a11 11 0 0 1 14.08 0" />
       <path d="M1.42 9a16 16 0 0 1 21.16 0" />
       <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
@@ -180,6 +233,11 @@ function UpdateActivity() {
   );
 }
 
+interface WifiStatus {
+  enabled: boolean;
+  connected: boolean;
+}
+
 interface MediaInfo {
   title: string;
   artist: string;
@@ -319,7 +377,13 @@ function App() {
   const [albumArtUrl, setAlbumArtUrl] = useState<string | null>(null);
   const [albumArtKey, setAlbumArtKey] = useState(0);
   const [volume, setVolume] = useState(0.5);
-  const [wifiEnabled, setWifiEnabled] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
+  // Sliders show 0 while muted, like the overlay.
+  const displayVolume = isMuted ? 0 : volume;
+  // null until the first fetch so the pill doesn't flash a wrong default.
+  const [wifiStatus, setWifiStatus] = useState<WifiStatus | null>(null);
+  const wifiEnabled = wifiStatus?.enabled ?? false;
+  const wifiConnected = wifiStatus?.connected ?? false;
   const [bluetoothEnabled, setBluetoothEnabled] = useState(true);
   const [batterySaverEnabled, setBatterySaverEnabled] = useState(false);
   const [currentBrightness, setCurrentBrightness] = useState(50);
@@ -384,7 +448,7 @@ function App() {
   const [startupAnimating, setStartupAnimating] = useState(false);
 
   const [dockMode, setDockMode] = useState(() => {
-    const raw = localStorage.getItem("nectar-dock-mode") || "fixed";
+    const raw = localStorage.getItem("nectar-dock-mode") || "smart";
     if (raw === "auto-hide") return "smart";
     return raw;
   });
@@ -421,6 +485,13 @@ function App() {
       invoke('set_notch_hovered', { hovered: isNotchHovered }).catch(() => { });
     }
   }, [isNotchHovered, isNotchWindow]);
+
+  // Tell the backend when the notch is hidden (smart/peek) so it stays click-through.
+  useEffect(() => {
+    if (isNotchWindow) {
+      invoke('set_notch_hidden', { hidden: !isVisible || isHidden }).catch(() => { });
+    }
+  }, [isVisible, isHidden, isNotchWindow]);
 
   useEffect(() => {
     let lastSent = "";
@@ -538,6 +609,9 @@ function App() {
   const [settingsTimerEnabled, setSettingsTimerEnabled] = useState(
     () => (localStorage.getItem("nectar-timer-enabled") ?? localStorage.getItem("nectar-calendar-enabled")) !== "false",
   );
+  const [settingsTimerSoundEnabled, setSettingsTimerSoundEnabled] = useState(
+    () => localStorage.getItem("nectar-timer-sound-enabled") !== "false",
+  );
   const [settingsStopwatchEnabled, setSettingsStopwatchEnabled] = useState(
     () => (localStorage.getItem("nectar-stopwatch-enabled") ?? localStorage.getItem("nectar-calendar-enabled")) !== "false",
   );
@@ -580,6 +654,7 @@ function App() {
       setSettingsWeatherEnabled(getVal("nectar-weather-enabled", "true") !== "false");
       setSettingsCalendarEnabled(getVal("nectar-calendar-enabled", "true") !== "false");
       setSettingsTimerEnabled((getVal("nectar-timer-enabled") ?? getVal("nectar-calendar-enabled", "true")) !== "false");
+      setSettingsTimerSoundEnabled(getVal("nectar-timer-sound-enabled", "true") !== "false");
       setSettingsStopwatchEnabled((getVal("nectar-stopwatch-enabled") ?? getVal("nectar-calendar-enabled", "true")) !== "false");
       setSettingsMusicModeEnabled(getVal("nectar-music-mode-enabled", "true") !== "false");
       setSettingsMusicCompactNotch(getVal("nectar-music-compact-notch", "true") !== "false");
@@ -606,7 +681,7 @@ function App() {
           });
           localStorage.setItem("nectar-first-run", "done");
         }
-        const rawDockMode = getVal("nectar-dock-mode", "fixed") as string;
+        const rawDockMode = getVal("nectar-dock-mode", "smart") as string;
         const dockMode = rawDockMode === "auto-hide" ? "smart" : rawDockMode;
         const syncWindows = async () => {
           const dockEnabled = getVal("nectar-dock-enabled", "true") === "true";
@@ -675,11 +750,14 @@ function App() {
       setIsVisible(event.payload);
     });
 
-    const unlistenNotchOverlap = listen<boolean>("notch-overlap", (event) => {
+    // Only this notch's events, the other monitor's notch shouldn't react.
+    const thisWindow = getCurrentWebviewWindow();
+
+    const unlistenNotchOverlap = thisWindow.listen<boolean>("notch-overlap", (event) => {
       setIsOverlapped(event.payload);
     });
 
-    const unlistenNotchEdgeHover = listen<boolean>("notch-edge-hover", (event) => {
+    const unlistenNotchEdgeHover = thisWindow.listen<boolean>("notch-edge-hover", (event) => {
       setIsEdgeHovered(event.payload);
     });
 
@@ -703,6 +781,7 @@ function App() {
       "nectar-weather-enabled": setSettingsWeatherEnabled,
       "nectar-calendar-enabled": setSettingsCalendarEnabled,
       "nectar-timer-enabled": setSettingsTimerEnabled,
+      "nectar-timer-sound-enabled": setSettingsTimerSoundEnabled,
       "nectar-stopwatch-enabled": setSettingsStopwatchEnabled,
       "nectar-music-mode-enabled": setSettingsMusicModeEnabled,
       "nectar-music-compact-notch": setSettingsMusicCompactNotch,
@@ -740,7 +819,7 @@ function App() {
     if (windowLabel !== 'main') return;
     if (dockEnabledInitial.current) { dockEnabledInitial.current = false; return; }
     if (dockEnabled) {
-      invoke("init_dock", { mode: localStorage.getItem("nectar-dock-mode") || "fixed" });
+      invoke("init_dock", { mode: localStorage.getItem("nectar-dock-mode") || "smart" });
     } else {
       invoke("toggle_dock", { enable: false });
     }
@@ -830,12 +909,17 @@ function App() {
   };
 
   const startTimerSeconds = (seconds: number) => {
+    // Unlock audio on this click so the chime can play later.
+    getTimerChimeCtx();
     setTimerSeconds(seconds);
     setIsTimerRunning(true);
     setIsTimerFinished(false);
   };
 
-  const toggleTimer = () => setIsTimerRunning(!isTimerRunning);
+  const toggleTimer = () => {
+    if (!isTimerRunning) getTimerChimeCtx();
+    setIsTimerRunning(!isTimerRunning);
+  };
   const resetTimer = () => {
     setIsTimerRunning(false);
     setTimerSeconds(0);
@@ -865,6 +949,16 @@ function App() {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
   }, [isTimerRunning, timerSeconds === 0]);
+
+  // On finish: chime, and peek the notch.
+  const prevTimerFinishedRef = useRef(false);
+  useEffect(() => {
+    if (isTimerFinished && !prevTimerFinishedRef.current) {
+      if (settingsTimerSoundEnabled) playTimerChime();
+      if (notchMode === 'peek') triggerEventPeek(6000);
+    }
+    prevTimerFinishedRef.current = isTimerFinished;
+  }, [isTimerFinished, settingsTimerSoundEnabled, notchMode, triggerEventPeek]);
 
   const lastTrackRef = useRef<string | null>(null);
   const lastPlayingRef = useRef<boolean>(false);
@@ -996,17 +1090,55 @@ function App() {
   useEffect(() => {
     const unlisten = listen<{ volume: number; is_muted: boolean }>("volume-change", (event) => {
       setVolume(event.payload.volume);
+      setIsMuted(event.payload.is_muted);
     });
     return () => { unlisten.then(fn => fn()); };
   }, []);
 
-  // Load wifi/bluetooth/volume/brightness state on mount
+  // Wi-Fi has three states (off, on, connected) and the radio state can't tell them apart.
+  // Returns false so startup can retry.
+  const refreshWifiStatus = useCallback(async (): Promise<boolean> => {
+    try {
+      setWifiStatus(await invoke<WifiStatus>("get_wifi_status"));
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  // Seed the Wi-Fi pill. The first call can fail while the WLAN service is starting, so retry.
   useEffect(() => {
-    invoke<boolean>("get_wifi_state").then(setWifiEnabled).catch(() => { });
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    const initializeWifiStatus = async (attempt: number) => {
+      const loaded = await refreshWifiStatus();
+      if (!loaded && !cancelled && attempt < 3) {
+        retryTimer = setTimeout(() => void initializeWifiStatus(attempt + 1), (attempt + 1) * 1000);
+      }
+    };
+    void initializeWifiStatus(0);
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [refreshWifiStatus]);
+
+  // Keep Wi-Fi fresh while the command center is open (keyboard toggle, Windows quick settings).
+  useEffect(() => {
+    if (nectarMode !== 'command-center') return;
+    void refreshWifiStatus();
+    const interval = setInterval(() => void refreshWifiStatus(), 5000);
+    return () => clearInterval(interval);
+  }, [nectarMode, refreshWifiStatus]);
+
+  // Load bluetooth/volume/brightness state on mount
+  useEffect(() => {
     invoke<boolean>("get_bluetooth_state").then(setBluetoothEnabled).catch(() => { });
     invoke<boolean>("get_battery_saver_state").then(setBatterySaverEnabled).catch(() => { });
     invoke<boolean>("has_battery").then(setHasBattery).catch(() => { });
-    invoke<number>("get_volume").then(setVolume).catch(() => { });
+    invoke<{ volume: number; is_muted: boolean }>("get_volume_state")
+      .then((state) => { setVolume(state.volume); setIsMuted(state.is_muted); })
+      .catch(() => { });
     invoke<number>("get_brightness").then(setCurrentBrightness).catch(() => { });
 
     // Poll battery saver state every 5s (since we can't listen for changes)
@@ -1137,17 +1269,16 @@ function App() {
     skipNext();
   }, [skipNext, nextFront, nextBack]);
 
-  const lastVolumeCallRef = useRef(0);
+  const sendVolume = useTrailingThrottle((newVol: number) => {
+    invoke("set_volume", { volume: newVol }).catch(() => {});
+  }, 50);
 
   const handleVolumeChange = useCallback((newVol: number) => {
     setVolume(newVol);
-
-    const now = Date.now();
-    if (now - lastVolumeCallRef.current < 50) return;
-    lastVolumeCallRef.current = now;
-
-    invoke("set_volume", { volume: newVol }).catch(() => {});
-  }, []);
+    // set_volume unmutes for any non-zero level.
+    setIsMuted(newVol === 0);
+    sendVolume(newVol);
+  }, [sendVolume]);
 
 
   // Open WiFi settings
@@ -1161,15 +1292,18 @@ function App() {
 
   // WiFi toggle
   const toggleWifi = useCallback(async () => {
-    const newState = !wifiEnabled;
-    setWifiEnabled(newState);
+    const previous = wifiStatus;
+    const newState = !(previous?.enabled ?? false);
+    setWifiStatus({ enabled: newState, connected: newState ? (previous?.connected ?? false) : false });
     try {
       await invoke("set_wifi_state", { enabled: newState });
+      // The radio and association take a moment to settle.
+      setTimeout(() => void refreshWifiStatus(), 800);
     } catch (e) {
-      setWifiEnabled(!newState);
+      setWifiStatus(previous);
       console.error("Failed to toggle WiFi:", e);
     }
-  }, [wifiEnabled]);
+  }, [wifiStatus, refreshWifiStatus]);
 
   // Bluetooth toggle
   const toggleBluetooth = useCallback(async () => {
@@ -1194,17 +1328,14 @@ function App() {
 
 
   // Brightness change with throttling
-  const lastBrightnessCallRef = useRef(0);
+  const sendBrightness = useTrailingThrottle((newVal: number) => {
+    invoke("set_brightness", { brightness: newVal }).catch(() => {});
+  }, 50);
 
   const handleBrightnessChange = useCallback((newVal: number) => {
     setCurrentBrightness(newVal);
-
-    const now = Date.now();
-    if (now - lastBrightnessCallRef.current < 50) return;
-    lastBrightnessCallRef.current = now;
-
-    invoke("set_brightness", { brightness: newVal }).catch(() => {});
-  }, []);
+    sendBrightness(newVal);
+  }, [sendBrightness]);
 
   const openSettingsWindow = useCallback(async () => {
     try {
@@ -1514,7 +1645,7 @@ function App() {
                         albumArtUrl={albumArtUrl}
                         albumArtKey={albumArtKey}
                         isPlaying={isPlaying}
-                        volume={volume}
+                        volume={displayVolume}
                         volumeExpanded={compactVolumeExpanded}
                         onVolumeExpandedChange={setCompactVolumeExpanded}
                         onTogglePlayPause={togglePlayPause}
@@ -1660,13 +1791,13 @@ function App() {
                               min="0"
                               max="1"
                               step="0.01"
-                              value={volume}
+                              value={displayVolume}
                               onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
                               onPointerDown={(e) => e.stopPropagation()}
                               onClick={(e) => e.stopPropagation()}
                               className="premium-slider"
                             />
-                            <div className="slider-progress-fill" style={{ width: `${volume * 100}%` }} />
+                            <div className="slider-progress-fill" style={{ width: `${displayVolume * 100}%` }} />
                           </div>
                           <VolumeHighIcon size={14} style={{ opacity: 0.5 }} />
                         </div>
@@ -1909,11 +2040,11 @@ function App() {
                         onContextMenu={handleWifiRightClick}
                       >
                         <div className="cc-pill-icon-wrapper">
-                          <WifiIcon connected={wifiEnabled} />
+                          <WifiIcon enabled={wifiEnabled} connected={wifiConnected} />
                         </div>
                         <div className="cc-pill-info">
                           <span className="cc-pill-title">Wi-Fi</span>
-                          <span className="cc-pill-status">{wifiEnabled ? 'Connected' : 'Off'}</span>
+                          <span className="cc-pill-status">{wifiStatus === null ? '…' : !wifiEnabled ? 'Off' : wifiConnected ? 'Connected' : 'Not connected'}</span>
                         </div>
                       </div>
 
@@ -2015,15 +2146,15 @@ function App() {
                             min="0"
                             max="1"
                             step="0.01"
-                            value={volume}
+                            value={displayVolume}
                             onChange={(e) => handleVolumeChange(parseFloat(e.target.value))}
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => e.stopPropagation()}
                             className="cc-classic-input"
                           />
-                          <div className="cc-classic-fill" style={{ width: `${volume * 100}%` }} />
+                          <div className="cc-classic-fill" style={{ width: `${displayVolume * 100}%` }} />
                         </div>
-                        <span className="cc-classic-percentage">{Math.round(volume * 100)}%</span>
+                        <span className="cc-classic-percentage">{Math.round(displayVolume * 100)}%</span>
                       </div>
 
                       {/* Brightness Slider */}

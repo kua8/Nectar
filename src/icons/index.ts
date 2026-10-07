@@ -8,3 +8,4 @@ export { MusicNoteIcon } from './MusicNoteIcon';
 export { SpeakerIcon } from './SpeakerIcon';
 export { HeadphonesIcon } from './HeadphonesIcon';
 export { AudioOutputIcon } from './AudioOutputIcon';
+export { MixerIcon } from './MixerIcon';

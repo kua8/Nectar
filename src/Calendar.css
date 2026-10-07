@@ -73,10 +73,6 @@ button {
   pointer-events: none;
 }
 
-.cw-title-spacer {
-  width: 52px;
-}
-
 .cw-body {
   flex: 1;
   min-height: 0;

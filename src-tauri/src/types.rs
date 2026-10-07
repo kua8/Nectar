@@ -102,7 +102,22 @@ pub struct BrightnessChangeEvent {
 }
 
 #[derive(Clone, Serialize)]
+pub struct WifiStatus {
+    pub enabled: bool,
+    pub connected: bool,
+}
+
+#[derive(Clone, Serialize)]
 pub struct VolumeChangeEvent {
+    pub volume: f32,
+    pub is_muted: bool,
+}
+
+#[derive(Clone, Serialize)]
+pub struct AudioSessionInfo {
+    pub pid: u32,
+    pub name: String,
+    pub process_path: Option<String>,
     pub volume: f32,
     pub is_muted: bool,
 }

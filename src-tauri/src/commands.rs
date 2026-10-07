@@ -1,9 +1,10 @@
 use tauri::{AppHandle, Emitter, Manager, Window};
+use windows::core::Interface;
 use windows::Win32::Foundation::{HWND, LPARAM};
 use windows::Win32::UI::WindowsAndMessaging::EnumWindows;
 use std::sync::atomic::Ordering;
 
-use crate::types::{IntRect, AppInfo, BrightnessChangeEvent};
+use crate::types::{IntRect, AppInfo, BrightnessChangeEvent, WifiStatus, AudioSessionInfo, VolumeChangeEvent};
 use crate::state::*;
 use crate::utils::*;
 use crate::services::{register_appbar, register_dock_appbar, sync_overlays, unregister_appbar_native, enum_windows_proc};
@@ -25,6 +26,11 @@ pub async fn set_dock_hovered(window: Window, hovered: bool) {
 #[tauri::command]
 pub async fn set_notch_hovered(window: Window, hovered: bool) {
     crate::state::set_flag(crate::state::notch_hovered(), window.label(), hovered);
+}
+
+#[tauri::command]
+pub async fn set_notch_hidden(window: Window, hidden: bool) {
+    crate::state::set_flag(crate::state::notch_hidden(), window.label(), hidden);
 }
 
 #[tauri::command]
@@ -162,15 +168,19 @@ pub async fn init_dock_window(app: &AppHandle, dock_win: tauri::WebviewWindow, m
     // 4. Reset overlap state so the overlap thread re-syncs cleanly
     crate::state::set_overlap(crate::state::dock_overlap(), &label, 0);
     let _ = app.emit_to(label.as_str(), "dock-overlap", false);
+    // Sync the maximized state so the adaptive dock expands right away.
+    if label == "dock" {
+        let _ = app.emit_to(label.as_str(), "dock-maximized", CURRENT_FOREGROUND_MAXIMIZED.load(Ordering::Relaxed));
+    }
 }
 
 #[tauri::command]
 pub async fn toggle_dock(app: AppHandle, enable: bool) {
     if let Some(dock_win) = app.get_webview_window("dock") {
         if enable {
-            // Load the saved dock mode rather than hardcoding "fixed"
+            // Saved dock mode, smart on a fresh install.
             let saved_mode = crate::utils::get_setting_str(&app, "nectar-dock-mode")
-                .unwrap_or_else(|| "fixed".to_string());
+                .unwrap_or_else(|| "smart".to_string());
             init_dock(app.clone(), saved_mode).await;
         } else {
             let _ = dock_win.hide();
@@ -218,6 +228,12 @@ pub async fn sync_appbar(app: AppHandle) {
 
 #[tauri::command]
 pub async fn change_dock_mode(app: AppHandle, mode: String) {
+    // A disabled dock keeps the mode in settings (init_dock applies it on re-enable),
+    // just don't show it now.
+    let enabled = get_setting_str(&app, "nectar-dock-enabled").unwrap_or_else(|| "true".to_string());
+    if enabled != "true" {
+        return;
+    }
     let labels: Vec<String> = app.webview_windows().keys()
         .filter(|l| crate::state::is_dock_label(l))
         .cloned()
@@ -290,6 +306,9 @@ async fn change_dock_mode_for_window(app: &AppHandle, dock_win: tauri::WebviewWi
     let current = crate::state::get_overlap(crate::state::dock_overlap(), &label);
     if current != -1 {
         let _ = app.emit_to(label.as_str(), "dock-overlap", current == 1);
+    }
+    if label == "dock" {
+        let _ = app.emit_to(label.as_str(), "dock-maximized", CURRENT_FOREGROUND_MAXIMIZED.load(Ordering::Relaxed));
     }
 
     // Double sync after a short delay to catch any layout changes
@@ -387,39 +406,88 @@ fn get_uwp_launch_cmd(exe_path: &str) -> Option<String> {
     None
 }
 
+/// Coalesces duplicate events, has to stay below the double-click interval.
+const START_TOGGLE_DEBOUNCE_MS: i64 = 80;
+/// How long Win is held so the shell registers the tap.
+const START_WIN_KEY_HOLD_MS: u64 = 40;
+
+fn send_key_tap(vk: windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY, hold_ms: u64) {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{SendInput, INPUT, INPUT_0, KEYBDINPUT, KEYEVENTF_KEYUP};
+    let down = [INPUT {
+        r#type: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT { wVk: vk, wScan: 0, dwFlags: Default::default(), time: 0, dwExtraInfo: 0 },
+        },
+    }];
+    let up = [INPUT {
+        r#type: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT { wVk: vk, wScan: 0, dwFlags: KEYEVENTF_KEYUP, time: 0, dwExtraInfo: 0 },
+        },
+    }];
+    unsafe {
+        SendInput(&down, std::mem::size_of::<INPUT>() as i32);
+        if hold_ms > 0 {
+            std::thread::sleep(std::time::Duration::from_millis(hold_ms));
+        }
+        SendInput(&up, std::mem::size_of::<INPUT>() as i32);
+    }
+}
+
+/// True while the native Start menu has focus (StartMenuExperienceHost, or SearchHost on 24H2+).
+fn is_start_menu_open() -> bool {
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::Threading::{OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION};
+    use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
+
+    unsafe {
+        let fg = GetForegroundWindow();
+        if fg.0.is_null() {
+            return false;
+        }
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(fg, Some(&mut pid));
+        if pid == 0 {
+            return false;
+        }
+        if let Ok(process) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) {
+            let mut buf = [0u16; 260];
+            let mut len = buf.len() as u32;
+            let ok = QueryFullProcessImageNameW(process, PROCESS_NAME_WIN32, windows::core::PWSTR(buf.as_mut_ptr()), &mut len);
+            let _ = CloseHandle(process);
+            if ok.is_ok() {
+                let path = String::from_utf16_lossy(&buf[..len as usize]);
+                let file = path.rsplit('\\').next().unwrap_or("").to_lowercase();
+                return file == "startmenuexperiencehost.exe" || file == "searchhost.exe";
+            }
+        }
+        false
+    }
+}
+
+/// Toggles the native Start menu. If it's open, Escape closes it, otherwise tap Win.
+/// Tapping Win blindly replayed the open animation on a quick second click.
+fn toggle_start_menu() {
+    let now = get_now_ms();
+    if now - LAST_START_TOGGLE_MS.load(Ordering::Relaxed) < START_TOGGLE_DEBOUNCE_MS {
+        return;
+    }
+    LAST_START_TOGGLE_MS.store(now, Ordering::Relaxed);
+
+    tauri::async_runtime::spawn_blocking(move || {
+        use windows::Win32::UI::Input::KeyboardAndMouse::{VK_ESCAPE, VK_LWIN};
+        if is_start_menu_open() {
+            send_key_tap(VK_ESCAPE, 0);
+        } else {
+            send_key_tap(VK_LWIN, START_WIN_KEY_HOLD_MS);
+        }
+    });
+}
+
 #[tauri::command]
-pub async fn open_app(app_name: String) {
+pub async fn open_app(app: AppHandle, app_name: String) {
     if app_name == "start" {
-        tauri::async_runtime::spawn_blocking(move || unsafe {
-            use windows::Win32::UI::Input::KeyboardAndMouse::{SendInput, INPUT, INPUT_0, KEYBDINPUT, VK_LWIN, KEYEVENTF_KEYUP};
-            let inputs = [
-                INPUT {
-                    r#type: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_KEYBOARD,
-                    Anonymous: INPUT_0 {
-                        ki: KEYBDINPUT {
-                            wVk: VK_LWIN,
-                            wScan: 0,
-                            dwFlags: Default::default(),
-                            time: 0,
-                            dwExtraInfo: 0,
-                        },
-                    },
-                },
-                INPUT {
-                    r#type: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_KEYBOARD,
-                    Anonymous: INPUT_0 {
-                        ki: KEYBDINPUT {
-                            wVk: VK_LWIN,
-                            wScan: 0,
-                            dwFlags: KEYEVENTF_KEYUP,
-                            time: 0,
-                            dwExtraInfo: 0,
-                        },
-                    },
-                },
-            ];
-            SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
-        });
+        toggle_start_menu();
         return;
     }
 
@@ -443,19 +511,80 @@ pub async fn open_app(app_name: String) {
         });
         return;
     }
-    
-    let path = app_name;
-    tauri::async_runtime::spawn_blocking(move || unsafe {
-        let (actual_path, _args) = if path.to_lowercase().ends_with(".lnk") {
-            resolve_shortcut(&path).unwrap_or((path.clone(), String::new()))
+
+    if app_name == "nectar-settings" {
+        open_settings_window(app);
+        return;
+    }
+
+    tauri::async_runtime::spawn_blocking(move || launch_path(&app_name));
+}
+
+/// Starts another instance of an app. Running PWAs go through their Start Menu
+/// shortcut so the new window belongs to the web app.
+#[tauri::command]
+pub async fn launch_new_instance(app_path: String, app_name: Option<String>) {
+    tauri::async_runtime::spawn_blocking(move || {
+        if app_path == "start" {
+            return;
+        }
+        let target = pwa_launch_target(&app_path, app_name.as_deref()).unwrap_or(app_path);
+        launch_path(&target);
+    });
+}
+
+/// Finds the Start Menu shortcut for a running PWA (same title, same browser).
+fn pwa_launch_target(path: &str, name: Option<&str>) -> Option<String> {
+    let name = name?.trim();
+    if name.is_empty() || !is_browser_host_process(path) {
+        return None;
+    }
+    let host_exe = std::path::Path::new(path).file_name()?.to_str()?.to_lowercase();
+    let apps = INSTALLED_APPS_CACHE.get()?.lock().ok()?;
+    apps.iter()
+        .find(|app| is_pwa_shortcut_for(app, name, &host_exe))
+        .map(|app| app.path.clone())
+}
+
+fn is_pwa_shortcut_for(app: &AppInfo, name: &str, host_exe: &str) -> bool {
+    app.name.eq_ignore_ascii_case(name)
+        && app.executable.as_deref().is_some_and(|exe| exe.eq_ignore_ascii_case(host_exe))
+}
+
+/// Opens a path, shortcut or shell app id through the shell.
+fn launch_path(path: &str) {
+    unsafe {
+        use windows::Win32::UI::Shell::ShellExecuteW;
+        use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+        let wide_open: Vec<u16> = "open".encode_utf16().chain(std::iter::once(0)).collect();
+
+        // Shortcuts and shell app ids go through the shell so args and package identity survive.
+        let shell_target = if path.to_lowercase().ends_with(".lnk") {
+            Some(path.to_string())
+        } else if is_aumid_path(path) {
+            let id = path.trim().trim_start_matches("shell:AppsFolder\\");
+            Some(format!("shell:AppsFolder\\{}", id))
         } else {
-            (path.clone(), String::new())
+            None
         };
 
-        if let Some(uwp_cmd) = crate::commands::get_uwp_launch_cmd(&actual_path) {
-            use windows::Win32::UI::Shell::ShellExecuteW;
-            use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
-            let wide_open: Vec<u16> = "open".encode_utf16().chain(std::iter::once(0)).collect();
+        if let Some(target) = shell_target {
+            let wide_target: Vec<u16> = target.encode_utf16().chain(std::iter::once(0)).collect();
+            let res = ShellExecuteW(
+                None,
+                windows::core::PCWSTR(wide_open.as_ptr()),
+                windows::core::PCWSTR(wide_target.as_ptr()),
+                None,
+                None,
+                SW_SHOWNORMAL,
+            );
+            if res.0 as usize <= 32 {
+                eprintln!("Failed to open {}: error code {}", target, res.0 as usize);
+            }
+            return;
+        }
+
+        if let Some(uwp_cmd) = crate::commands::get_uwp_launch_cmd(path) {
             let wide_cmd: Vec<u16> = uwp_cmd.encode_utf16().chain(std::iter::once(0)).collect();
             
             let res = ShellExecuteW(
@@ -474,7 +603,7 @@ pub async fn open_app(app_name: String) {
         }
 
         use std::path::Path;
-        let mut final_path = actual_path.clone();
+        let mut final_path = path.to_string();
         
         if !Path::new(&final_path).exists() {
             if let Some(exe_name) = Path::new(&final_path).file_name() {
@@ -501,9 +630,6 @@ pub async fn open_app(app_name: String) {
             }
         }
 
-        use windows::Win32::UI::Shell::ShellExecuteW;
-        use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
-        
         let wide_path: Vec<u16> = final_path.encode_utf16().chain(std::iter::once(0)).collect();
         let wide_open: Vec<u16> = "open".encode_utf16().chain(std::iter::once(0)).collect();
         
@@ -519,12 +645,16 @@ pub async fn open_app(app_name: String) {
         if res.0 as usize <= 32 {
             eprintln!("Failed to open app {}: error code {}", final_path, res.0 as usize);
         }
-    });
+    }
 }
 
 #[tauri::command]
 pub async fn get_active_windows() -> Vec<AppInfo> {
     tauri::async_runtime::spawn_blocking(move || {
+        use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED};
+        // COM is needed here, each window's AppUserModelID comes from the shell property store.
+        let com_initialized = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED).is_ok() };
+
         let mut apps: Vec<AppInfo> = Vec::new();
         unsafe {
             let _ = EnumWindows(Some(enum_windows_proc), LPARAM(&mut apps as *mut Vec<AppInfo> as isize));
@@ -536,9 +666,9 @@ pub async fn get_active_windows() -> Vec<AppInfo> {
             let path = app.path.to_lowercase();
             let name = app.name.to_lowercase();
             
-            // For host processes (Edge, Chrome, ApplicationFrameHost), use path + name 
+            // For host processes (Edge, Chrome, Brave, ApplicationFrameHost), use path + name 
             // so that different PWAs/UWP apps are separate dock items.
-            let key = if path.contains("msedge.exe") || path.contains("chrome.exe") || path.contains("applicationframehost.exe") {
+            let key = if path.contains("msedge.exe") || path.contains("chrome.exe") || path.contains("brave.exe") || path.contains("applicationframehost.exe") {
                 format!("{}:{}", path, name)
             } else if let Some(ref exe) = app.executable {
                 format!("{}:{}", path, exe.to_lowercase())
@@ -584,6 +714,10 @@ pub async fn get_active_windows() -> Vec<AppInfo> {
                     ts_b.cmp(&ts_a)
                 });
             }
+        }
+
+        if com_initialized {
+            unsafe { CoUninitialize(); }
         }
 
         result_apps
@@ -733,10 +867,48 @@ pub async fn focus_window(hwnd: isize) {
     }).await.unwrap_or_default();
 }
 
+/// Focuses one window of a multi-window item. hwnds are most recent first: if none is
+/// in front take the first, otherwise go to the next one so clicks cycle through all of them.
+#[tauri::command]
+pub async fn focus_app_windows(hwnds: Vec<isize>) {
+    if let Some(&first) = hwnds.first() {
+        if is_repeat_click(first) {
+            return;
+        }
+    }
+    tauri::async_runtime::spawn_blocking(move || unsafe {
+        use windows::Win32::UI::WindowsAndMessaging::{
+            GetForegroundWindow, IsIconic, IsWindowVisible, SetForegroundWindow, ShowWindow,
+            SW_RESTORE, SW_SHOW,
+        };
+        let Some(&most_recent) = hwnds.first() else {
+            return;
+        };
+        let foreground = GetForegroundWindow().0 as isize;
+        let mut ring = hwnds.clone();
+        ring.sort_unstable();
+        let target = match ring.iter().position(|&h| h == foreground) {
+            Some(i) => ring[(i + 1) % ring.len()],
+            None => most_recent,
+        };
+
+        let hwnd = HWND(target as *mut _);
+        if !IsWindowVisible(hwnd).as_bool() {
+            let _ = ShowWindow(hwnd, SW_SHOW);
+        }
+        if IsIconic(hwnd).as_bool() {
+            let _ = ShowWindow(hwnd, SW_RESTORE);
+        }
+        let _ = SetForegroundWindow(hwnd);
+    })
+    .await
+    .unwrap_or_default();
+}
+
 fn get_cache_key(path: &str, name: Option<&str>) -> String {
     let path_lc = path.to_lowercase();
     let name_lc = name.map(|n| n.to_lowercase()).unwrap_or_default();
-    if path_lc.contains("msedge.exe") || path_lc.contains("chrome.exe") || path_lc.contains("applicationframehost.exe") {
+    if path_lc.contains("msedge.exe") || path_lc.contains("chrome.exe") || path_lc.contains("brave.exe") || path_lc.contains("applicationframehost.exe") {
         format!("{}:{}", path, name_lc)
     } else {
         path.to_string()
@@ -751,6 +923,310 @@ fn get_custom_icons_dir(app: &AppHandle) -> Result<std::path::PathBuf, String> {
 
 fn sanitize_filename(key: &str) -> String {
     key.replace(|c: char| c == ':' || c == '\\' || c == '/' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|', "_")
+}
+
+/// Reads a --flag=value argument from a command line, handles quotes.
+fn extract_arg(args: &str, key: &str) -> Option<String> {
+    let idx = args.find(key)?;
+    let rest = &args[idx + key.len()..];
+    let value = if let Some(stripped) = rest.strip_prefix('"') {
+        stripped.split('"').next().unwrap_or("")
+    } else {
+        rest.split_whitespace().next().unwrap_or("")
+    };
+    let value = value.trim().trim_matches('"');
+    if value.is_empty() { None } else { Some(value.to_string()) }
+}
+
+/// True for shell app ids (PackageFamily!App etc.), not file paths.
+pub fn is_aumid_path(path: &str) -> bool {
+    let p = path.trim().trim_matches('"');
+    if p.is_empty() || p.len() < 3 { return false; }
+    if p.to_lowercase().starts_with("shell:appsfolder\\") { return true; }
+    if p.contains('\\') || p.contains('/') || p.contains(':') { return false; }
+    if p.to_lowercase().ends_with(".exe") { return false; }
+    if std::path::Path::new(p).exists() { return false; }
+    true
+}
+
+fn is_browser_host_process(path: &str) -> bool {
+    let p = path.to_lowercase();
+    p.contains("msedge.exe") || p.contains("chrome.exe") || p.contains("brave.exe") || p.contains("vivaldi.exe") || p.contains("firefox.exe")
+}
+
+/// Icon for a shell app id via shell:AppsFolder (SHGetFileInfoW can't do these).
+fn icon_from_aumid(aumid: &str) -> Option<String> {
+    unsafe {
+        use windows::Win32::Foundation::SIZE;
+        use windows::Win32::UI::Shell::{IShellItemImageFactory, SHCreateItemFromParsingName, SIIGBF, SIIGBF_BIGGERSIZEOK, SIIGBF_ICONONLY};
+
+        let id = aumid.trim().trim_start_matches("shell:AppsFolder\\");
+        if id.is_empty() { return None; }
+
+        let parsing_name = format!("shell:AppsFolder\\{}", id);
+        let wide: Vec<u16> = parsing_name.encode_utf16().chain(std::iter::once(0)).collect();
+        let factory: IShellItemImageFactory = SHCreateItemFromParsingName(windows::core::PCWSTR(wide.as_ptr()), None).ok()?;
+
+        let size = SIZE { cx: 256, cy: 256 };
+        let hbitmap = factory.GetImage(size, SIIGBF(SIIGBF_ICONONLY.0 | SIIGBF_BIGGERSIZEOK.0))
+            .or_else(|_| factory.GetImage(size, SIIGBF_BIGGERSIZEOK))
+            .ok()?;
+        if hbitmap.0.is_null() { return None; }
+
+        let result = crate::utils::hbitmap_to_base64(hbitmap);
+        let _ = windows::Win32::Graphics::Gdi::DeleteObject(hbitmap.into());
+        result
+    }
+}
+
+/// Package family name (Name_PublisherId) from a WindowsApps exe path.
+fn package_family_from_windows_apps_path(path: &str) -> Option<String> {
+    let lower = path.to_lowercase();
+    let idx = lower.find("\\windowsapps\\")?;
+    let rest = &path[idx + "\\windowsapps\\".len()..];
+    let folder = rest.split(['\\', '/']).next()?;
+    let (before_publisher, publisher) = folder.rsplit_once("__")?;
+    let name = before_publisher.split('_').next()?;
+    if name.is_empty() || publisher.is_empty() { return None; }
+    Some(format!("{}_{}", name, publisher))
+}
+
+/// Looks up the exact AUMID of a package family by walking shell:AppsFolder.
+fn find_aumid_by_family(family: &str) -> Option<String> {
+    use windows::Win32::System::Com::CoTaskMemFree;
+    use windows::Win32::UI::Shell::{SHGetKnownFolderIDList, FOLDERID_AppsFolder, SHGetDesktopFolder, IShellFolder, IEnumIDList, SHGetNameFromIDList, ILCombine, ILFree, SIGDN_DESKTOPABSOLUTEPARSING, SHCONTF_FOLDERS, SHCONTF_NONFOLDERS};
+
+    unsafe {
+        let pidl_apps = SHGetKnownFolderIDList(&FOLDERID_AppsFolder, 0, None).ok()?;
+        let result = (|| -> Option<String> {
+            let desktop = SHGetDesktopFolder().ok()?;
+            let apps_folder: IShellFolder = desktop.BindToObject(pidl_apps, None).ok()?;
+            let mut enum_id: Option<IEnumIDList> = None;
+            if apps_folder.EnumObjects(HWND(std::ptr::null_mut()), (SHCONTF_FOLDERS.0 | SHCONTF_NONFOLDERS.0) as u32, &mut enum_id).is_err() { return None; }
+            let enum_id = enum_id?;
+
+            let prefix = format!("{}!", family);
+            let mut pidl_buf: [*mut windows::Win32::UI::Shell::Common::ITEMIDLIST; 1] = [std::ptr::null_mut()];
+            let mut fetched = 0;
+            while enum_id.Next(&mut pidl_buf, Some(&mut fetched)).is_ok() && fetched > 0 {
+                let pidl_item = pidl_buf[0];
+                pidl_buf[0] = std::ptr::null_mut();
+                if pidl_item.is_null() { continue; }
+
+                let absolute_pidl = ILCombine(Some(pidl_apps as *const _), Some(pidl_item as *const _));
+                if absolute_pidl.is_null() {
+                    CoTaskMemFree(Some(pidl_item as *const _));
+                    continue;
+                }
+
+                let mut found = None;
+                if let Ok(p_ptr) = SHGetNameFromIDList(absolute_pidl, SIGDN_DESKTOPABSOLUTEPARSING) {
+                    let s = String::from_utf16_lossy(windows::core::PCWSTR(p_ptr.0).as_wide());
+                    CoTaskMemFree(Some(p_ptr.0 as *const _));
+                    if s.starts_with(&prefix) { found = Some(s); }
+                }
+                ILFree(Some(absolute_pidl as *const _));
+                CoTaskMemFree(Some(pidl_item as *const _));
+                if found.is_some() { return found; }
+            }
+            None
+        })();
+        CoTaskMemFree(Some(pidl_apps as *const _));
+        result
+    }
+}
+
+/// Icon for exes inside an MSIX package. The exe has none, so use the manifest logo.
+fn packaged_exe_icon(path: &str) -> Option<String> {
+    let family = package_family_from_windows_apps_path(path)?;
+    let aumid = find_aumid_by_family(&family)?;
+    icon_from_aumid(&aumid)
+}
+
+/// Process command line via WMI, used to spot PWAs inside browser processes.
+fn process_command_line(pid: u32) -> Option<String> {
+    use serde::Deserialize;
+    #[derive(Deserialize)]
+    #[serde(rename_all = "PascalCase")]
+    struct Win32Process {
+        command_line: Option<String>,
+    }
+
+    let com = wmi::COMLibrary::new().ok()?;
+    let connection = wmi::WMIConnection::new(com).ok()?;
+    let results: Vec<Win32Process> = connection
+        .raw_query(format!("SELECT CommandLine FROM Win32_Process WHERE ProcessId = {}", pid))
+        .ok()?;
+    results.into_iter().next().and_then(|p| p.command_line)
+}
+
+fn pwa_icon_from_command_line(process_path: &str, command_line: &str) -> Option<String> {
+    // Store PWAs from Edge carry their package id here.
+    if let Some(aumid) = extract_arg(command_line, "--ip-aumid=") {
+        if let Some(icon) = icon_from_aumid(&aumid) { return Some(icon); }
+    }
+    // Installed web app windows carry the web app id.
+    if command_line.contains("--app-id=") {
+        if let Some(icon_path) = find_browser_pwa_icon(process_path, command_line) {
+            if let Some(icon) = crate::utils::image_file_to_base64(&icon_path) { return Some(icon); }
+        }
+    }
+    None
+}
+
+/// Web app ids are 32 chars, a-p.
+pub(crate) fn browser_web_app_id_from_aumid(id: &str) -> Option<String> {
+    let is_web_app_id = |s: &str| s.len() == 32 && s.bytes().all(|b| (b'a'..=b'p').contains(&b));
+    if let Some(segment) = id.rsplit('.').next() {
+        if is_web_app_id(segment) { return Some(segment.to_string()); }
+    }
+    if let Some(idx) = id.find("_crx_") {
+        if let Some(segment) = id[idx + 5..].split('.').next() {
+            if is_web_app_id(segment) { return Some(segment.to_string()); }
+        }
+    }
+    None
+}
+
+/// True if an AUMID belongs to a browser-hosted app (PWA) and not the browser itself.
+/// Brave uses a shortened id, so the _crx_ marker is checked directly.
+pub(crate) fn is_browser_pwa_aumid(id: &str) -> bool {
+    id.contains('!') || id.contains("_crx_") || browser_web_app_id_from_aumid(id).is_some()
+}
+
+unsafe fn pwa_icon_for_window(hwnd: HWND, process_path: &str) -> Option<String> {
+    // The window's own AUMID is the most reliable, the command line isn't (Edge reuses its browser process).
+    match crate::utils::get_window_app_user_model_id(hwnd) {
+        Some(id) if id.contains('!') => {
+            if let Some(icon) = icon_from_aumid(&id) { return Some(icon); }
+        }
+        Some(id) if is_browser_pwa_aumid(&id) => {
+            // PWA window: app id from the AUMID, else from the command line.
+            let mut pid = 0u32;
+            windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId(hwnd, Some(&mut pid));
+            if pid == 0 { return None; }
+            if let Some(app_id) = browser_web_app_id_from_aumid(&id) {
+                if let Some(icon_path) = find_browser_pwa_icon(process_path, &format!("--app-id={}", app_id)) {
+                    if let Some(icon) = crate::utils::image_file_to_base64(&icon_path) { return Some(icon); }
+                }
+            }
+            if let Some(command_line) = process_command_line(pid) {
+                if let Some(icon) = pwa_icon_from_command_line(process_path, &command_line) { return Some(icon); }
+            }
+            return None;
+        }
+        // Plain browser window. Its process command line can carry an --app-id from another
+        // window, so skip it and let the caller use the window icon.
+        Some(_) => return None,
+        None => {}
+    }
+    // Fall back to the command line when the window has no id.
+    let mut pid = 0u32;
+    windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId(hwnd, Some(&mut pid));
+    if pid == 0 { return None; }
+    let command_line = process_command_line(pid)?;
+    pwa_icon_from_command_line(process_path, &command_line)
+}
+
+/// Finds a web app's icon in the browser profile (Manifest Resources/<id>/Icons,
+/// or the old _crx_ layout).
+fn find_browser_pwa_icon(executable_path: &str, args: &str) -> Option<String> {
+    let app_id = extract_arg(args, "--app-id=")?;
+    let local = std::env::var("LOCALAPPDATA").ok()?;
+
+    let chrome_base = format!("{}\\Google\\Chrome\\User Data", local);
+    let edge_base = format!("{}\\Microsoft\\Edge\\User Data", local);
+    let brave_base = format!("{}\\BraveSoftware\\Brave-Browser\\User Data", local);
+    let vivaldi_base = format!("{}\\Vivaldi\\User Data", local);
+    let browser_path = executable_path.to_lowercase();
+    let bases = if browser_path.contains("msedge") {
+        vec![edge_base, chrome_base]
+    } else if browser_path.contains("brave") {
+        vec![brave_base, chrome_base]
+    } else if browser_path.contains("vivaldi") {
+        vec![vivaldi_base, chrome_base]
+    } else {
+        vec![chrome_base, edge_base]
+    };
+
+    let profile = extract_arg(args, "--profile-directory=").unwrap_or_else(|| "Default".to_string());
+
+    for base in bases {
+        if !std::path::Path::new(&base).is_dir() { continue; }
+
+        let mut profiles = vec![profile.clone()];
+        if let Ok(entries) = std::fs::read_dir(&base) {
+            for entry in entries.flatten() {
+                if entry.path().is_dir() {
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    if !profiles.iter().any(|p| p.eq_ignore_ascii_case(&name)) { profiles.push(name); }
+                }
+            }
+        }
+
+        for prof in profiles {
+            let web_apps = std::path::Path::new(&base).join(&prof).join("Web Applications");
+            if !web_apps.is_dir() { continue; }
+
+            let candidates = [
+                web_apps.join("Manifest Resources").join(&app_id),
+                web_apps.join(&app_id),
+                web_apps.join(format!("_crx_{}", app_id)),
+            ];
+            for dir in candidates {
+                if let Some(icon) = find_largest_image_in_dir(&dir) { return Some(icon); }
+            }
+        }
+    }
+    None
+}
+
+fn find_largest_image_in_dir(dir: &std::path::Path) -> Option<String> {
+    if !dir.is_dir() { return None; }
+    let mut best: Option<(u64, String)> = None;
+    collect_images(dir, 0, &mut best);
+    best.map(|(_, path)| path)
+}
+
+fn collect_images(dir: &std::path::Path, depth: u32, best: &mut Option<(u64, String)>) {
+    if depth > 3 { return; }
+    let Ok(entries) = std::fs::read_dir(dir) else { return; };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            collect_images(&path, depth + 1, best);
+            continue;
+        }
+        let Some(ext) = path.extension().and_then(|e| e.to_str()).map(|e| e.to_lowercase()) else { continue; };
+        if !matches!(ext.as_str(), "png" | "ico" | "jpg" | "jpeg" | "bmp" | "webp") { continue; }
+        let score = image_size_score(&path);
+        let is_better = match best.as_ref() {
+            Some((best_score, _)) => score > *best_score,
+            None => true,
+        };
+        if is_better {
+            *best = Some((score, path.to_string_lossy().to_string()));
+        }
+    }
+}
+
+/// Scores an icon by the size in its file name (256.png, 192x192.png).
+fn image_size_score(path: &std::path::Path) -> u64 {
+    let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
+    let mut score: u64 = 0;
+    for token in name.split(|c: char| !c.is_ascii_digit() && c != 'x') {
+        if token.is_empty() { continue; }
+        if let Some(idx) = token.find('x') {
+            let (w, h) = token.split_at(idx);
+            let h = &h[1..];
+            if let (Ok(w), Ok(h)) = (w.parse::<u64>(), h.parse::<u64>()) {
+                score = score.max(w * h);
+            }
+        } else if let Ok(n) = token.parse::<u64>() {
+            score = score.max(n * n);
+        }
+    }
+    score
 }
 
 static LAST_ICON_SAVE_REQUEST: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(0);
@@ -890,13 +1366,58 @@ pub async fn get_app_icon(app: AppHandle, path: String, name: Option<String>, hw
         }
     }
 
-    // Strategy 2: Extract icon from live window HWND
+    // Resolve bare names (notepad.exe) first so Store packages get their own logo, not the System32 stub.
+    let mut path = path;
+    if !path.contains('\\') && !path.contains('/') {
+        if let Some(resolved) = resolve_executable_path(&path) {
+            path = resolved;
+        }
+    }
+
+    // Strategy 2: shell-resolved icons for Store/UWP/PWA ids and exes inside MSIX packages.
+    let aumid_opt = if is_aumid_path(&path) {
+        Some(path.trim().trim_start_matches("shell:AppsFolder\\").to_string())
+    } else {
+        None
+    };
+    let packaged_exe = path.to_lowercase().contains("\\windowsapps\\");
+    if aumid_opt.is_some() || packaged_exe {
+        let path_owned = path.clone();
+        let result = tauri::async_runtime::spawn_blocking(move || {
+            let _ = unsafe { windows::Win32::System::Com::CoInitializeEx(None, windows::Win32::System::Com::COINIT_MULTITHREADED) };
+            let icon = match aumid_opt {
+                Some(aumid) => icon_from_aumid(&aumid),
+                None => packaged_exe_icon(&path_owned),
+            };
+            unsafe { windows::Win32::System::Com::CoUninitialize(); }
+            icon
+        }).await.unwrap_or(None);
+
+        if let Some(base64) = result {
+            if let Ok(mut c) = cache.lock() { c.insert(cache_key.clone(), base64.clone()); }
+            schedule_icon_cache_save(app);
+            return Ok(Some(base64));
+        }
+    }
+
+    // Strategy 3: Extract icon from live window HWND
     if let Some(h) = hwnd {
+        let path_owned = path.clone();
         let result = tauri::async_runtime::spawn_blocking(move || unsafe {
             use windows::Win32::System::Com::{CoInitializeEx, COINIT_MULTITHREADED, CoUninitialize};
             use windows::Win32::UI::WindowsAndMessaging::{GetClassLongPtrW, GCLP_HICON, WM_GETICON, ICON_BIG, SendMessageTimeoutW, SMTO_ABORTIFHUNG};
             
             let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+
+            // Browser-hosted PWAs only show the browser icon on the window, so go by the
+            // window's AUMID (command line as fallback).
+            if is_browser_host_process(&path_owned) {
+                if let Some(icon) = pwa_icon_for_window(HWND(h as *mut _), &path_owned) {
+                    CoUninitialize();
+                    return Some(icon);
+                }
+            }
+
             let h_hwnd = HWND(h as *mut _);
             
             let mut h_icon = windows::Win32::UI::WindowsAndMessaging::HICON(GetClassLongPtrW(h_hwnd, GCLP_HICON) as *mut _);
@@ -925,7 +1446,7 @@ pub async fn get_app_icon(app: AppHandle, path: String, name: Option<String>, hw
         }
     }
 
-    // Strategy 3: Extract icon from file path
+    // Strategy 4: Extract icon from file path
     let path_clone = path.clone();
     let ck_clone = cache_key.clone();
     let file_icon = tauri::async_runtime::spawn_blocking(move || unsafe {
@@ -941,20 +1462,31 @@ pub async fn get_app_icon(app: AppHandle, path: String, name: Option<String>, hw
                 (path_clone.clone(), String::new())
             };
 
-            if actual_path.to_lowercase().contains("chrome_proxy.exe") || actual_path.to_lowercase().contains("msedge_proxy.exe") || args.contains("--app-id=") {
-                if let Some(app_id_start) = args.find("--app-id=") {
-                    let app_id = &args[app_id_start + 9..].split_whitespace().next().unwrap_or("");
-                    if !app_id.is_empty() {
-                        if let Ok(local) = std::env::var("LOCALAPPDATA") {
-                            let chrome_pwa = format!("{}\\Google\\Chrome\\User Data\\Default\\Web Applications\\_crx_{}\\icon_256.png", local, app_id);
-                            if std::path::Path::new(&chrome_pwa).exists() { actual_path = chrome_pwa; }
-                            else {
-                                let edge_pwa = format!("{}\\Microsoft\\Edge\\User Data\\Default\\Web Applications\\_crx_{}\\icon_256.png", local, app_id);
-                                if std::path::Path::new(&edge_pwa).exists() { actual_path = edge_pwa; }
-                            }
-                        }
-                    }
+            // Shortcuts can have their own icon file (Firefox web apps).
+            let mut icon_data = if path_clone.to_lowercase().ends_with(".lnk") {
+                get_shortcut_icon_location(&path_clone).and_then(|p| image_file_to_base64(&p))
+            } else {
+                None
+            };
+
+            // Web apps keep their icon in the browser profile.
+            if icon_data.is_none() {
+                if let Some(pwa_icon_path) = find_browser_pwa_icon(&actual_path, &args) {
+                    icon_data = image_file_to_base64(&pwa_icon_path);
                 }
+            }
+
+            // UWP shortcuts launch `explorer.exe shell:AppsFolder\<AUMID>`.
+            if icon_data.is_none() {
+                if let Some(aumid) = extract_arg(&args, "shell:AppsFolder\\") {
+                    icon_data = icon_from_aumid(&aumid);
+                }
+            }
+
+            if let Some(icon) = icon_data {
+                if let Ok(mut lock) = ICON_CACHE.get().unwrap().lock() { lock.insert(ck_clone, icon.clone()); }
+                CoUninitialize();
+                return Some(icon);
             }
 
             // Robust path resolution for common apps
@@ -1440,10 +1972,297 @@ pub fn open_media_source_app() {
 #[tauri::command]
 pub fn set_volume(volume: f32) { if let Some(sender) = COMMAND_SENDER.get() { let _ = sender.send(crate::types::SystemCommand::SetVolume(volume)); } }
 
+/// Full path of a process, None if we can't open it.
+unsafe fn process_image_path(pid: u32) -> Option<String> {
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::Threading::{
+        OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32,
+        PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+
+    let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+    let mut buf = [0u16; 1024];
+    let mut size = buf.len() as u32;
+    let res = QueryFullProcessImageNameW(
+        handle,
+        PROCESS_NAME_WIN32,
+        windows::core::PWSTR(buf.as_mut_ptr()),
+        &mut size,
+    );
+    let _ = CloseHandle(handle);
+    res.ok()?;
+    Some(String::from_utf16_lossy(&buf[..size as usize]))
+}
+
+/// Friendly exe name from version info (FileDescription), else the file stem.
+/// Cached because the mixer polls.
+unsafe fn friendly_process_name(path: &str) -> String {
+    let cache = PROCESS_NAME_CACHE.get_or_init(|| std::sync::Mutex::new(HashMap::new()));
+    if let Ok(guard) = cache.lock() {
+        if let Some(name) = guard.get(path) {
+            return name.clone();
+        }
+    }
+    let name = friendly_process_name_uncached(path);
+    if let Ok(mut guard) = cache.lock() {
+        guard.insert(path.to_string(), name.clone());
+    }
+    name
+}
+
+unsafe fn friendly_process_name_uncached(path: &str) -> String {
+    use windows::Win32::Storage::FileSystem::{
+        GetFileVersionInfoSizeW, GetFileVersionInfoW, VerQueryValueW,
+    };
+
+    let wide: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
+    let filename = windows::core::PCWSTR(wide.as_ptr());
+
+    'description: {
+        let size = GetFileVersionInfoSizeW(filename, None);
+        if size == 0 {
+            break 'description;
+        }
+        let mut data = vec![0u8; size as usize];
+        if GetFileVersionInfoW(filename, None, size, data.as_mut_ptr() as *mut _).is_err() {
+            break 'description;
+        }
+
+        // FileDescription is under the first language/codepage pair in the translation table.
+        let mut trans_ptr: *mut core::ffi::c_void = std::ptr::null_mut();
+        let mut trans_len = 0u32;
+        if !VerQueryValueW(
+            data.as_ptr() as *const _,
+            windows::core::w!("\\VarFileInfo\\Translation"),
+            &mut trans_ptr,
+            &mut trans_len,
+        )
+        .as_bool()
+            || trans_len < 4
+            || trans_ptr.is_null()
+        {
+            break 'description;
+        }
+        // Need all four bytes of the (LANGID, codepage) pair, read bytewise to avoid alignment issues.
+        let translation = std::slice::from_raw_parts(trans_ptr as *const u8, 4);
+        let lang = u16::from_le_bytes([translation[0], translation[1]]);
+        let codepage = u16::from_le_bytes([translation[2], translation[3]]);
+
+        let query = format!("\\StringFileInfo\\{lang:04x}{codepage:04x}\\FileDescription");
+        let query_wide: Vec<u16> = query.encode_utf16().chain(std::iter::once(0)).collect();
+        let mut value_ptr: *mut core::ffi::c_void = std::ptr::null_mut();
+        let mut value_len = 0u32;
+        if !VerQueryValueW(
+            data.as_ptr() as *const _,
+            windows::core::PCWSTR(query_wide.as_ptr()),
+            &mut value_ptr,
+            &mut value_len,
+        )
+        .as_bool()
+            || value_len == 0
+            || value_ptr.is_null()
+        {
+            break 'description;
+        }
+
+        let chars = std::slice::from_raw_parts(value_ptr as *const u16, value_len as usize);
+        let description = String::from_utf16_lossy(chars)
+            .trim_end_matches('\0')
+            .trim()
+            .to_string();
+        if !description.is_empty() {
+            return description;
+        }
+    }
+
+    std::path::Path::new(path)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .map(|stem| {
+            let mut chars = stem.chars();
+            match chars.next() {
+                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                None => stem.to_string(),
+            }
+        })
+        .unwrap_or_else(|| "Unknown app".to_string())
+}
+
+/// Runs f for every audio session on every active output (sets up and tears down COM itself).
+unsafe fn for_each_audio_session<F: FnMut(&windows::Win32::Media::Audio::IAudioSessionControl2)>(
+    mut f: F,
+) -> Result<(), String> {
+    use windows::Win32::Media::Audio::{
+        eRender, IAudioSessionControl2, IAudioSessionManager2, IMMDeviceEnumerator,
+        DEVICE_STATE_ACTIVE,
+    };
+    use windows::Win32::System::Com::{
+        CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_MULTITHREADED,
+    };
+
+    let com_initialized = CoInitializeEx(None, COINIT_MULTITHREADED).is_ok();
+    let result = (|| -> Result<(), String> {
+        let enumerator: IMMDeviceEnumerator = CoCreateInstance(
+            &windows::Win32::Media::Audio::MMDeviceEnumerator,
+            None,
+            CLSCTX_ALL,
+        )
+        .map_err(|e| e.to_string())?;
+        // Per-app output routing can put an app on a non-default device, so scan all active outputs.
+        let devices = enumerator
+            .EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE)
+            .map_err(|e| e.to_string())?;
+        let device_count = devices.GetCount().map_err(|e| e.to_string())?;
+        for i in 0..device_count {
+            let Ok(device) = devices.Item(i) else {
+                continue;
+            };
+            let Ok(manager) = device.Activate::<IAudioSessionManager2>(CLSCTX_ALL, None) else {
+                continue;
+            };
+            let Ok(sessions) = manager.GetSessionEnumerator() else {
+                continue;
+            };
+            let Ok(count) = sessions.GetCount() else {
+                continue;
+            };
+            for j in 0..count {
+                let Ok(control) = sessions.GetSession(j) else {
+                    continue;
+                };
+                let Ok(control) = control.cast::<IAudioSessionControl2>() else {
+                    continue;
+                };
+                f(&control);
+            }
+        }
+        Ok(())
+    })();
+    if com_initialized {
+        CoUninitialize();
+    }
+    result
+}
+
+/// Apps with an audio session, one per process, playing ones first.
+#[tauri::command]
+pub async fn get_audio_sessions() -> Result<Vec<AudioSessionInfo>, String> {
+    tauri::async_runtime::spawn_blocking(|| unsafe {
+        use std::collections::HashSet;
+        use windows::Win32::Media::Audio::{
+            AudioSessionStateActive, AudioSessionStateExpired, ISimpleAudioVolume,
+        };
+
+        let own_pid = std::process::id();
+        let mut seen: HashSet<u32> = HashSet::new();
+        let mut found: Vec<(AudioSessionInfo, bool)> = Vec::new();
+
+        for_each_audio_session(|control| {
+            // Only S_OK is the system sounds session.
+            if control.IsSystemSoundsSession() == windows::Win32::Foundation::S_OK {
+                return;
+            }
+            let Ok(pid) = control.GetProcessId() else {
+                return;
+            };
+            if pid == 0 || pid == own_pid || !seen.insert(pid) {
+                return;
+            }
+            let state = control.GetState().unwrap_or_default();
+            if state == AudioSessionStateExpired {
+                seen.remove(&pid);
+                return;
+            }
+            let Ok(volume_ctl) = control.cast::<ISimpleAudioVolume>() else {
+                return;
+            };
+            let process_path = process_image_path(pid);
+            let name = match process_path.as_deref() {
+                Some(path) => friendly_process_name(path),
+                None => format!("Process {pid}"),
+            };
+            found.push((
+                AudioSessionInfo {
+                    pid,
+                    name,
+                    process_path,
+                    volume: volume_ctl.GetMasterVolume().unwrap_or(1.0),
+                    is_muted: volume_ctl.GetMute().map(|m| m.as_bool()).unwrap_or(false),
+                },
+                state == AudioSessionStateActive,
+            ));
+        })?;
+
+        found.sort_by(|a, b| {
+            b.1.cmp(&a.1)
+                .then_with(|| a.0.name.to_lowercase().cmp(&b.0.name.to_lowercase()))
+        });
+        Ok(found.into_iter().map(|(info, _)| info).collect())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn set_app_volume(pid: u32, volume: f32) -> Result<(), String> {
+    let volume = volume.clamp(0.0, 1.0);
+    tauri::async_runtime::spawn_blocking(move || unsafe {
+        use windows::Win32::Media::Audio::ISimpleAudioVolume;
+
+        for_each_audio_session(|control| {
+            if control.GetProcessId().ok() != Some(pid) {
+                return;
+            }
+            if let Ok(volume_ctl) = control.cast::<ISimpleAudioVolume>() {
+                let _ = volume_ctl.SetMasterVolume(volume, std::ptr::null());
+                if volume > 0.0 {
+                    let _ = volume_ctl.SetMute(false, std::ptr::null());
+                }
+            }
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn set_app_mute(pid: u32, muted: bool) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || unsafe {
+        use windows::Win32::Media::Audio::ISimpleAudioVolume;
+
+        for_each_audio_session(|control| {
+            if control.GetProcessId().ok() != Some(pid) {
+                return;
+            }
+            if let Ok(volume_ctl) = control.cast::<ISimpleAudioVolume>() {
+                let _ = volume_ctl.SetMute(muted, std::ptr::null());
+            }
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Mixer panel bounds in overlay CSS px, so the mouse hook keeps the card clickable while open.
+#[tauri::command]
+pub fn set_volume_mixer_rect(x: f64, y: f64, width: f64, height: f64) {
+    if let Ok(mut rect) = VOLUME_MIXER_RECT.lock() {
+        *rect = Some((x, y, width, height));
+    }
+}
+
+#[tauri::command]
+pub fn clear_volume_mixer_rect() {
+    if let Ok(mut rect) = VOLUME_MIXER_RECT.lock() {
+        *rect = None;
+    }
+}
+
 /// Shared by the tray menu, the in-app Quit button, and the window CloseRequested
 /// handlers so that any shutdown path (including Task Manager's WM_CLOSE) behaves
 /// identically.
 pub fn restore_taskbar_and_exit(handle: &AppHandle) {
+    SHUTTING_DOWN.store(true, Ordering::Relaxed);
     NATIVE_TASKBAR_HIDDEN.store(false, Ordering::SeqCst);
     for (_, w) in handle.webview_windows() {
         let _ = w.hide();
@@ -1554,6 +2373,7 @@ pub fn get_hitbox_logging() -> bool {
 pub async fn restart_nectar(handle: AppHandle) {
     #[cfg(debug_assertions)]
     {
+        // Dev just reloads the pages. Leave SHUTTING_DOWN alone here or the hooks stay off.
         for (_, w) in handle.webview_windows() {
             let _ = w.eval("window.location.reload()");
         }
@@ -1561,13 +2381,19 @@ pub async fn restart_nectar(handle: AppHandle) {
     }
     #[cfg(not(debug_assertions))]
     {
-        if let Some(w) = handle.get_webview_window("main") { unregister_appbar_native(w.hwnd().unwrap()); }
-        if let Some(w) = handle.get_webview_window("dock") { unregister_appbar_native(w.hwnd().unwrap()); }
-        if let Some(w) = handle.get_webview_window("settings") { let _ = w.destroy(); }
-        std::env::set_var("NECTAR_RESTARTING", "1");
-        close_single_instance_handles();
-        handle.restart();
+        relaunch_nectar(&handle);
     }
+}
+
+/// Relaunches the process. Also used for webview crashes, reloading pages can't fix those.
+pub fn relaunch_nectar(handle: &AppHandle) {
+    SHUTTING_DOWN.store(true, Ordering::Relaxed);
+    if let Some(w) = handle.get_webview_window("main") { if let Ok(hwnd) = w.hwnd() { unregister_appbar_native(hwnd); } }
+    if let Some(w) = handle.get_webview_window("dock") { if let Ok(hwnd) = w.hwnd() { unregister_appbar_native(hwnd); } }
+    if let Some(w) = handle.get_webview_window("settings") { let _ = w.destroy(); }
+    std::env::set_var("NECTAR_RESTARTING", "1");
+    close_single_instance_handles();
+    handle.restart();
 }
 
 fn terminate_process(pid: u32) -> Result<(), bool> {
@@ -1803,7 +2629,7 @@ pub fn reset_settings(app: AppHandle) -> Result<(), String> {
 pub async fn capture_window_thumbnail(hwnd: isize, max_width: u32, max_height: u32) -> Result<Option<(String, i64)>, String> {
     tauri::async_runtime::spawn_blocking(move || unsafe {
         use windows::Win32::Foundation::HWND;
-        use windows::Win32::UI::WindowsAndMessaging::{IsWindow, IsIconic, ShowWindow, SW_SHOWNOACTIVATE, SW_MINIMIZE};
+        use windows::Win32::UI::WindowsAndMessaging::{IsWindow, IsIconic};
 
         let hwnd = HWND(hwnd as *mut _);
         if !IsWindow(Some(hwnd)).as_bool() { return None; }
@@ -1811,36 +2637,25 @@ pub async fn capture_window_thumbnail(hwnd: isize, max_width: u32, max_height: u
         let hwnd_key = hwnd.0 as isize;
         let is_minimized = IsIconic(hwnd).as_bool();
 
+        let mut focus_time = 0i64;
+        if let Some(map) = crate::state::FOCUS_TIMESTAMPS.get() {
+            if let Ok(guard) = map.lock() {
+                focus_time = guard.get(&hwnd_key).copied().unwrap_or(0);
+            }
+        }
+
         if is_minimized {
+            // Don't restore a minimized window to capture it, it flashes on screen. The hooks keep
+            // thumbnails warm, so without one we just show no preview.
             let cached_img = if let Some(cache) = crate::state::THUMBNAIL_CACHE.get() {
                 cache.lock().ok().and_then(|g| g.get(&hwnd_key).map(|(img, _)| img.clone()))
             } else {
                 None
             };
-
-            if let Some(cached) = cached_img {
-                let mut focus_time = 0i64;
-                if let Some(map) = crate::state::FOCUS_TIMESTAMPS.get() {
-                    if let Ok(f_guard) = map.lock() {
-                        focus_time = f_guard.get(&hwnd_key).copied().unwrap_or(0);
-                    }
-                }
-                return Some((cached, focus_time));
-            }
-        }
-
-        let mut did_restore = false;
-        if is_minimized {
-            let _ = ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-            std::thread::sleep(std::time::Duration::from_millis(60));
-            did_restore = true;
+            return cached_img.map(|img| (img, focus_time));
         }
 
         let result = crate::utils::capture_hwnd_to_base64(hwnd, max_width, max_height);
-
-        if did_restore {
-            let _ = ShowWindow(hwnd, SW_MINIMIZE);
-        }
 
         if let Some(ref img) = result {
             if let Some(cache) = crate::state::THUMBNAIL_CACHE.get() {
@@ -1854,13 +2669,6 @@ pub async fn capture_window_thumbnail(hwnd: isize, max_width: u32, max_height: u
                         });
                     }
                 }
-            }
-        }
-
-        let mut focus_time = 0i64;
-        if let Some(map) = crate::state::FOCUS_TIMESTAMPS.get() {
-            if let Ok(guard) = map.lock() {
-                focus_time = guard.get(&hwnd_key).copied().unwrap_or(0);
             }
         }
 
@@ -1919,16 +2727,116 @@ pub fn get_volume() -> f32 {
     crate::state::CURRENT_VOLUME.load(std::sync::atomic::Ordering::Relaxed) as f32 / 100.0
 }
 
+/// Live volume and mute of the default output. HUDs seed from this because the worker's
+/// first volume-change fires before the overlay can listen.
+#[tauri::command]
+pub async fn get_volume_state() -> Result<VolumeChangeEvent, String> {
+    tauri::async_runtime::spawn_blocking(|| unsafe {
+        use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
+        use windows::Win32::Media::Audio::{eConsole, eRender, IMMDeviceEnumerator};
+        use windows::Win32::System::Com::{
+            CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_MULTITHREADED,
+        };
+
+        let com_initialized = CoInitializeEx(None, COINIT_MULTITHREADED).is_ok();
+        let result = (|| -> Result<VolumeChangeEvent, String> {
+            let enumerator: IMMDeviceEnumerator = CoCreateInstance(
+                &windows::Win32::Media::Audio::MMDeviceEnumerator,
+                None,
+                CLSCTX_ALL,
+            )
+            .map_err(|e| e.to_string())?;
+            let device = enumerator
+                .GetDefaultAudioEndpoint(eRender, eConsole)
+                .map_err(|e| e.to_string())?;
+            let endpoint: IAudioEndpointVolume = device
+                .Activate(CLSCTX_ALL, None)
+                .map_err(|e| e.to_string())?;
+            let volume = endpoint
+                .GetMasterVolumeLevelScalar()
+                .map_err(|e| e.to_string())?;
+            let is_muted = endpoint.GetMute().map(|m| m.as_bool()).unwrap_or(false);
+            CURRENT_VOLUME.store((volume * 100.0) as u32, Ordering::Relaxed);
+            Ok(VolumeChangeEvent { volume, is_muted })
+        })();
+        if com_initialized {
+            CoUninitialize();
+        }
+        result
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub fn get_brightness() -> u32 {
     crate::state::CURRENT_BRIGHTNESS.load(std::sync::atomic::Ordering::Relaxed)
 }
 
+// Wi-Fi status: the radio state alone can't tell on from connected, so ask the WLAN API too.
+
+fn is_wlan_connected_sync() -> bool {
+    use windows::Win32::Foundation::HANDLE;
+    use windows::Win32::NetworkManagement::WiFi::{
+        wlan_intf_opcode_current_connection, WlanCloseHandle, WlanEnumInterfaces, WlanFreeMemory,
+        WlanOpenHandle, WlanQueryInterface, WLAN_INTERFACE_INFO_LIST,
+    };
+
+    unsafe {
+        let mut negotiated_version = 0u32;
+        let mut client_handle = HANDLE::default();
+        if WlanOpenHandle(2, None, &mut negotiated_version, &mut client_handle) != 0 {
+            return false;
+        }
+
+        let mut interface_list: *mut WLAN_INTERFACE_INFO_LIST = std::ptr::null_mut();
+        let mut connected = false;
+        if WlanEnumInterfaces(client_handle, None, &mut interface_list) == 0
+            && !interface_list.is_null()
+        {
+            let interfaces = std::slice::from_raw_parts(
+                (*interface_list).InterfaceInfo.as_ptr(),
+                (*interface_list).dwNumberOfItems as usize,
+            );
+            for interface in interfaces {
+                let mut data_size = 0u32;
+                let mut data: *mut std::ffi::c_void = std::ptr::null_mut();
+                // Errors with ERROR_INVALID_STATE when not associated, so success means connected.
+                let result = WlanQueryInterface(
+                    client_handle,
+                    &interface.InterfaceGuid,
+                    wlan_intf_opcode_current_connection,
+                    None,
+                    &mut data_size,
+                    &mut data,
+                    None,
+                );
+                if !data.is_null() {
+                    WlanFreeMemory(data);
+                }
+                if result == 0 {
+                    connected = true;
+                    break;
+                }
+            }
+            WlanFreeMemory(interface_list as *const _);
+        }
+
+        WlanCloseHandle(client_handle, None);
+        connected
+    }
+}
+
+/// Wi-Fi radio and connection state for the quick settings tile.
 #[tauri::command]
-pub async fn get_wifi_state() -> Result<bool, String> {
-    tauri::async_runtime::spawn_blocking(|| {
-        get_radio_state_sync(windows::Devices::Radios::RadioKind::WiFi)
-    }).await.map_err(|e| e.to_string())?
+pub async fn get_wifi_status() -> Result<WifiStatus, String> {
+    tauri::async_runtime::spawn_blocking(|| -> Result<WifiStatus, String> {
+        let enabled = get_radio_state_sync(windows::Devices::Radios::RadioKind::WiFi)?;
+        let connected = enabled && is_wlan_connected_sync();
+        Ok(WifiStatus { enabled, connected })
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -2483,3 +3391,123 @@ pub fn setup_settings_watcher(app: AppHandle) {
     });
 }
 
+#[cfg(test)]
+mod pwa_icon_tests {
+    use super::*;
+
+    #[test]
+    fn aumid_detection() {
+        assert!(is_aumid_path("4DF9E0F8.Netflix_mcm4njqhnhss8!Netflix.App"));
+        assert!(is_aumid_path("Microsoft.VisualStudioCode"));
+        assert!(is_aumid_path("shell:AppsFolder\\4DF9E0F8.Netflix_mcm4njqhnhss8!Netflix.App"));
+        assert!(!is_aumid_path("C:\\Windows\\explorer.exe"));
+        assert!(!is_aumid_path("msedge.exe"));
+        assert!(!is_aumid_path(""));
+    }
+
+    #[test]
+    fn command_line_arg_parsing() {
+        let args = "--profile-directory=\"Profile 1\" --app-id=abcdef --ip-aumid=Package_Pub!App";
+        assert_eq!(extract_arg(args, "--app-id="), Some("abcdef".into()));
+        assert_eq!(extract_arg(args, "--profile-directory="), Some("Profile 1".into()));
+        assert_eq!(extract_arg(args, "--ip-aumid="), Some("Package_Pub!App".into()));
+        assert_eq!(extract_arg(args, "--missing="), None);
+        assert_eq!(extract_arg("shell:AppsFolder\\Microsoft.WindowsCalculator_8wekyb3d8bbwe!App", "shell:AppsFolder\\"), Some("Microsoft.WindowsCalculator_8wekyb3d8bbwe!App".into()));
+    }
+
+    #[test]
+    fn package_family_from_paths() {
+        assert_eq!(
+            package_family_from_windows_apps_path("C:\\Program Files\\WindowsApps\\5319275A.WhatsAppDesktop_2.2634.101.0_x64__cv1g1gvanyjgm\\WhatsApp.Root.exe").as_deref(),
+            Some("5319275A.WhatsAppDesktop_cv1g1gvanyjgm")
+        );
+        assert_eq!(package_family_from_windows_apps_path("C:\\Windows\\explorer.exe"), None);
+        assert_eq!(package_family_from_windows_apps_path("C:\\Program Files\\App\\app.exe"), None);
+    }
+
+    #[test]
+    fn browser_web_app_ids_from_aumids() {
+        assert_eq!(browser_web_app_id_from_aumid("Chrome.edhbnieanoeijlkpgkminebadpibapgm").as_deref(), Some("edhbnieanoeijlkpgkminebadpibapgm"));
+        assert_eq!(browser_web_app_id_from_aumid("Chrome._crx_edhbnieanoeijlkpgkminebadpibapgm").as_deref(), Some("edhbnieanoeijlkpgkminebadpibapgm"));
+        assert_eq!(browser_web_app_id_from_aumid("4DF9E0F8.Netflix_mcm4njqhnhss8!Netflix.App"), None);
+        assert_eq!(browser_web_app_id_from_aumid("MSEdge"), None);
+    }
+
+    #[test]
+    fn browser_pwa_aumid_detection() {
+        assert!(is_browser_pwa_aumid("Chrome.edhbnieanoeijlkpgkminebadpibapgm"));
+        assert!(is_browser_pwa_aumid("Brave._crx_edhbnieanoeijlkpgkminebadpibapgm"));
+        assert!(is_browser_pwa_aumid("Brave._crx_agimnkijcamfeangaknmldooml"));
+        assert!(is_browser_pwa_aumid("4DF9E0F8.Netflix_mcm4njqhnhss8!Netflix.App"));
+        assert!(!is_browser_pwa_aumid("MSEdge"));
+        assert!(!is_browser_pwa_aumid("Chrome"));
+        assert!(!is_browser_pwa_aumid("Brave"));
+    }
+
+    #[test]
+    fn image_size_scoring_prefers_larger_dimensions() {
+        use std::path::Path;
+        assert!(image_size_score(Path::new("C:\\x\\Icons\\256.png")) > image_size_score(Path::new("C:\\x\\Icons\\64.png")));
+        assert!(image_size_score(Path::new("C:\\x\\512x512.png")) > image_size_score(Path::new("C:\\x\\192x192.png")));
+        assert_eq!(image_size_score(Path::new("C:\\x\\icon.png")), 0);
+    }
+
+    #[test]
+    fn pwa_shortcut_matching() {
+        let app = AppInfo {
+            name: "YouTube".into(),
+            path: "C:\\Users\\x\\Start Menu\\Programs\\YouTube.lnk".into(),
+            icon: None,
+            is_running: false,
+            hwnd: None,
+            executable: Some("brave.exe".into()),
+            all_hwnds: None,
+        };
+        assert!(is_pwa_shortcut_for(&app, "youtube", "brave.exe"));
+        assert!(is_pwa_shortcut_for(&app, "YouTube", "BRAVE.EXE"));
+        assert!(!is_pwa_shortcut_for(&app, "YouTube", "msedge.exe"));
+        assert!(!is_pwa_shortcut_for(&app, "YouTube Music", "brave.exe"));
+    }
+
+    #[test]
+    fn pwa_launch_target_resolution() {
+        // Non-browser paths and missing titles don't resolve.
+        assert_eq!(pwa_launch_target("C:\\Windows\\notepad.exe", Some("Notepad")), None);
+        assert_eq!(pwa_launch_target("C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe", None), None);
+        assert_eq!(pwa_launch_target("C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe", Some("   ")), None);
+
+        // With the cache filled, a running PWA resolves to its shortcut, a same-titled app in another browser doesn't.
+        let _ = INSTALLED_APPS_CACHE.set(std::sync::Mutex::new(vec![
+            AppInfo {
+                name: "YouTube".into(),
+                path: "C:\\Start Menu\\YouTube.lnk".into(),
+                icon: None,
+                is_running: false,
+                hwnd: None,
+                executable: Some("brave.exe".into()),
+                all_hwnds: None,
+            },
+            AppInfo {
+                name: "Netflix".into(),
+                path: "C:\\Start Menu\\Netflix.lnk".into(),
+                icon: None,
+                is_running: false,
+                hwnd: None,
+                executable: Some("msedge.exe".into()),
+                all_hwnds: None,
+            },
+        ]));
+        assert_eq!(
+            pwa_launch_target("C:\\Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe", Some("YouTube")),
+            Some("C:\\Start Menu\\YouTube.lnk".into())
+        );
+        assert_eq!(
+            pwa_launch_target("C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe", Some("YouTube")),
+            None
+        );
+        assert_eq!(
+            pwa_launch_target("C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe", Some("Netflix")),
+            Some("C:\\Start Menu\\Netflix.lnk".into())
+        );
+    }
+}

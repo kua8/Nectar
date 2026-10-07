@@ -2698,7 +2698,7 @@ dependencies = [
 
 [[package]]
 name = "nectar"
-version = "1.3.5"
+version = "1.4.0"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -2719,6 +2719,7 @@ dependencies = [
  "tauri-plugin-opener",
  "tauri-plugin-updater",
  "tokio",
+ "webview2-com",
  "window-vibrancy 0.7.1",
  "windows 0.61.3",
  "wmi",

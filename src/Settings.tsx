@@ -69,11 +69,10 @@ function SettingsApp() {
   return (
     <div className="settings-container" style={{ zoom: settings.scale }}>
       <div className="title-bar" data-tauri-drag-region>
-        <WindowControls canZoom />
         <span className="title-text" data-tauri-drag-region>
           Settings
         </span>
-        <span className="title-spacer" />
+        <WindowControls />
       </div>
 
       <div className="settings-body">
@@ -138,10 +137,13 @@ function SettingsApp() {
               setNotchMonitorIdValue={settings.setNotchMonitorIdValue}
               notchModeByMonitor={settings.notchModeByMonitor}
               setNotchModeForMonitor={settings.setNotchModeForMonitor}
+              replaceNotchModes={settings.replaceNotchModesByMonitor}
               calendarEnabled={settings.calendarEnabled}
               toggleCalendar={settings.toggleCalendar}
               timerEnabled={settings.timerEnabled}
               toggleTimerEnabled={settings.toggleTimerEnabled}
+              timerSoundEnabled={settings.timerSoundEnabled}
+              toggleTimerSound={settings.toggleTimerSound}
               stopwatchEnabled={settings.stopwatchEnabled}
               toggleStopwatchEnabled={settings.toggleStopwatchEnabled}
               musicModeEnabled={settings.musicModeEnabled}
@@ -184,6 +186,12 @@ function SettingsApp() {
               toggleDockCalendar={settings.toggleDockCalendar}
               dockIconOnly={settings.dockIconOnly}
               toggleDockIconOnly={settings.toggleDockIconOnly}
+              dockAdaptive={settings.dockAdaptive}
+              toggleDockAdaptive={settings.toggleDockAdaptive}
+              startIcon={settings.startIcon}
+              handleStartIconChange={settings.handleStartIconChange}
+              dockWinNumberEnabled={settings.dockWinNumberEnabled}
+              toggleDockWinNumber={settings.toggleDockWinNumber}
               dockMixedReorder={settings.dockMixedReorder}
               toggleDockMixedReorder={settings.toggleDockMixedReorder}
               monitors={settings.monitors}
@@ -193,6 +201,7 @@ function SettingsApp() {
               setDockMonitorIdValue={settings.setDockMonitorIdValue}
               dockModeByMonitor={settings.dockModeByMonitor}
               setDockModeForMonitor={settings.setDockModeForMonitor}
+              replaceDockModes={settings.replaceDockModesByMonitor}
             />
           )}
           {activeTab === "overlays" && (

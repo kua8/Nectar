@@ -246,8 +246,29 @@ async fn sync(app: &AppHandle, background: bool) -> Result<CalendarState, String
     Ok(state)
 }
 
+/// True when no source reported an error on the last sync.
+fn last_sync_clean(app: &AppHandle) -> bool {
+    read_store(app).sources.values().all(|s| s.error.is_none())
+}
+
 pub fn start_background_sync(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
+        // After a restart or crash, sync right away instead of waiting out the interval.
+        // The network may not be back yet, so retry a few times until a sync comes through clean.
+        if crate::state::RELAUNCHED.load(Ordering::Relaxed) {
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            for _ in 0..6 {
+                let has_source = crate::caldav::is_connected(&app) || !crate::ics::list_links(&app).is_empty();
+                if !has_source {
+                    break;
+                }
+                let _ = sync(&app, true).await;
+                if last_sync_clean(&app) {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_secs(30)).await;
+            }
+        }
         tokio::time::sleep(Duration::from_secs(20)).await;
         loop {
             let has_source = crate::caldav::is_connected(&app) || !crate::ics::list_links(&app).is_empty();

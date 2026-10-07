@@ -72,10 +72,6 @@ body {
   pointer-events: none; /* Let drag through */
 }
 
-.title-spacer {
-  width: 52px;
-}
-
 .settings-body {
   display: flex;
   flex-direction: row;

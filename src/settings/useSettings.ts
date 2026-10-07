@@ -22,6 +22,7 @@ export function useSettings() {
   const [weatherEnabled, setWeatherEnabled] = useState(true);
   const [calendarEnabled, setCalendarEnabled] = useState(true);
   const [timerEnabled, setTimerEnabled] = useState(true);
+  const [timerSoundEnabled, setTimerSoundEnabled] = useState(true);
   const [stopwatchEnabled, setStopwatchEnabled] = useState(true);
   const [musicModeEnabled, setMusicModeEnabled] = useState(true);
   const [musicCompactNotch, setMusicCompactNotch] = useState(true);
@@ -66,11 +67,20 @@ export function useSettings() {
   const [dockIconOnly, setDockIconOnly] = useState(
     () => localStorage.getItem("nectar-dock-icon-only") === "true"
   );
+  const [startIcon, setStartIcon] = useState(
+    () => localStorage.getItem("nectar-start-icon") || "default"
+  );
+  const [dockAdaptive, setDockAdaptive] = useState(
+    () => localStorage.getItem("nectar-dock-adaptive") === "true"
+  );
+  const [dockWinNumberEnabled, setDockWinNumberEnabled] = useState(
+    () => localStorage.getItem("nectar-dock-win-number-enabled") !== "false"
+  );
   const [dockMixedReorder, setDockMixedReorder] = useState(
     () => localStorage.getItem("nectar-dock-mixed-reorder") === "true"
   );
   const [dockMode, setDockMode] = useState(() => {
-    const raw = localStorage.getItem("nectar-dock-mode") || "fixed";
+    const raw = localStorage.getItem("nectar-dock-mode") || "smart";
     return raw === "auto-hide" ? "smart" : raw;
   });
   const [notchMode, setNotchMode] = useState("fixed");
@@ -143,6 +153,7 @@ export function useSettings() {
       apply(getVal("nectar-weather-enabled"), setWeatherEnabled, readBool);
       apply(getVal("nectar-calendar-enabled"), setCalendarEnabled, readBool);
       apply(getVal("nectar-timer-enabled") ?? getVal("nectar-calendar-enabled"), setTimerEnabled, readBool);
+      apply(getVal("nectar-timer-sound-enabled"), setTimerSoundEnabled, readBool);
       apply(getVal("nectar-stopwatch-enabled") ?? getVal("nectar-calendar-enabled"), setStopwatchEnabled, readBool);
       apply(getVal("nectar-music-mode-enabled"), setMusicModeEnabled, readBool);
       apply(getVal("nectar-music-compact-notch"), setMusicCompactNotch, readBool);
@@ -161,6 +172,9 @@ export function useSettings() {
       apply(getVal("nectar-dock-search-enabled"), setDockSearchEnabled, readBool);
       apply(getVal("nectar-dock-calendar-enabled"), setDockCalendarEnabled, readBool);
       apply(getVal("nectar-dock-icon-only"), setDockIconOnly, readBool);
+      apply(getVal("nectar-start-icon"), setStartIcon, (v) => v);
+      apply(getVal("nectar-dock-adaptive"), setDockAdaptive, readBool);
+      apply(getVal("nectar-dock-win-number-enabled"), setDockWinNumberEnabled, readBool);
       apply(getVal("nectar-dock-mixed-reorder"), setDockMixedReorder, readBool);
 
       apply(getVal("nectar-temp-unit"), setTempUnitFahrenheit, (v) => v === "fahrenheit");
@@ -247,6 +261,9 @@ export function useSettings() {
     "nectar-notch-mode-by-monitor": (v) => { try { setNotchModeByMonitor(JSON.parse(v)); } catch {} },
     "nectar-dock-enabled": setDockEnabled,
     "nectar-dock-icon-only": setDockIconOnly,
+    "nectar-start-icon": setStartIcon,
+    "nectar-dock-adaptive": setDockAdaptive,
+    "nectar-dock-win-number-enabled": setDockWinNumberEnabled,
     "nectar-dock-preview-enabled": setDockPreviewEnabled,
     "nectar-dock-search-enabled": setDockSearchEnabled,
     "nectar-dock-calendar-enabled": setDockCalendarEnabled,
@@ -254,6 +271,7 @@ export function useSettings() {
     "nectar-weather-enabled": setWeatherEnabled,
     "nectar-calendar-enabled": setCalendarEnabled,
     "nectar-timer-enabled": setTimerEnabled,
+    "nectar-timer-sound-enabled": setTimerSoundEnabled,
     "nectar-stopwatch-enabled": setStopwatchEnabled,
     "nectar-music-mode-enabled": setMusicModeEnabled,
     "nectar-music-compact-notch": setMusicCompactNotch,
@@ -414,6 +432,12 @@ export function useSettings() {
     saveSetting("nectar-timer-enabled", String(next));
   };
 
+  const toggleTimerSound = () => {
+    const next = !timerSoundEnabled;
+    setTimerSoundEnabled(next);
+    saveSetting("nectar-timer-sound-enabled", String(next));
+  };
+
   const toggleStopwatchEnabled = () => {
     const next = !stopwatchEnabled;
     setStopwatchEnabled(next);
@@ -533,6 +557,23 @@ export function useSettings() {
     saveSetting("nectar-dock-icon-only", String(next));
   };
 
+  const handleStartIconChange = (icon: string) => {
+    setStartIcon(icon);
+    saveSetting("nectar-start-icon", icon);
+  };
+
+  const toggleDockAdaptive = () => {
+    const next = !dockAdaptive;
+    setDockAdaptive(next);
+    saveSetting("nectar-dock-adaptive", String(next));
+  };
+
+  const toggleDockWinNumber = () => {
+    const next = !dockWinNumberEnabled;
+    setDockWinNumberEnabled(next);
+    saveSetting("nectar-dock-win-number-enabled", String(next));
+  };
+
   const toggleAutoUpdate = () => {
     const next = !autoUpdate;
     setAutoUpdate(next);
@@ -577,6 +618,16 @@ export function useSettings() {
       saveSetting("nectar-dock-mode-by-monitor", JSON.stringify(next));
       return next;
     });
+  };
+
+  const replaceDockModesByMonitor = (next: Record<string, string>) => {
+    setDockModeByMonitor(next);
+    saveSetting("nectar-dock-mode-by-monitor", JSON.stringify(next));
+  };
+
+  const replaceNotchModesByMonitor = (next: Record<string, string>) => {
+    setNotchModeByMonitor(next);
+    saveSetting("nectar-notch-mode-by-monitor", JSON.stringify(next));
   };
 
   const setNotchModeForMonitor = (monitorId: string, mode: string | null) => {
@@ -808,6 +859,8 @@ export function useSettings() {
     toggleCalendar,
     timerEnabled,
     toggleTimerEnabled,
+    timerSoundEnabled,
+    toggleTimerSound,
     stopwatchEnabled,
     toggleStopwatchEnabled,
     musicModeEnabled,
@@ -852,6 +905,12 @@ export function useSettings() {
     toggleDockCalendar,
     dockIconOnly,
     toggleDockIconOnly,
+    startIcon,
+    handleStartIconChange,
+    dockAdaptive,
+    toggleDockAdaptive,
+    dockWinNumberEnabled,
+    toggleDockWinNumber,
     dockMixedReorder,
     toggleDockMixedReorder,
 
@@ -866,8 +925,10 @@ export function useSettings() {
     setNotchMonitorIdValue,
     dockModeByMonitor,
     setDockModeForMonitor,
+    replaceDockModesByMonitor,
     notchModeByMonitor,
     setNotchModeForMonitor,
+    replaceNotchModesByMonitor,
 
     // Overlays
     volumeOverlayEnabled,

@@ -111,10 +111,12 @@ fn main() {
             change_notch_mode,
             sync_appbar,
             open_app,
+            launch_new_instance,
             update_dock_rect,
             update_notch_rect,
             set_dock_hovered,
             set_notch_hovered,
+            set_notch_hidden,
             set_dock_dragging,
             get_active_windows,
             get_app_icon,
@@ -127,6 +129,7 @@ fn main() {
             get_custom_icons,
             set_menu_open,
             focus_window,
+            focus_app_windows,
             close_window,
             end_task,
             quit_nectar,
@@ -137,13 +140,19 @@ fn main() {
             set_hitbox_logging,
             get_hitbox_logging,
             get_volume,
+            get_volume_state,
             get_brightness,
             set_volume,
+            get_audio_sessions,
+            set_app_volume,
+            set_app_mute,
+            set_volume_mixer_rect,
+            clear_volume_mixer_rect,
             save_setting,
             load_settings,
             reset_settings,
             capture_window_thumbnail,
-            get_wifi_state,
+            get_wifi_status,
             set_wifi_state,
             get_bluetooth_state,
             set_bluetooth_state,
@@ -188,8 +197,10 @@ fn main() {
             // (init_dock fires after a delay), so the flag must be removed first.
             if std::env::var_os("NECTAR_RESTARTING").is_some() {
                 std::env::remove_var("NECTAR_RESTARTING");
+                RELAUNCHED.store(true, Ordering::Relaxed);
             } else if taskbar_marker_exists() {
-                set_taskbar_visibility(true, true);
+                RELAUNCHED.store(true, Ordering::Relaxed);
+                restore_taskbar_after_crash();
                 NATIVE_TASKBAR_HIDDEN.store(false, Ordering::Relaxed);
             }
 
@@ -246,18 +257,21 @@ fn main() {
                 });
             }
 
+            watch_webview_processes(app.handle());
             setup_mouse_hook(app.handle().clone());
             setup_display_change_monitor(app.handle().clone());
             setup_window_change_hook(app.handle().clone());
             {
                 let _ = crate::state::THUMBNAIL_CACHE.set(std::sync::Mutex::new(std::collections::HashMap::new()));
                 let _ = crate::state::FOCUS_TIMESTAMPS.set(std::sync::Mutex::new(std::collections::HashMap::new()));
+                // Set before the scan so it can store results.
+                let _ = crate::state::INSTALLED_APPS_CACHE.set(std::sync::Mutex::new(Vec::new()));
             }
             setup_thumbnail_capture(app.handle().clone());
             trigger_app_scan();
             let tx = setup_system_worker(app.handle().clone());
             let _ = COMMAND_SENDER.set(tx.clone());
-            let _hook = services::setup_keyboard_hook();
+            let _hook = services::setup_keyboard_hook(app.handle().clone());
             setup_taskbar_hook();
             start_window_style_guard(app.handle().clone());
             setup_audio_visualization(app.handle().clone());
@@ -334,6 +348,7 @@ fn main() {
                             crate::commands::restore_taskbar_and_exit(&ah);
                         }
                         "restart" => {
+                            crate::state::SHUTTING_DOWN.store(true, std::sync::atomic::Ordering::Relaxed);
                             for (label, w) in ah.webview_windows() {
                                 if crate::state::is_notch_label(&label) || crate::state::is_dock_label(&label) {
                                     if let Ok(hwnd) = w.hwnd() { unregister_appbar_native(hwnd); }

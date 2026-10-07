@@ -166,11 +166,10 @@ function CalendarWindow() {
   return (
     <div className="cw">
       <div className="cw-titlebar" data-tauri-drag-region>
-        <WindowControls canZoom />
         <span className="cw-title-text" data-tauri-drag-region>
           Calendar
         </span>
-        <span className="cw-title-spacer" />
+        <WindowControls />
       </div>
 
       <div className="cw-body">

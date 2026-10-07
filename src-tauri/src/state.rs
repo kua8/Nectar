@@ -6,6 +6,11 @@ use tauri::{AppHandle, PhysicalPosition, PhysicalSize};
 
 pub static COMMAND_SENDER: OnceLock<Sender<SystemCommand>> = OnceLock::new();
 pub static NATIVE_TASKBAR_HIDDEN: AtomicBool = AtomicBool::new(false);
+/// Set first on every quit/restart path. Window calls while the webviews are torn down panic
+/// ("already mutably borrowed"), so hooks and loops stand down once it's set.
+pub static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
+/// This launch follows a restart or a crash, so calendars should sync right away.
+pub static RELAUNCHED: AtomicBool = AtomicBool::new(false);
 
 macro_rules! label_map {
     ($fn_name:ident, $val_ty:ty) => {
@@ -20,6 +25,11 @@ label_map!(dock_rects, IntRect);
 label_map!(notch_rects, IntRect);
 label_map!(dock_hovered, bool);
 label_map!(notch_hovered, bool);
+// Frontend says the notch is off screen (smart/peek), keep it click-through then.
+label_map!(notch_hidden, bool);
+// Top edge hover intent: when the cursor entered the band, and whether it rested long enough.
+label_map!(notch_edge_enter_ms, i64);
+label_map!(notch_edge_armed, bool);
 label_map!(dock_overlap, i32);
 label_map!(notch_overlap, i32);
 label_map!(dock_window_rects, (PhysicalPosition<i32>, PhysicalSize<u32>));
@@ -79,6 +89,9 @@ pub fn clear_window_state(label: &str) {
     if let Ok(mut m) = notch_rects().lock() { m.remove(label); }
     if let Ok(mut m) = dock_hovered().lock() { m.remove(label); }
     if let Ok(mut m) = notch_hovered().lock() { m.remove(label); }
+    if let Ok(mut m) = notch_hidden().lock() { m.remove(label); }
+    if let Ok(mut m) = notch_edge_enter_ms().lock() { m.remove(label); }
+    if let Ok(mut m) = notch_edge_armed().lock() { m.remove(label); }
     if let Ok(mut m) = dock_overlap().lock() { m.remove(label); }
     if let Ok(mut m) = notch_overlap().lock() { m.remove(label); }
     if let Ok(mut m) = dock_window_rects().lock() { m.remove(label); }
@@ -128,8 +141,10 @@ pub static CURRENT_BRIGHTNESS: AtomicU32 = AtomicU32::new(50);
 pub static CURRENT_VOLUME: AtomicU32 = AtomicU32::new(50);
 pub static LAST_BRIGHTNESS_CHANGE: AtomicI64 = AtomicI64::new(0);
 pub static ANY_MEDIA_PLAYING: AtomicBool = AtomicBool::new(false);
+pub static LAST_START_TOGGLE_MS: AtomicI64 = AtomicI64::new(0);
 pub static OVERLAY_IN_SPLASH: AtomicBool = AtomicBool::new(false);
 pub static CURRENT_FOREGROUND_FULLSCREEN: AtomicBool = AtomicBool::new(false);
+pub static CURRENT_FOREGROUND_MAXIMIZED: AtomicBool = AtomicBool::new(false);
 
 pub static SINGLE_INSTANCE_MUTEX_HANDLE: OnceLock<isize> = OnceLock::new();
 pub static SINGLE_INSTANCE_EVENT_HANDLE: OnceLock<isize> = OnceLock::new();
@@ -151,6 +166,12 @@ pub fn close_single_instance_handles() {
 
 pub static DISPLAY_MONITOR_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 pub static LAST_DISPLAY_CHANGE_MS: AtomicI64 = AtomicI64::new(0);
+
+/// Mixer panel bounds (x, y, w, h) in overlay CSS px, None when collapsed.
+pub static VOLUME_MIXER_RECT: Mutex<Option<(f64, f64, f64, f64)>> = Mutex::new(None);
+
+/// Exe path to friendly name (FileDescription). Cached since the mixer polls every 2s.
+pub static PROCESS_NAME_CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
 
 pub static THUMBNAIL_CACHE: OnceLock<Mutex<HashMap<isize, (String, i64)>>> = OnceLock::new();
 pub static FOCUS_TIMESTAMPS: OnceLock<Mutex<HashMap<isize, i64>>> = OnceLock::new();

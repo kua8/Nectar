@@ -14,12 +14,14 @@ import {
   ChevronRight,
   Hourglass,
   Timer,
+  BellRing,
 } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { Dropdown } from "./Dropdown";
 import { useCaldav } from "../hooks/useCaldav";
 import { StatusWidgetConfig } from "../components/StatusWidgetConfig";
 import type { WidgetConfig, MonitorInfo, MonitorMode } from "./types";
+import { usePerMonitor } from "./usePerMonitor";
 
 interface NotchTabProps {
   notchMode: string;
@@ -31,10 +33,13 @@ interface NotchTabProps {
   setNotchMonitorIdValue: (id: string) => void;
   notchModeByMonitor: Record<string, string>;
   setNotchModeForMonitor: (monitorId: string, mode: string | null) => void;
+  replaceNotchModes: (next: Record<string, string>) => void;
   calendarEnabled: boolean;
   toggleCalendar: () => void;
   timerEnabled: boolean;
   toggleTimerEnabled: () => void;
+  timerSoundEnabled: boolean;
+  toggleTimerSound: () => void;
   stopwatchEnabled: boolean;
   toggleStopwatchEnabled: () => void;
   musicModeEnabled: boolean;
@@ -74,10 +79,13 @@ export function NotchTab({
   setNotchMonitorIdValue,
   notchModeByMonitor,
   setNotchModeForMonitor,
+  replaceNotchModes,
   calendarEnabled,
   toggleCalendar,
   timerEnabled,
   toggleTimerEnabled,
+  timerSoundEnabled,
+  toggleTimerSound,
   stopwatchEnabled,
   toggleStopwatchEnabled,
   musicModeEnabled,
@@ -108,21 +116,26 @@ export function NotchTab({
 }: NotchTabProps) {
   const caldav = useCaldav();
   const sources = (caldav.account ? 1 : 0) + caldav.links.length;
+  const perMonitor = usePerMonitor(notchMode, notchModeByMonitor, replaceNotchModes, monitors);
+  const multiMonitor = notchMonitorMode === "all" && monitors.length > 1;
+  const showPerMonitor = multiMonitor && perMonitor.enabled;
   return (
     <>
       <div className="setting-group-label">Notch</div>
       <div className="setting-group">
-        <SettingRow icon={PanelTop} label="Notch Behavior" desc="Choose how the notch appears">
-          <Dropdown
-            value={notchMode}
-            onChange={setNotchModeValue}
-            options={[
-              { value: "fixed", label: "Fixed" },
-              { value: "smart", label: "Smart" },
-              { value: "peek", label: "Peek" },
-            ]}
-          />
-        </SettingRow>
+        {!showPerMonitor && (
+          <SettingRow icon={PanelTop} label="Notch Behavior" desc="Choose how the notch appears">
+            <Dropdown
+              value={notchMode}
+              onChange={setNotchModeValue}
+              options={[
+                { value: "fixed", label: "Fixed" },
+                { value: "smart", label: "Smart" },
+                { value: "peek", label: "Peek" },
+              ]}
+            />
+          </SettingRow>
+        )}
 
         <SettingRow icon={MonitorCheck} label="Show On" desc="Choose which monitor(s) display the notch">
           <Dropdown
@@ -150,13 +163,21 @@ export function NotchTab({
           </SettingRow>
         )}
 
-        {notchMonitorMode === "all" && monitors.length > 1 && monitors.map((m) => (
+        {multiMonitor && (
+          <SettingRow icon={Monitor} label="Per-Monitor Behavior" desc="Set a different behavior for each monitor">
+            <label className="toggle-switch">
+              <input type="checkbox" checked={perMonitor.enabled} onChange={perMonitor.toggle} />
+              <span className="slider"></span>
+            </label>
+          </SettingRow>
+        )}
+
+        {showPerMonitor && monitors.map((m) => (
           <SettingRow key={m.id} icon={Monitor} label={`${m.label} Behavior`} desc={m.is_primary ? "Primary monitor" : undefined}>
             <Dropdown
-              value={notchModeByMonitor[m.id] || ""}
-              onChange={(v) => setNotchModeForMonitor(m.id, v || null)}
+              value={notchModeByMonitor[m.id] || notchMode}
+              onChange={(v) => setNotchModeForMonitor(m.id, v)}
               options={[
-                { value: "", label: `Use default (${notchMode === "fixed" ? "Fixed" : notchMode === "smart" ? "Smart" : "Peek"})` },
                 { value: "fixed", label: "Fixed" },
                 { value: "smart", label: "Smart" },
                 { value: "peek", label: "Peek" },
@@ -190,6 +211,15 @@ export function NotchTab({
             <span className="slider"></span>
           </label>
         </SettingRow>
+
+        {timerEnabled && (
+          <SettingRow icon={BellRing} label="Timer Sound" desc="Play a chime when the timer finishes">
+            <label className="toggle-switch">
+              <input type="checkbox" checked={timerSoundEnabled} onChange={toggleTimerSound} />
+              <span className="slider"></span>
+            </label>
+          </SettingRow>
+        )}
 
         <SettingRow icon={Timer} label="Stopwatch" desc="Count up with laps">
           <label className="toggle-switch">

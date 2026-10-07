@@ -174,7 +174,7 @@ async function resolveLocation(): Promise<ResolvedLocation> {
   // 3. Fallback IP geolocation
   try {
     const res = await fetch(
-      "https://ip-api.com/json/?fields=status,lat,lon,city,country",
+      "http://ip-api.com/json/?fields=status,lat,lon,city,country",
     );
     if (res.ok) {
       const data = await res.json();

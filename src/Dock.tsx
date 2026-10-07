@@ -2,6 +2,7 @@ import { useState, useEffect, useLayoutEffect, useMemo, useRef, memo } from 'rea
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import './Dock.css';
 import { initTheme } from './theme';
 import { useSettingsSync } from './hooks/useSettingsSync';
@@ -17,8 +18,77 @@ interface AppInfo {
   all_hwnds?: [number, string][];
 }
 
+// Browser hosts (Edge/Chrome/Brave/ApplicationFrameHost) run every PWA/UWP window, so the
+// title is part of the identity or two PWAs would merge into one item.
+const HOST_PROCESSES = ['msedge.exe', 'chrome.exe', 'brave.exe', 'applicationframehost.exe'];
+export function isBrowserHost(path: string) {
+  const p = path.toLowerCase();
+  return HOST_PROCESSES.some(host => p.includes(host));
+}
+
+// Stable identity for a dock item.
+export function appIdentity(p: string, executable?: string, name?: string) {
+  if (!p) return "";
+  const normalized = p.toLowerCase().replace(/\\/g, '/');
+  // Shell application ids (AUMIDs) and bare names are unique on their own.
+  if (!normalized.includes('/')) return normalized;
+  if (name && isBrowserHost(normalized)) {
+    return `${normalized}:${name.toLowerCase()}`;
+  }
+  if (executable) return `${normalized}:${executable.toLowerCase()}`;
+  return normalized;
+}
+
+const itemKey = (app: AppInfo) => appIdentity(app.path, app.executable, app.name);
+
+// Fuzzy identity: a running window and its installed or pinned entry can have different
+// paths (exe, .lnk, AUMID), so exact keys miss.
+export function isSameApp(a: AppInfo, b: AppInfo): boolean {
+  if (!a.path || !b.path) return false;
+  if (itemKey(a) === itemKey(b)) return true;
+  // Browser hosts run many apps under one exe, only the full identity can match those.
+  if (isBrowserHost(a.path) || isBrowserHost(b.path)) return false;
+  const aId = isIdentifier(a.path);
+  const bId = isIdentifier(b.path);
+  // Two opaque shell ids match only exactly (checked above).
+  if (aId && bId) return false;
+  if (aId !== bId) {
+    // One side is an AUMID, the other a file path. AUMIDs contain the product name, so match
+    // on overlapping display names plus the exe stem inside the id.
+    const fileSide = aId ? b : a;
+    const idLower = (aId ? a : b).path.toLowerCase();
+    const na = a.name.toLowerCase();
+    const nb = b.name.toLowerCase();
+    if (na !== nb && !na.includes(nb) && !nb.includes(na)) return false;
+    const stem = (fileSide.executable?.toLowerCase() || fileOf(fileSide.path)).replace(
+      /\.(exe|lnk)$/,
+      ""
+    );
+    return stem.length >= 3 && idLower.includes(stem);
+  }
+  if (appIdentity(a.path) === appIdentity(b.path)) return true;
+  const normExe = (s: string) => (s.endsWith(".exe") ? s : `${s}.exe`);
+  const aExe = a.executable?.toLowerCase() || fileOf(a.path);
+  const bExe = b.executable?.toLowerCase() || fileOf(b.path);
+  if (!aExe || !bExe) return false;
+  return normExe(aExe) === normExe(bExe);
+}
+
+const fileOf = (p: string) =>
+  (p.split("/").pop()?.split("\\").pop()?.toLowerCase() || "").replace(/\.lnk$/, "");
+
+// AUMIDs identify one app. Two PWAs in the same browser must never match on the shared exe name.
+const isIdentifier = (p: string) => !p.includes('/') && !p.includes('\\');
+
 const isNectarWindow = (app: { name: string; path: string }) =>
   app.path.toLowerCase().includes('nectar.exe') || app.name.toLowerCase() === 'nectar';
+
+// Start button icon: a public asset, or the data URI of an uploaded icon ("custom:" prefix).
+function resolveStartIcon(startIcon: string): string {
+  if (startIcon === "windows") return "/windows.png";
+  if (startIcon.startsWith("custom:")) return startIcon.slice("custom:".length);
+  return "/nectar.png";
+}
 
 // Stable module-level constants so object references never change between renders,
 // preventing Framer Motion from re-triggering animations on every re-render.
@@ -50,6 +120,17 @@ function CalendarIcon() {
   );
 }
 
+// One dot per open window, capped at three.
+function WindowDots({ count }: { count: number }) {
+  return (
+    <div className="window-dots">
+      {Array.from({ length: Math.min(Math.max(count, 1), 3) }, (_, i) => (
+        <div key={i} className="active-indicator" />
+      ))}
+    </div>
+  );
+}
+
 const Dock = memo(function Dock() {
   useEffect(() => {
     return initTheme();
@@ -60,7 +141,7 @@ const Dock = memo(function Dock() {
   const iconsRef = useRef<Record<string, string>>({});
   const [, setIconsTick] = useState(0); 
   const [dockMode, setDockMode] = useState(() => {
-    const raw = localStorage.getItem("nectar-dock-mode") || "fixed";
+    const raw = localStorage.getItem("nectar-dock-mode") || "smart";
     if (raw === "auto-hide") return "smart";
     return raw;
   });
@@ -68,9 +149,12 @@ const Dock = memo(function Dock() {
   const [dockSearchEnabled, setDockSearchEnabled] = useState(() => localStorage.getItem("nectar-dock-search-enabled") !== "false");
   const [dockCalendarEnabled, setDockCalendarEnabled] = useState(() => localStorage.getItem("nectar-dock-calendar-enabled") !== "false");
   const [dockIconOnly, setDockIconOnly] = useState(() => localStorage.getItem("nectar-dock-icon-only") === "true");
+  const [dockAdaptive, setDockAdaptive] = useState(() => localStorage.getItem("nectar-dock-adaptive") === "true");
+  const [startIcon, setStartIcon] = useState(() => localStorage.getItem("nectar-start-icon") || "default");
+  const [isMaximized, setIsMaximized] = useState(false);
   const [dockMixedReorder, setDockMixedReorder] = useState(() => localStorage.getItem("nectar-dock-mixed-reorder") === "true");
   const [mixedOrder, setMixedOrder] = useState<string[]>([]);
-  const [previewData, setPreviewData] = useState<{ path: string, previews: { hwnd: number, title: string, image: string }[] } | null>(null);
+  const [previewData, setPreviewData] = useState<{ id: string, previews: { hwnd: number, title: string, image: string }[] } | null>(null);
   const [isDockHovered, setIsDockHovered] = useState(false);
   const [isEdgeHovered, setIsEdgeHovered] = useState(false);
   const [isOverlapped, setIsOverlapped] = useState(false);
@@ -92,9 +176,28 @@ const Dock = memo(function Dock() {
   const iconPickerTargetRef = useRef<string | null>(null);
   const toastTimerRef = useRef<any>(null);
   const dockRef = useRef<HTMLDivElement>(null);
+  const [popupBottom, setPopupBottom] = useState(56);
   const [scale, setScale] = useState(() => parseFloat(localStorage.getItem("nectar-scale") || "1.0"));
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
+  const pinnedItemsRef = useRef<AppInfo[]>([]);
+  const handleAppClickRef = useRef<(app: AppInfo) => void>(() => {});
+
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
 
+
+  // Measure the dock pill when the popup opens. The card tucks ~14px behind it,
+  // so the seam stays fused even if the measurement is slightly off.
+  useEffect(() => {
+    if (showAddPopup) {
+      const h = dockRef.current?.getBoundingClientRect().height ?? 0;
+      if (h > 0) setPopupBottom(h / (scale || 1) - 14);
+    }
+  }, [showAddPopup, scale]);
 
   const isCurrentlyHovered = isDockHovered || isEdgeHovered;
   const [interactionState, setInteractionState] = useState<'active' | 'grace' | 'none'>('none');
@@ -118,6 +221,11 @@ const Dock = memo(function Dock() {
     (dockMode === 'smart' && isOverlapped && interactionState === 'none') ||
     (dockMode === 'peek' && interactionState === 'none')
   );
+
+  // Adaptive mode (fixed dock): stretch to a full-width taskbar while a window is maximized.
+  const isAdaptive = dockAdaptive && dockMode === 'fixed' && isMaximized && isExpanded && !isHidden;
+  // Nearly full width, 24px margin per side. Width is pre-scale, so (viewport - 48*scale) / scale.
+  const adaptiveWidth = (viewportWidth - 48 * scale) / scale;
 
   useEffect(() => {
     let cleared = false;
@@ -227,6 +335,12 @@ const Dock = memo(function Dock() {
       const iconOnly = getVal("nectar-dock-icon-only", "false");
       setDockIconOnly(iconOnly === "true");
 
+      const adaptive = getVal("nectar-dock-adaptive", "false");
+      setDockAdaptive(adaptive === "true");
+
+      const startIconVal = getVal("nectar-start-icon", "default") || "default";
+      setStartIcon(startIconVal);
+
       const mixedReorder = getVal("nectar-dock-mixed-reorder", "false");
       setDockMixedReorder(mixedReorder === "true");
 
@@ -237,6 +351,9 @@ const Dock = memo(function Dock() {
       setPinnedApps(pinned.map(a => ({ ...a, is_pinned: true })));
       pinned.forEach(app => fetchIcon(app.path));
 
+      // Warm the installed apps cache so the add-app popup opens with data.
+      invoke<AppInfo[]>('get_installed_apps').catch(() => {});
+
       // Load custom icons
       try {
         const icons = await invoke<Record<string, string>>('get_custom_icons');
@@ -245,17 +362,25 @@ const Dock = memo(function Dock() {
     };
     init();
 
-    const unlistenOverlap = listen<boolean>("dock-overlap", (event) => {
+    // Sent to one dock by label, a global listen() would get them for every dock.
+    const thisWindow = getCurrentWebviewWindow();
+
+    const unlistenOverlap = thisWindow.listen<boolean>("dock-overlap", (event) => {
       setIsOverlapped(event.payload);
     });
 
-    const unlistenEdgeHover = listen<boolean>("dock-edge-hover", (event) => {
+    const unlistenEdgeHover = thisWindow.listen<boolean>("dock-edge-hover", (event) => {
       setIsEdgeHovered(event.payload);
     });
 
     const unlistenMonitors = listen("monitors-changed", refreshDockMode);
 
+    const unlistenMaximized = thisWindow.listen<boolean>("dock-maximized", (event) => {
+      setIsMaximized(event.payload);
+    });
+
     return () => {
+      unlistenMaximized.then(f => f());
       unlistenOverlap.then(f => f());
       unlistenEdgeHover.then(f => f());
       unlistenMonitors.then(f => f());
@@ -272,19 +397,26 @@ const Dock = memo(function Dock() {
       "nectar-dock-search-enabled": setDockSearchEnabled,
       "nectar-dock-calendar-enabled": setDockCalendarEnabled,
       "nectar-dock-icon-only": setDockIconOnly,
+      "nectar-dock-adaptive": setDockAdaptive,
+      "nectar-start-icon": setStartIcon,
       "nectar-dock-mixed-reorder": setDockMixedReorder,
       "nectar-scale": setScale,
     }
   );
 
   useEffect(() => {
+    let pollSeq = 0;
+
     const poll = async () => {
       if (isDragging) return;
+      const seq = ++pollSeq;
       const running = await invoke<AppInfo[]>('get_active_windows');
+      // Drop out-of-order responses, an old poll must not bring back closed apps.
+      if (seq !== pollSeq) return;
       setActiveApps(running);
 
       setActiveOrder(prev => {
-        const newPaths = running.map(r => r.path);
+        const newPaths = running.map(r => appIdentity(r.path, r.executable, r.name));
         const existingPaths = prev.filter(p => newPaths.includes(p));
         const addedPaths = newPaths.filter(p => !prev.includes(p));
         return [...existingPaths, ...addedPaths];
@@ -304,14 +436,18 @@ const Dock = memo(function Dock() {
       window.location.reload();
     });
 
+    // Safety net: even if a window event is missed, converge on the real state
+    const interval = setInterval(poll, 10000);
+
     return () => {
+      clearInterval(interval);
       unlistenWindowChange.then(f => f());
       unlistenSettingsReset.then(f => f());
     };
   }, [isDragging]);
 
   const fetchIcon = async (path: string, name?: string, hwnd?: number, retryCount = 0) => {
-    const isHost = path.toLowerCase().includes("msedge.exe") || path.toLowerCase().includes("chrome.exe") || path.toLowerCase().includes("applicationframehost.exe");
+    const isHost = isBrowserHost(path);
     const cacheKey = isHost && name ? `${path}:${name.toLowerCase()}` : (hwnd ? `${path}-${hwnd}` : path);
     
     if (iconsRef.current[cacheKey]) return;
@@ -371,7 +507,7 @@ const Dock = memo(function Dock() {
   const handleRemoveCustomIcon = async (app: AppInfo) => {
     try {
       await invoke('remove_custom_icon', { path: app.path, name: app.name || null });
-      const isHost = app.path.toLowerCase().includes("msedge.exe") || app.path.toLowerCase().includes("chrome.exe") || app.path.toLowerCase().includes("applicationframehost.exe");
+      const isHost = isBrowserHost(app.path);
       const ck = isHost && app.name ? `${app.path}:${app.name.toLowerCase()}` : (app.hwnd ? `${app.path}-${app.hwnd}` : app.path);
       setCustomIcons(prev => {
         const next = { ...prev };
@@ -412,6 +548,9 @@ const Dock = memo(function Dock() {
     try {
       if (app.path === 'start') {
         await invoke('open_app', { appName: 'start' });
+      } else if (app.all_hwnds && app.all_hwnds.length > 1) {
+        // Several windows: bring the most recent forward, then cycle.
+        await invoke('focus_app_windows', { hwnds: app.all_hwnds.map(([hwnd]) => hwnd) });
       } else if (app.hwnd) {
         await invoke('focus_window', { hwnd: app.hwnd });
       } else {
@@ -422,12 +561,31 @@ const Dock = memo(function Dock() {
     }
   };
 
+  const handleNewInstance = async (app: AppInfo) => {
+    if (!app || app.path === 'start') return;
+    try {
+      await invoke('launch_new_instance', { appPath: app.path, appName: app.name });
+    } catch (e) {
+      console.error(`Failed to launch a new instance of ${app.name}:`, e);
+    }
+  };
+
+  // Middle-click opens a new instance like the taskbar. The mousedown preventDefault
+  // stops the autoscroll cursor.
+  const handleMiddleClick = (e: React.MouseEvent, app: AppInfo) => {
+    if (e.button !== 1) return;
+    e.preventDefault();
+    e.stopPropagation();
+    handleNewInstance(app);
+  };
+
   const togglePin = async (app: AppInfo) => {
     let newPinned;
     if (app.is_pinned) {
-      newPinned = pinnedApps.filter(a => a.path !== app.path);
+      newPinned = pinnedApps.filter(a => itemKey(a) !== itemKey(app));
     } else {
-      if (pinnedApps.find(a => a.path === app.path)) return;
+      // Same app pinned under another entry shape (running window vs shortcut) must not duplicate.
+      if (pinnedApps.some(a => isSameApp(a, app))) return;
       newPinned = [...pinnedApps, { ...app, is_pinned: true, is_running: false, hwnd: undefined }];
       fetchIcon(app.path, app.name); 
     }
@@ -511,44 +669,37 @@ const Dock = memo(function Dock() {
   }, [contextMenu, showAddPopup, pinnedApps, activeApps, activeSubmenu, scale]);
 
   const dockItems = useMemo(() => {
-    const getAppId = (p: string, executable?: string) => {
-      if (!p) return "";
-      const normalized = p.toLowerCase().replace(/\\/g, '/');
-      if (executable) return `${normalized}:${executable.toLowerCase()}`;
-      return normalized;
-    };
-
     const runningMap = new Map();
     activeApps.forEach(a => {
-      const id = getAppId(a.path, a.executable);
+      const id = appIdentity(a.path, a.executable, a.name);
       if (!runningMap.has(id)) runningMap.set(id, a);
     });
     
     const matchedRunningKeys = new Set<string>();
 
     const findRunningApp = (p: AppInfo) => {
-      // 1. Try exact match by getAppId
-      const id = getAppId(p.path, p.executable);
+      // 1. Try exact match by identity
+      const id = appIdentity(p.path, p.executable, p.name);
       let running = runningMap.get(id);
       if (running) {
-        matchedRunningKeys.add(getAppId(running.path, running.executable));
+        matchedRunningKeys.add(appIdentity(running.path, running.executable, running.name));
         return running;
       }
 
       // 2. Try match by path (without executable)
-      const pathId = getAppId(p.path);
+      const pathId = appIdentity(p.path);
       running = runningMap.get(pathId);
       if (running) {
-        matchedRunningKeys.add(getAppId(running.path, running.executable));
+        matchedRunningKeys.add(appIdentity(running.path, running.executable, running.name));
         return running;
       }
 
       // 3. Try fallback match by executable name if defined
       if (p.executable) {
         const targetExe = p.executable.toLowerCase();
-        const found = activeApps.find(a => a.executable?.toLowerCase() === targetExe);
+        const found = activeApps.find(a => !isIdentifier(a.path) && a.executable?.toLowerCase() === targetExe);
         if (found) {
-          matchedRunningKeys.add(getAppId(found.path, found.executable));
+          matchedRunningKeys.add(appIdentity(found.path, found.executable, found.name));
           return found;
         }
       }
@@ -557,11 +708,12 @@ const Dock = memo(function Dock() {
       const pinFilename = p.path.split('/').pop()?.split('\\').pop()?.toLowerCase() || "";
       if (pinFilename) {
         const found = activeApps.find(a => {
+          if (isIdentifier(a.path)) return false;
           const runExe = a.executable?.toLowerCase() || a.path.split('/').pop()?.split('\\').pop()?.toLowerCase() || "";
           return runExe === pinFilename || runExe === `${pinFilename}.exe` || `${runExe}.exe` === pinFilename;
         });
         if (found) {
-          matchedRunningKeys.add(getAppId(found.path, found.executable));
+          matchedRunningKeys.add(appIdentity(found.path, found.executable, found.name));
           return found;
         }
       }
@@ -578,8 +730,8 @@ const Dock = memo(function Dock() {
     ];
 
     const unpinned = activeOrder
-      .map(path => activeApps.find(a => a.path.toLowerCase().replace(/\\/g, '/') === path.toLowerCase().replace(/\\/g, '/')))
-      .filter((a): a is AppInfo => !!a && !matchedRunningKeys.has(getAppId(a.path, a.executable)));
+      .map(id => activeApps.find(a => appIdentity(a.path, a.executable, a.name) === id))
+      .filter((a): a is AppInfo => !!a && !matchedRunningKeys.has(appIdentity(a.path, a.executable, a.name)));
 
     return [...pinned, ...unpinned];
   }, [pinnedApps, activeApps, activeOrder]);
@@ -588,20 +740,36 @@ const Dock = memo(function Dock() {
   const pinnedItems = useMemo(() => dockItems.filter(i => i.path !== 'start' && i.is_pinned), [dockItems]);
   const unpinnedItems = useMemo(() => dockItems.filter(i => !i.is_pinned), [dockItems]);
 
+  // Latest state for the Win+Number listener, which subscribes only once.
+  useEffect(() => {
+    pinnedItemsRef.current = pinnedItems;
+    handleAppClickRef.current = handleAppClick;
+  });
+
+  useEffect(() => {
+    // Backend claims Win+1-9 while the taskbar is hidden and tells us the slot, same as clicking that icon.
+    const unlisten = getCurrentWebviewWindow().listen<number>("dock-win-number", (event) => {
+      const app = pinnedItemsRef.current[event.payload];
+      if (app) handleAppClickRef.current(app);
+    });
+    return () => { unlisten.then(f => f()); };
+  }, []);
+
   const combinableItems = useMemo(() => dockItems.filter(i => i.path !== 'start'), [dockItems]);
   const mixedItems = useMemo(() => {
     if (!dockMixedReorder) return combinableItems;
-    const known = combinableItems.filter(i => mixedOrder.includes(i.path));
-    const unknown = combinableItems.filter(i => !mixedOrder.includes(i.path));
-    known.sort((a, b) => mixedOrder.indexOf(a.path) - mixedOrder.indexOf(b.path));
+    const known = combinableItems.filter(i => mixedOrder.includes(itemKey(i)));
+    const unknown = combinableItems.filter(i => !mixedOrder.includes(itemKey(i)));
+    known.sort((a, b) => mixedOrder.indexOf(itemKey(a)) - mixedOrder.indexOf(itemKey(b)));
     return [...known, ...unknown];
   }, [combinableItems, dockMixedReorder, mixedOrder]);
 
-  const handleReorder = (newPaths: string[]) => {
-    const oldPaths = pinnedApps.map(p => p.path);
-    if (JSON.stringify(newPaths) !== JSON.stringify(oldPaths)) {
-      const reordered = newPaths
-        .map(path => pinnedApps.find(p => p.path === path))
+  // Keyed by identity, not path: web apps in one browser share an exe path.
+  const handleReorder = (newKeys: string[]) => {
+    const oldKeys = pinnedApps.map(itemKey);
+    if (JSON.stringify(newKeys) !== JSON.stringify(oldKeys)) {
+      const reordered = newKeys
+        .map(key => pinnedApps.find(p => itemKey(p) === key))
         .filter((p): p is AppInfo => !!p);
       setPinnedApps(reordered);
     }
@@ -622,14 +790,14 @@ const Dock = memo(function Dock() {
     setPressedApp(null);
   };
 
-  const handleMixedReorder = (newPaths: string[]) => {
-    setMixedOrder(newPaths);
-    const pinnedPaths = new Set(pinnedApps.map(p => p.path));
-    const newPinnedOrder = newPaths.filter(p => pinnedPaths.has(p));
-    const oldPinnedOrder = pinnedApps.map(p => p.path);
+  const handleMixedReorder = (newKeys: string[]) => {
+    setMixedOrder(newKeys);
+    const pinnedKeys = new Set(pinnedApps.map(itemKey));
+    const newPinnedOrder = newKeys.filter(k => pinnedKeys.has(k));
+    const oldPinnedOrder = pinnedApps.map(itemKey);
     if (JSON.stringify(newPinnedOrder) !== JSON.stringify(oldPinnedOrder)) {
       const reordered = newPinnedOrder
-        .map(path => pinnedApps.find(p => p.path === path))
+        .map(key => pinnedApps.find(p => itemKey(p) === key))
         .filter((p): p is AppInfo => !!p);
       setPinnedApps(reordered);
     }
@@ -673,7 +841,7 @@ const Dock = memo(function Dock() {
     }
 
     if (hoveredApp && !isDragging) {
-      const app = dockItems.find(a => a.path === hoveredApp);
+      const app = dockItems.find(a => itemKey(a) === hoveredApp);
       if (app && app.is_running) {
         const hwndsToCapture = app.all_hwnds || (app.hwnd ? [[app.hwnd, app.name]] : []);
 
@@ -698,9 +866,9 @@ const Dock = memo(function Dock() {
               .map(({ hwnd, title, image }) => ({ hwnd, title, image }));
 
             const currentHovered = hoveredAppRef.current;
-            if (captured.length > 0 && currentHovered === app.path) {
-              setPreviewData({ path: app.path, previews: captured });
-            } else if (currentHovered === app.path) {
+            if (captured.length > 0 && currentHovered === itemKey(app)) {
+              setPreviewData({ id: itemKey(app), previews: captured });
+            } else if (currentHovered === itemKey(app)) {
               setPreviewData(null);
             }
           } catch (e) {
@@ -731,13 +899,13 @@ const Dock = memo(function Dock() {
         <motion.div
           ref={dockRef}
           layout
-          className={`dock ${isExpanded && !isHidden ? 'dock-expanded' : ''} ${isImpacted && !isExpanded && !isHidden ? 'dock-impacted' : ''} ${dockIconOnly ? 'dock-icon-only' : ''}`}
+          className={`dock ${isExpanded && !isHidden ? 'dock-expanded' : ''} ${isImpacted && !isExpanded && !isHidden ? 'dock-impacted' : ''} ${dockIconOnly ? 'dock-icon-only' : ''} ${isAdaptive ? 'dock-adaptive' : ''}`}
           onMouseEnter={() => setIsDockHovered(true)}
           onMouseLeave={() => { setIsDockHovered(false); setHoveredApp(null); setPressedApp(null); }}
         initial={{ y: -800, opacity: 1, width: 34, height: 34, borderTopLeftRadius: 17, borderTopRightRadius: 17, borderBottomLeftRadius: 17, borderBottomRightRadius: 17 }}
         animate={{
           y: !isReady ? -800 : (isHidden ? 100 : 0),
-          width: isExpanded && !isHidden ? 'auto' : 34,
+          width: isExpanded && !isHidden ? (isAdaptive ? adaptiveWidth : 'auto') : 34,
           height: isExpanded && !isHidden ? 'auto' : 34,
           borderTopLeftRadius: (isImpacted || isExpanded) && !isHidden ? 18 : 17,
           borderTopRightRadius: (isImpacted || isExpanded) && !isHidden ? 18 : 17,
@@ -778,17 +946,17 @@ const Dock = memo(function Dock() {
                   transition={{ opacity: { duration: 0.15, delay: 0.15 }, scale: { type: "spring", stiffness: 400, damping: 25, delay: 0.15 } }}
                   className="dock-icon-wrapper"
                   onContextMenu={(e) => handleContextMenu(e, startItem)}
-                  onMouseEnter={() => setHoveredApp(startItem.path)}
+                  onMouseEnter={() => setHoveredApp(itemKey(startItem))}
                   onMouseLeave={() => { setHoveredApp(null); setPressedApp(null); }}
                 >
-                  {(!dockPreviewEnabled || (dockPreviewEnabled && hoveredApp === startItem.path)) && (
+                  {(!dockPreviewEnabled || (dockPreviewEnabled && hoveredApp === itemKey(startItem))) && (
                     <div className="tooltip">{startItem.name}</div>
                   )}
                   <motion.div 
                     className="dock-icon"
                     variants={iconVariants}
-                    animate={pressedApp === startItem.path ? "tap" : (hoveredApp === startItem.path ? "hover" : "idle")}
-                    onPointerDown={() => setPressedApp(startItem.path)}
+                    animate={pressedApp === itemKey(startItem) ? "tap" : (hoveredApp === itemKey(startItem) ? "hover" : "idle")}
+                    onPointerDown={() => setPressedApp(itemKey(startItem))}
                     onPointerUp={() => setPressedApp(null)}
                     onPointerCancel={() => setPressedApp(null)}
                     onClick={(e) => {
@@ -796,7 +964,7 @@ const Dock = memo(function Dock() {
                       handleAppClick(startItem);
                     }}
                   >
-                    <img src="/nectar.png" alt="Nectar" className="nectar-icon-img" draggable={false} />
+                    <img src={resolveStartIcon(startIcon)} alt="Start" className="nectar-icon-img" style={startIcon.startsWith("custom:") ? { borderRadius: "8px" } : undefined} draggable={false} />
                   </motion.div>
                 </motion.div>
               )}
@@ -864,19 +1032,21 @@ const Dock = memo(function Dock() {
               <Reorder.Group
                 as="div"
                 axis="x"
-                values={pinnedItems.map(i => i.path)}
+                values={pinnedItems.map(itemKey)}
                 onReorder={handleReorder}
                 className="dock-reorder-group"
               >
                 {pinnedItems.map((app) => (
                   <Reorder.Item
                     as="div"
-                    key={app.path}
-                    value={app.path}
+                    key={itemKey(app)}
+                    value={itemKey(app)}
                     style={{ position: 'relative' }}
                     onDragStart={() => { setIsDragging(true); setHoveredApp(null); setPressedApp(null); }}
                     onDragEnd={handleDragEnd}
                     onContextMenu={(e) => handleContextMenu(e, app)}
+                    onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}
+                    onAuxClick={(e) => handleMiddleClick(e, app)}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (!isDragging) handleAppClick(app);
@@ -888,11 +1058,11 @@ const Dock = memo(function Dock() {
                       animate={ITEM_ANIMATE}
                       exit={ITEM_EXIT}
                       transition={ITEM_ENTRY_TRANSITION}
-                      onMouseEnter={() => setHoveredApp(app.path)}
+                      onMouseEnter={() => setHoveredApp(itemKey(app))}
                       onMouseLeave={() => { if (!isPreviewHoveredRef.current) { setHoveredApp(null); setPressedApp(null); } }}
                     >
                 <AnimatePresence>
-                  {dockPreviewEnabled && previewData && previewData.path === app.path && hoveredApp === app.path && (
+                  {dockPreviewEnabled && previewData && previewData.id === itemKey(app) && hoveredApp === itemKey(app) && (
                     <motion.div 
                       className={`preview-tooltip ${previewData.previews.length > 1 ? 'multi' : ''}`} 
                       initial={{opacity: 0, y: 10, scale: 0.95}} 
@@ -925,22 +1095,24 @@ const Dock = memo(function Dock() {
                 </AnimatePresence>
                 
                 {/* Fallback to text tooltip if previews are disabled, app isn't running, or preview failed to load */}
-                {(!dockPreviewEnabled || (dockPreviewEnabled && hoveredApp === app.path && !previewData)) && (
+                {(!dockPreviewEnabled || (dockPreviewEnabled && hoveredApp === itemKey(app) && !previewData)) && (
                   <div className="tooltip">{app.name}</div>
                 )}
                 <motion.div 
                   className="dock-icon"
                   variants={iconVariants}
-                  animate={pressedApp === app.path ? "tap" : (isDragging && !app.is_pinned ? "idle" : (hoveredApp === app.path && !isDragging ? "hover" : "idle"))}
+                  animate={pressedApp === itemKey(app) ? "tap" : (isDragging && !app.is_pinned ? "idle" : (hoveredApp === itemKey(app) && !isDragging ? "hover" : "idle"))}
                   whileDrag="drag"
-                  onPointerDown={() => setPressedApp(app.path)}
+                  onPointerDown={() => setPressedApp(itemKey(app))}
                   onPointerUp={() => setPressedApp(null)}
                   onPointerCancel={() => setPressedApp(null)}
                 >
                   {(() => {
-                    const isHost = app.path.toLowerCase().includes("msedge.exe") || app.path.toLowerCase().includes("chrome.exe") || app.path.toLowerCase().includes("applicationframehost.exe");
+                    const isHost = isBrowserHost(app.path);
                     const cacheKey = isHost ? `${app.path}:${app.name.toLowerCase()}` : (app.hwnd ? `${app.path}-${app.hwnd}` : app.path);
-                    const icon = customIcons[cacheKey] || customIcons[app.path] || iconsRef.current[cacheKey] || iconsRef.current[app.path] || app.icon;
+                    // Running host items skip the shared path fallback, or the browser's icon leaks onto its PWAs.
+                    const allowPathFallback = !isHost || !app.is_running;
+                    const icon = customIcons[cacheKey] || (allowPathFallback && customIcons[app.path]) || iconsRef.current[cacheKey] || (allowPathFallback && iconsRef.current[app.path]) || app.icon;
                     
                     const isNectarOrSettings = isNectarWindow(app);
                     
@@ -956,7 +1128,7 @@ const Dock = memo(function Dock() {
                     );
                   })()}
                 </motion.div>
-                  {app.is_running && <div className="active-indicator" />}
+                  {app.is_running && <WindowDots count={app.all_hwnds?.length ?? 1} />}
                     </motion.div>
                   </Reorder.Item>
                 ))}
@@ -969,19 +1141,21 @@ const Dock = memo(function Dock() {
               <Reorder.Group
                 as="div"
                 axis="x"
-                values={unpinnedItems.map(i => i.path)}
+                values={unpinnedItems.map(itemKey)}
                 onReorder={handleUnpinnedReorder}
                 className="dock-reorder-group"
               >
                 {unpinnedItems.map((app) => (
                   <Reorder.Item
                     as="div"
-                    key={app.path}
-                    value={app.path}
+                    key={itemKey(app)}
+                    value={itemKey(app)}
                     style={{ position: 'relative' }}
                     onDragStart={() => { setIsDragging(true); setHoveredApp(null); setPressedApp(null); }}
                     onDragEnd={handleUnpinnedDragEnd}
                     onContextMenu={(e) => handleContextMenu(e, app)}
+                    onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}
+                    onAuxClick={(e) => handleMiddleClick(e, app)}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (!isDragging) handleAppClick(app);
@@ -993,11 +1167,11 @@ const Dock = memo(function Dock() {
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0, transition: { duration: 0.12 } }}
                       transition={ITEM_ENTRY_TRANSITION}
-                      onMouseEnter={() => setHoveredApp(app.path)}
+                      onMouseEnter={() => setHoveredApp(itemKey(app))}
                       onMouseLeave={() => { if (!isPreviewHoveredRef.current) { setHoveredApp(null); setPressedApp(null); } }}
                     >
                       <AnimatePresence>
-                        {dockPreviewEnabled && previewData && previewData.path === app.path && hoveredApp === app.path && (
+                        {dockPreviewEnabled && previewData && previewData.id === itemKey(app) && hoveredApp === itemKey(app) && (
                           <motion.div
                             className={`preview-tooltip ${previewData.previews.length > 1 ? 'multi' : ''}`}
                             initial={{opacity: 0, y: 10, scale: 0.95}}
@@ -1028,22 +1202,24 @@ const Dock = memo(function Dock() {
                           </motion.div>
                         )}
                       </AnimatePresence>
-                      {(!dockPreviewEnabled || (dockPreviewEnabled && hoveredApp === app.path && !previewData)) && (
+                      {(!dockPreviewEnabled || (dockPreviewEnabled && hoveredApp === itemKey(app) && !previewData)) && (
                         <div className="tooltip">{app.name}</div>
                       )}
                       <motion.div
                         className="dock-icon"
                         variants={iconVariants}
-                        animate={pressedApp === app.path ? "tap" : (isDragging && app.is_pinned ? "idle" : (hoveredApp === app.path && !isDragging ? "hover" : "idle"))}
+                        animate={pressedApp === itemKey(app) ? "tap" : (isDragging && app.is_pinned ? "idle" : (hoveredApp === itemKey(app) && !isDragging ? "hover" : "idle"))}
                         whileDrag="drag"
-                        onPointerDown={() => setPressedApp(app.path)}
+                        onPointerDown={() => setPressedApp(itemKey(app))}
                         onPointerUp={() => setPressedApp(null)}
                         onPointerCancel={() => setPressedApp(null)}
                       >
                         {(() => {
-                          const isHost = app.path.toLowerCase().includes("msedge.exe") || app.path.toLowerCase().includes("chrome.exe") || app.path.toLowerCase().includes("applicationframehost.exe");
+                          const isHost = isBrowserHost(app.path);
                           const cacheKey = isHost ? `${app.path}:${app.name.toLowerCase()}` : (app.hwnd ? `${app.path}-${app.hwnd}` : app.path);
-                        const icon = customIcons[cacheKey] || customIcons[app.path] || iconsRef.current[cacheKey] || iconsRef.current[app.path] || app.icon;
+                        // Running host items skip the shared path fallback, or the browser's icon leaks onto its PWAs.
+                    const allowPathFallback = !isHost || !app.is_running;
+                    const icon = customIcons[cacheKey] || (allowPathFallback && customIcons[app.path]) || iconsRef.current[cacheKey] || (allowPathFallback && iconsRef.current[app.path]) || app.icon;
                           const isNectarOrSettings = isNectarWindow(app);
                           return (icon || isNectarOrSettings) ? (
                             <img src={isNectarOrSettings ? "/nectar.png" : (icon ?? undefined)} alt={app.name} className={isNectarOrSettings ? "nectar-icon-img" : ""} draggable={false} />
@@ -1052,7 +1228,7 @@ const Dock = memo(function Dock() {
                           );
                         })()}
                       </motion.div>
-                      {app.is_running && <div className="active-indicator" />}
+                      {app.is_running && <WindowDots count={app.all_hwnds?.length ?? 1} />}
                     </motion.div>
                   </Reorder.Item>
                 ))}
@@ -1062,19 +1238,21 @@ const Dock = memo(function Dock() {
               <Reorder.Group
                 as="div"
                 axis="x"
-                values={mixedItems.map(i => i.path)}
+                values={mixedItems.map(itemKey)}
                 onReorder={handleMixedReorder}
                 className="dock-reorder-group"
               >
                 {mixedItems.map((app) => (
                   <Reorder.Item
                     as="div"
-                    key={app.path}
-                    value={app.path}
+                    key={itemKey(app)}
+                    value={itemKey(app)}
                     style={{ position: 'relative' }}
                     onDragStart={() => { setIsDragging(true); setHoveredApp(null); setPressedApp(null); }}
                     onDragEnd={() => handleMixedDragEnd(app)}
                     onContextMenu={(e) => handleContextMenu(e, app)}
+                    onMouseDown={(e) => { if (e.button === 1) e.preventDefault(); }}
+                    onAuxClick={(e) => handleMiddleClick(e, app)}
                     onClick={(e) => {
                       e.stopPropagation();
                       if (!isDragging) handleAppClick(app);
@@ -1086,11 +1264,11 @@ const Dock = memo(function Dock() {
                       animate={ITEM_ANIMATE}
                       exit={ITEM_EXIT}
                       transition={ITEM_ENTRY_TRANSITION}
-                      onMouseEnter={() => setHoveredApp(app.path)}
+                      onMouseEnter={() => setHoveredApp(itemKey(app))}
                       onMouseLeave={() => { if (!isPreviewHoveredRef.current) { setHoveredApp(null); setPressedApp(null); } }}
                     >
                       <AnimatePresence>
-                        {dockPreviewEnabled && previewData && previewData.path === app.path && hoveredApp === app.path && (
+                        {dockPreviewEnabled && previewData && previewData.id === itemKey(app) && hoveredApp === itemKey(app) && (
                           <motion.div
                             className={`preview-tooltip ${previewData.previews.length > 1 ? 'multi' : ''}`}
                             initial={{opacity: 0, y: 10, scale: 0.95}}
@@ -1122,22 +1300,24 @@ const Dock = memo(function Dock() {
                         )}
                       </AnimatePresence>
 
-                      {(!dockPreviewEnabled || (dockPreviewEnabled && hoveredApp === app.path && !previewData)) && (
+                      {(!dockPreviewEnabled || (dockPreviewEnabled && hoveredApp === itemKey(app) && !previewData)) && (
                         <div className="tooltip">{app.name}</div>
                       )}
                       <motion.div
                         className="dock-icon"
                         variants={iconVariants}
-                        animate={pressedApp === app.path ? "tap" : (hoveredApp === app.path && !isDragging ? "hover" : "idle")}
+                        animate={pressedApp === itemKey(app) ? "tap" : (hoveredApp === itemKey(app) && !isDragging ? "hover" : "idle")}
                         whileDrag="drag"
-                        onPointerDown={() => setPressedApp(app.path)}
+                        onPointerDown={() => setPressedApp(itemKey(app))}
                         onPointerUp={() => setPressedApp(null)}
                         onPointerCancel={() => setPressedApp(null)}
                       >
                         {(() => {
-                          const isHost = app.path.toLowerCase().includes("msedge.exe") || app.path.toLowerCase().includes("chrome.exe") || app.path.toLowerCase().includes("applicationframehost.exe");
+                          const isHost = isBrowserHost(app.path);
                           const cacheKey = isHost ? `${app.path}:${app.name.toLowerCase()}` : (app.hwnd ? `${app.path}-${app.hwnd}` : app.path);
-                          const icon = customIcons[cacheKey] || customIcons[app.path] || iconsRef.current[cacheKey] || iconsRef.current[app.path] || app.icon;
+                          // Running host items skip the shared path fallback, or the browser's icon leaks onto its PWAs.
+                    const allowPathFallback = !isHost || !app.is_running;
+                    const icon = customIcons[cacheKey] || (allowPathFallback && customIcons[app.path]) || iconsRef.current[cacheKey] || (allowPathFallback && iconsRef.current[app.path]) || app.icon;
                           const isNectarOrSettings = isNectarWindow(app);
                           return (icon || isNectarOrSettings) ? (
                             <img src={isNectarOrSettings ? "/nectar.png" : (icon ?? undefined)} alt={app.name} className={isNectarOrSettings ? "nectar-icon-img" : ""} draggable={false} />
@@ -1146,7 +1326,7 @@ const Dock = memo(function Dock() {
                           );
                         })()}
                       </motion.div>
-                      {app.is_running && <div className="active-indicator" />}
+                      {app.is_running && <WindowDots count={app.all_hwnds?.length ?? 1} />}
                     </motion.div>
                   </Reorder.Item>
                 ))}
@@ -1181,6 +1361,14 @@ const Dock = memo(function Dock() {
         >
           {contextMenu.app ? (
             <>
+              {contextMenu.app.is_running && contextMenu.app.path !== 'start' && (
+                <>
+                  <div className="menu-item" onClick={() => { handleNewInstance(contextMenu.app!); closeMenu(); }}>
+                    Open New Instance
+                  </div>
+                  <div className="menu-divider" />
+                </>
+              )}
               <div className="menu-item" onClick={() => togglePin(contextMenu.app!)}>
                 {contextMenu.app.is_pinned ? 'Unpin from Dock' : 'Pin to Dock'}
               </div>
@@ -1188,7 +1376,7 @@ const Dock = memo(function Dock() {
                 <>
                   <div className="menu-divider" />
                   <div className="menu-item" onClick={() => {
-                    const isHost = contextMenu.app!.path.toLowerCase().includes("msedge.exe") || contextMenu.app!.path.toLowerCase().includes("chrome.exe") || contextMenu.app!.path.toLowerCase().includes("applicationframehost.exe");
+                    const isHost = isBrowserHost(contextMenu.app!.path);
                     const ck = isHost ? `${contextMenu.app!.path}:${contextMenu.app!.name.toLowerCase()}` : contextMenu.app!.path;
                     iconPickerTargetRef.current = ck;
                     closeMenu();
@@ -1199,7 +1387,7 @@ const Dock = memo(function Dock() {
                     Change Icon...
                   </div>
                   {(() => {
-                    const isHost = contextMenu.app!.path.toLowerCase().includes("msedge.exe") || contextMenu.app!.path.toLowerCase().includes("chrome.exe") || contextMenu.app!.path.toLowerCase().includes("applicationframehost.exe");
+                    const isHost = isBrowserHost(contextMenu.app!.path);
                     const ck = isHost ? `${contextMenu.app!.path}:${contextMenu.app!.name.toLowerCase()}` : contextMenu.app!.path;
                     return customIcons[ck] ? (
                       <div className="menu-item" onClick={() => {
@@ -1291,6 +1479,9 @@ const Dock = memo(function Dock() {
             onClose={closePopup} 
             onAdd={(app: AppInfo) => { togglePin(app); closePopup(); }}
             scale={scale}
+            runningApps={activeApps}
+            pinned={pinnedApps}
+            bottom={popupBottom}
           />
         )}
       </AnimatePresence>
@@ -1313,20 +1504,32 @@ const Dock = memo(function Dock() {
   );
 });
 
-function AddAppPopup({ onClose, onAdd, containerRef, scale }: {
-  onClose: () => void,
-  onAdd: (app: AppInfo) => void,
-  containerRef: React.RefObject<HTMLDivElement | null>,
-  scale: number
+function AddAppPopup({
+  onClose,
+  onAdd,
+  containerRef,
+  scale,
+  runningApps,
+  pinned,
+  bottom
+}: {
+  onClose: () => void;
+  onAdd: (app: AppInfo) => void;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  scale: number;
+  runningApps: AppInfo[];
+  pinned: AppInfo[];
+  bottom: number;
 }) {
   const [apps, setApps] = useState<AppInfo[]>([]);
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [listIcons, setListIcons] = useState<Record<string, string>>({});
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const mountedRef = useRef(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 150);
@@ -1342,17 +1545,74 @@ function AddAppPopup({ onClose, onAdd, containerRef, scale }: {
     setSelectedIndex(0);
   }, [debouncedSearch]);
 
-  // Scroll selected item into view
+  // Running apps that aren't pinned: already in memory, so the default view is instant.
+  // Matching is fuzzy, a pinned .lnk and its running .exe are the same app.
+  const runningSuggestions = useMemo(
+    () => runningApps.filter((a) => a.path !== "start" && !pinned.some((p) => isSameApp(p, a))),
+    [runningApps, pinned]
+  );
+
+  const sections = useMemo(() => {
+    const s = debouncedSearch.trim().toLowerCase();
+    // No query: running apps, then everything installed, minus what's pinned.
+    // The backend already drops helper entries.
+    if (!s) {
+      const runningIds = new Set(runningSuggestions.map((a) => itemKey(a)));
+      const rest = apps
+        .filter(
+          (a) =>
+            a.path !== "start" &&
+            !pinned.some((p) => isSameApp(p, a)) &&
+            !runningIds.has(itemKey(a))
+        )
+        .slice(0, 60);
+      const out: { title: string | null; items: AppInfo[] }[] = [];
+      if (runningSuggestions.length > 0)
+        out.push({ title: "Running", items: runningSuggestions });
+      if (rest.length > 0) out.push({ title: "All apps", items: rest });
+      return out;
+    }
+    const starts: AppInfo[] = [];
+    const contains: AppInfo[] = [];
+    for (const a of apps) {
+      // Search covers pinned apps too.
+      if (a.path === "start") continue;
+      const n = a.name.toLowerCase();
+      if (n.startsWith(s)) starts.push(a);
+      else if (n.includes(s)) contains.push(a);
+    }
+    const byName = (x: AppInfo, y: AppInfo) => x.name.localeCompare(y.name);
+    starts.sort(byName);
+    contains.sort(byName);
+    return [{ title: null, items: [...starts, ...contains].slice(0, 50) }];
+  }, [apps, debouncedSearch, pinned, runningSuggestions]);
+
+  // Flat selectable list; section headers are not selectable.
+  const flat = useMemo(() => sections.flatMap((s) => s.items), [sections]);
+  const flatIndex = useMemo(() => new Map(flat.map((a, i) => [a, i])), [flat]);
+
+  // Keep selection in range as results narrow.
   useEffect(() => {
+    setSelectedIndex((i) => Math.min(i, Math.max(0, flat.length - 1)));
+  }, [flat.length]);
+
+  // Scroll on keyboard nav only, doing it on mount yanks the list.
+  useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
     if (!listRef.current) return;
-    const row = listRef.current.children[selectedIndex] as HTMLElement | undefined;
-    if (row) row.scrollIntoView({ block: 'nearest' });
+    const row = listRef.current.querySelector(
+      `[data-idx="${selectedIndex}"]`
+    ) as HTMLElement | null;
+    if (row) row.scrollIntoView({ block: "nearest" });
   }, [selectedIndex]);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await invoke<AppInfo[]>('get_installed_apps');
+        const res = await invoke<AppInfo[]>("get_installed_apps");
         setApps(res.sort((a, b) => a.name.localeCompare(b.name)));
       } finally {
         setLoading(false);
@@ -1361,29 +1621,25 @@ function AddAppPopup({ onClose, onAdd, containerRef, scale }: {
     load();
   }, []);
 
-  const filtered = useMemo(() => {
-    const s = debouncedSearch.toLowerCase();
-    if (!s) return apps.slice(0, 20);
-    return apps.filter(a => a.name.toLowerCase().includes(s)).slice(0, 50);
-  }, [apps, debouncedSearch]);
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         onClose();
         return;
       }
-      if (e.key === 'ArrowDown') {
+      if (e.key === "ArrowDown") {
         e.preventDefault();
-        setSelectedIndex(i => Math.min(i + 1, filtered.length - 1));
-      } else if (e.key === 'ArrowUp') {
+        setSelectedIndex((i) => Math.min(i + 1, flat.length - 1));
+      } else if (e.key === "ArrowUp") {
         e.preventDefault();
-        setSelectedIndex(i => Math.max(i - 1, 0));
-      } else if (e.key === 'Enter') {
+        setSelectedIndex((i) => Math.max(i - 1, 0));
+      } else if (e.key === "Enter") {
         e.preventDefault();
-        if (filtered[selectedIndex]) {
-          onAdd(filtered[selectedIndex]);
-        }
+        const target = flat[selectedIndex];
+        if (!target) return;
+        // Already on the dock: just dismiss, never pin twice.
+        if (pinned.some((p) => isSameApp(p, target))) onClose();
+        else onAdd(target);
       }
     };
     const handleMouseDown = (e: MouseEvent) => {
@@ -1393,66 +1649,72 @@ function AddAppPopup({ onClose, onAdd, containerRef, scale }: {
       }
     };
     const handleBlur = () => onClose();
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('blur', handleBlur);
-    document.addEventListener('mousedown', handleMouseDown, true);
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("blur", handleBlur);
+    document.addEventListener("mousedown", handleMouseDown, true);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('blur', handleBlur);
-      document.removeEventListener('mousedown', handleMouseDown, true);
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("blur", handleBlur);
+      document.removeEventListener("mousedown", handleMouseDown, true);
     };
-  }, [onClose, containerRef, filtered, selectedIndex, onAdd]);
+  }, [onClose, containerRef, flat, selectedIndex, onAdd, pinned]);
 
+  // Fetch icons in parallel and apply them as one batch, one at a time looked like the list
+  // shifting. Boxes are fixed size and images fade in.
   useEffect(() => {
     let active = true;
-    const fetchVisibleIcons = async () => {
-      let batch: Record<string, string> = {};
-      let count = 0;
-      for (const app of filtered) {
-        if (!active) break;
-        if (!listIcons[app.path]) {
-          await new Promise(r => setTimeout(r, 20));
-          try {
-            const icon = await invoke<string | null>('get_app_icon', { path: app.path });
-            if (icon && active) {
-              batch[app.path] = icon;
-              count++;
-              if (count >= 6) {
-                setListIcons(prev => ({ ...prev, ...batch }));
-                batch = {};
-                count = 0;
-              }
-            }
-          } catch (err) {
-            console.error(err);
-          }
+    const targets = flat.slice(0, 25).filter((a) => !listIcons[a.path]);
+    if (targets.length === 0) return;
+    Promise.all(
+      targets.map(async (app) => {
+        try {
+          const icon = await invoke<string | null>("get_app_icon", { path: app.path });
+          return [app.path, icon] as const;
+        } catch (err) {
+          console.error(err);
+          return [app.path, null] as const;
         }
-      }
-      if (active && count > 0) setListIcons(prev => ({ ...prev, ...batch }));
+      })
+    ).then((pairs) => {
+      if (!active) return;
+      const batch: Record<string, string> = {};
+      for (const [path, icon] of pairs) if (icon) batch[path] = icon;
+      if (Object.keys(batch).length > 0) setListIcons((prev) => ({ ...prev, ...batch }));
+    });
+    return () => {
+      active = false;
     };
-    fetchVisibleIcons();
-    return () => { active = false; };
-  }, [filtered]);
+  }, [flat, listIcons]);
 
   return (
-    <div className="add-popup-anchor" style={{ zoom: scale }}>
+    <div className="add-popup-anchor" style={{ zoom: scale, bottom }}>
       <motion.div
         ref={containerRef}
         className="add-app-popup"
         style={{ transformOrigin: "bottom center" }}
         initial={{ opacity: 0, scaleY: 0 }}
         animate={{ opacity: 1, scaleY: 1 }}
-        exit={{ opacity: 0, scaleY: 0 }}
+        exit={{ opacity: 0, scaleY: 0, transition: { duration: 0.16, ease: "easeIn" } }}
         transition={{
           opacity: { duration: 0.15 },
-          scaleY: { type: "spring", stiffness: 500, damping: 30, mass: 0.8 },
+          scaleY: { type: "spring", stiffness: 300, damping: 28, mass: 0.9 }
         }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="popup-search-row">
-          <svg className="popup-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8"/>
-            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          <svg
+            className="popup-search-icon"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
           </svg>
           <input
             ref={inputRef}
@@ -1465,33 +1727,59 @@ function AddAppPopup({ onClose, onAdd, containerRef, scale }: {
         </div>
         <div className="popup-apps-scroll" ref={listRef}>
           {loading ? (
-            <div className="popup-loading">
-              <div className="popup-spinner" />
-            </div>
-          ) : filtered.length > 0 ? (
-            filtered.map((app, idx) => {
-              const icon = listIcons[app.path];
-              return (
-                <div
-                  key={app.path}
-                  className={`popup-app-row${idx === selectedIndex ? ' selected' : ''}`}
-                  onClick={() => onAdd(app)}
-                  onMouseEnter={() => setSelectedIndex(idx)}
-                >
-                  <div className="popup-app-icon">
-                    {icon ? (
-                      <img src={icon} alt="" draggable={false} />
-                    ) : (
-                      <span className="popup-app-initial">{app.name[0]}</span>
-                    )}
-                  </div>
-                  <span className="popup-app-name">{app.name}</span>
-                  <span className="popup-app-pin">+</span>
+            <div aria-hidden>
+              {Array.from({ length: 8 }, (_, i) => (
+                <div className="popup-app-row popup-skeleton-row" key={i}>
+                  <div className="popup-app-icon popup-skeleton-box" />
+                  <div className="popup-skeleton-line" />
                 </div>
-              );
-            })
+              ))}
+            </div>
+          ) : flat.length > 0 ? (
+            sections.map((sec) => (
+              <div key={sec.title ?? "all"}>
+                {sec.title && <div className="popup-section-label">{sec.title}</div>}
+                {sec.items.map((app) => {
+                  const gi = flatIndex.get(app) ?? 0;
+                  const icon = listIcons[app.path];
+                  const alreadyPinned = pinned.some((p) => isSameApp(p, app));
+                  return (
+                    <div
+                      key={`${app.path}::${app.name}`}
+                      data-idx={gi}
+                      className={`popup-app-row${gi === selectedIndex ? " selected" : ""}${alreadyPinned ? " is-pinned" : ""}`}
+                      onClick={() => (alreadyPinned ? onClose() : onAdd(app))}
+                      onMouseEnter={() => setSelectedIndex(gi)}
+                    >
+                      <div className="popup-app-icon">
+                        {icon ? (
+                          <img
+                            key={icon}
+                            src={icon}
+                            alt=""
+                            draggable={false}
+                            style={{ opacity: 0 }}
+                            onLoad={(e) => {
+                              e.currentTarget.style.opacity = "1";
+                            }}
+                          />
+                        ) : (
+                          <span className="popup-app-initial">{app.name[0]}</span>
+                        )}
+                      </div>
+                      <span className="popup-app-name">{app.name}</span>
+                      <span className="popup-app-pin">{alreadyPinned ? "✓" : "+"}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ))
           ) : (
-            <div className="popup-empty">No results</div>
+            <div className="popup-empty">
+              {debouncedSearch.trim()
+                ? "No results"
+                : "Running apps show up here — search to pin anything else"}
+            </div>
           )}
         </div>
       </motion.div>

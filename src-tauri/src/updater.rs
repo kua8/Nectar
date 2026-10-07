@@ -200,6 +200,7 @@ async fn install_inner(app: &AppHandle) -> Result<(), String> {
         .updater_builder()
         .installer_args(installer_scope_args())
         .on_before_exit(move || {
+            crate::state::SHUTTING_DOWN.store(true, Ordering::Relaxed);
             let _ = hook_handle.emit("auto-update-status", serde_json::json!({ "status": "installing" }));
             hook_handle.cleanup_before_exit();
         })
