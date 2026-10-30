@@ -1575,7 +1575,7 @@ function App() {
   const isMusicMode = mediaInfo.has_media && nectarMode === 'music' && settingsMusicModeEnabled;
 
   // Second clock beside the time
-  const showDualClock = settingsDualClockEnabled && dualTime !== "";
+  const showDualClock = settingsDualClockEnabled && !settingsLegacyMode && dualTime !== "";
   const dualClockSize = useMemo(
     () => (showDualClock ? measureDualClock(time, dualClockLabel, dualTime, dualDayShift) : null),
     [showDualClock, time, dualClockLabel, dualTime, dualDayShift]

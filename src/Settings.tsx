@@ -148,6 +148,7 @@ function SettingsApp() {
               toggleTimerSound={settings.toggleTimerSound}
               stopwatchEnabled={settings.stopwatchEnabled}
               toggleStopwatchEnabled={settings.toggleStopwatchEnabled}
+              legacyMode={settings.legacyMode}
               dualClockEnabled={settings.dualClockEnabled}
               toggleDualClock={settings.toggleDualClock}
               dualClockZone={settings.dualClockZone}

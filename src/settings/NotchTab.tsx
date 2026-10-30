@@ -45,6 +45,7 @@ interface NotchTabProps {
   toggleTimerSound: () => void;
   stopwatchEnabled: boolean;
   toggleStopwatchEnabled: () => void;
+  legacyMode: boolean;
   dualClockEnabled: boolean;
   toggleDualClock: () => void;
   dualClockZone: string;
@@ -96,6 +97,7 @@ export function NotchTab({
   toggleTimerSound,
   stopwatchEnabled,
   toggleStopwatchEnabled,
+  legacyMode,
   dualClockEnabled,
   toggleDualClock,
   dualClockZone,
@@ -241,21 +243,25 @@ export function NotchTab({
           </label>
         </SettingRow>
 
-        <SettingRow
-          icon={Globe}
-          label="Dual Clock"
-          desc={dualClockEnabled ? [dualClockLabel, zoneOffsetLabel(dualClockZone)].filter(Boolean).join(" · ") : "Show a second time zone next to the time"}
-        >
-          <label className="toggle-switch">
-            <input type="checkbox" checked={dualClockEnabled} onChange={toggleDualClock} />
-            <span className="slider"></span>
-          </label>
-        </SettingRow>
-
-        {dualClockEnabled && (
+        {!legacyMode && (
           <>
-            <DualClockPicker onSelect={selectDualClockZone} />
-            <div className="setting-divider" />
+            <SettingRow
+              icon={Globe}
+              label="Dual Clock"
+              desc={dualClockEnabled ? [dualClockLabel, zoneOffsetLabel(dualClockZone)].filter(Boolean).join(" · ") : "Show a second time zone next to the time"}
+            >
+              <label className="toggle-switch">
+                <input type="checkbox" checked={dualClockEnabled} onChange={toggleDualClock} />
+                <span className="slider"></span>
+              </label>
+            </SettingRow>
+
+            {dualClockEnabled && (
+              <>
+                <DualClockPicker onSelect={selectDualClockZone} />
+                <div className="setting-divider" />
+              </>
+            )}
           </>
         )}
 
