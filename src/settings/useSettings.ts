@@ -76,6 +76,9 @@ export function useSettings() {
   const [dockPreviewEnabled, setDockPreviewEnabled] = useState(true);
   const [dockSearchEnabled, setDockSearchEnabled] = useState(true);
   const [dockCalendarEnabled, setDockCalendarEnabled] = useState(true);
+  const [dockTray, setDockTray] = useState(
+    () => localStorage.getItem("nectar-dock-tray-enabled") !== "false"
+  );
   const [dockTaskView, setDockTaskView] = useState(
     () => localStorage.getItem("nectar-dock-taskview-enabled") === "true"
   );
@@ -191,6 +194,7 @@ export function useSettings() {
       apply(getVal("nectar-dock-preview-enabled"), setDockPreviewEnabled, readBool);
       apply(getVal("nectar-dock-search-enabled"), setDockSearchEnabled, readBool);
       apply(getVal("nectar-dock-calendar-enabled"), setDockCalendarEnabled, readBool);
+      apply(getVal("nectar-dock-tray-enabled"), setDockTray, (v) => v !== "false");
       apply(getVal("nectar-dock-taskview-enabled"), setDockTaskView, readBool);
       apply(getVal("nectar-dock-recycle-enabled"), setDockRecycle, readBool);
       apply(getVal("nectar-dock-drives"), setDockDrives, parseDrives);
@@ -283,6 +287,7 @@ export function useSettings() {
     "nectar-dock-mode-by-monitor": (v) => { try { setDockModeByMonitor(JSON.parse(v)); } catch {} },
     "nectar-notch-mode-by-monitor": (v) => { try { setNotchModeByMonitor(JSON.parse(v)); } catch {} },
     "nectar-dock-enabled": setDockEnabled,
+    "nectar-dock-tray-enabled": (v) => setDockTray(v !== "false"),
     "nectar-dock-taskview-enabled": setDockTaskView,
     "nectar-dock-recycle-enabled": setDockRecycle,
     "nectar-dock-drives": (v) => setDockDrives(parseDrives(v)),
@@ -570,6 +575,12 @@ export function useSettings() {
     const next = !dockSearchEnabled;
     setDockSearchEnabled(next);
     saveSetting("nectar-dock-search-enabled", String(next));
+  };
+
+  const toggleDockTray = () => {
+    const next = !dockTray;
+    setDockTray(next);
+    saveSetting("nectar-dock-tray-enabled", String(next));
   };
 
   const toggleDockTaskView = () => {
@@ -956,6 +967,8 @@ export function useSettings() {
     toggleDockSearch,
     dockCalendarEnabled,
     toggleDockCalendar,
+    dockTray,
+    toggleDockTray,
     dockTaskView,
     toggleDockTaskView,
     dockRecycle,

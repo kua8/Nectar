@@ -130,6 +130,14 @@ function CalendarIcon() {
   );
 }
 
+function ChevronUpIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="6 15 12 9 18 15" />
+    </svg>
+  );
+}
+
 function TaskViewIcon() {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -189,6 +197,7 @@ const Dock = memo(function Dock() {
   const [dockSearchEnabled, setDockSearchEnabled] = useState(() => localStorage.getItem("nectar-dock-search-enabled") !== "false");
   const [dockCalendarEnabled, setDockCalendarEnabled] = useState(() => localStorage.getItem("nectar-dock-calendar-enabled") !== "false");
   const [legacyMode, setLegacyMode] = useState(() => localStorage.getItem("nectar-legacy-mode") === "true");
+  const [dockTray, setDockTray] = useState(() => localStorage.getItem("nectar-dock-tray-enabled") !== "false");
   const [dockTaskView, setDockTaskView] = useState(() => localStorage.getItem("nectar-dock-taskview-enabled") === "true");
   const [dockRecycle, setDockRecycle] = useState(() => localStorage.getItem("nectar-dock-recycle-enabled") === "true");
   const [dockDrives, setDockDrives] = useState<string[]>(() => parseDrives(localStorage.getItem("nectar-dock-drives")));
@@ -377,6 +386,7 @@ const Dock = memo(function Dock() {
       setDockCalendarEnabled(calendarEnabled === "true");
 
       setLegacyMode(getVal("nectar-legacy-mode", "false") === "true");
+      setDockTray(getVal("nectar-dock-tray-enabled", "true") !== "false");
       setDockTaskView(getVal("nectar-dock-taskview-enabled", "false") === "true");
       setDockRecycle(getVal("nectar-dock-recycle-enabled", "false") === "true");
       setDockDrives(parseDrives(getVal("nectar-dock-drives", "[]")));
@@ -446,6 +456,7 @@ const Dock = memo(function Dock() {
       "nectar-dock-search-enabled": setDockSearchEnabled,
       "nectar-dock-calendar-enabled": setDockCalendarEnabled,
       "nectar-legacy-mode": setLegacyMode,
+      "nectar-dock-tray-enabled": (v) => setDockTray(v !== "false"),
       "nectar-dock-taskview-enabled": setDockTaskView,
       "nectar-dock-recycle-enabled": setDockRecycle,
       "nectar-dock-drives": (v) => setDockDrives(parseDrives(v)),
@@ -1108,6 +1119,12 @@ const Dock = memo(function Dock() {
                     <CalendarIcon />
                   </motion.div>
                 </motion.div>
+              )}
+
+              {!legacyMode && dockTray && renderShortcut(
+                'tray', 'Hidden Icons', 0.21,
+                () => invoke('open_tray_at_cursor').catch((err) => console.error('Failed to open tray:', err)),
+                <ChevronUpIcon />
               )}
 
               {!legacyMode && dockTaskView && renderShortcut(

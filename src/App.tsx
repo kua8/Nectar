@@ -416,7 +416,7 @@ function App() {
   const wifiConnected = wifiStatus?.connected ?? false;
   const [bluetoothEnabled, setBluetoothEnabled] = useState(true);
   const [settingsLegacyMode, setSettingsLegacyMode] = useState(() => localStorage.getItem("nectar-legacy-mode") === "true");
-  const [ccView, setCcView] = useState<'main' | 'wifi' | 'bluetooth'>('main');
+  const [ccView, setCcView] = useState<'main' | 'wifi' | 'bluetooth' | 'audio'>('main');
   const showConnections = !settingsLegacyMode && ccView !== 'main';
   const [lanStatus, setLanStatus] = useState<{ present: boolean; connected: boolean; name: string } | null>(null);
   const showLan = !settingsLegacyMode && !!lanStatus?.connected && !(wifiStatus?.enabled && wifiStatus.connected);
@@ -2126,7 +2126,7 @@ function App() {
                       <ConnectionsView
                         kind={ccView}
                         onBack={() => setCcView('main')}
-                        onOpenWindowsSettings={() => { invoke(ccView === 'wifi' ? 'open_wifi_settings' : 'open_bluetooth_settings'); }}
+                        onOpenWindowsSettings={() => { invoke(ccView === 'wifi' ? 'open_wifi_settings' : ccView === 'audio' ? 'open_sound_settings' : 'open_bluetooth_settings'); }}
                       />
                     )}
 
@@ -2248,9 +2248,14 @@ function App() {
                     <div className="cc-classic-sliders-area">
                       {/* Volume Slider */}
                       <div className="cc-classic-slider-row">
-                        <div className="cc-classic-slider-label">
+                        <div
+                          className={`cc-classic-slider-label${settingsLegacyMode ? '' : ' clickable'}`}
+                          title={settingsLegacyMode ? undefined : 'Output device'}
+                          onClick={settingsLegacyMode ? undefined : (e) => { e.stopPropagation(); setCcView('audio'); }}
+                        >
                           <VolumeLowIcon style={{ opacity: 0.5 }} />
                           <span>Volume</span>
+                          {!settingsLegacyMode && <span className="cc-label-more">›</span>}
                         </div>
                         <div className="cc-classic-slider-track">
                           <input
@@ -2448,3 +2453,4 @@ function BatterySaverIcon() {
 }
 
 export default App;
+

@@ -1967,6 +1967,11 @@ pub fn open_calendar_window(app: AppHandle) {
 }
 
 #[tauri::command]
+pub fn open_tray_at_cursor() {
+    std::thread::spawn(|| crate::tray_icons::open_native_tray(None));
+}
+
+#[tauri::command]
 pub fn open_tray_window(app: AppHandle) {
     let anchor = notch_anchor(&app);
     std::thread::spawn(move || crate::tray_icons::open_native_tray(anchor));

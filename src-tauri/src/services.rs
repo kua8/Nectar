@@ -504,10 +504,40 @@ unsafe extern "system" fn taskbar_event_proc(
 }
 
 
+static AUDIO_CAPTURE_REFUSED: AtomicBool = AtomicBool::new(false);
+
+fn consent_value(subkey: &str) -> Option<String> {
+    use windows::core::PCWSTR;
+    use windows::Win32::Foundation::ERROR_SUCCESS;
+    use windows::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_SZ};
+    let key: Vec<u16> = subkey.encode_utf16().chain(Some(0)).collect();
+    let name: Vec<u16> = "Value".encode_utf16().chain(Some(0)).collect();
+    let mut buf = [0u16; 32];
+    let mut len = (buf.len() * 2) as u32;
+    let status = unsafe {
+        RegGetValueW(HKEY_CURRENT_USER, PCWSTR(key.as_ptr()), PCWSTR(name.as_ptr()), RRF_RT_REG_SZ, None, Some(buf.as_mut_ptr() as *mut _), Some(&mut len))
+    };
+    if status != ERROR_SUCCESS { return None; }
+    let n = (len as usize / 2).saturating_sub(1);
+    Some(String::from_utf16_lossy(&buf[..n]))
+}
+
+fn microphone_blocked() -> bool {
+    const BASE: &str = r"Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone";
+    if consent_value(BASE).as_deref() == Some("Deny") { return true; }
+    std::env::current_exe().ok().is_some_and(|exe| {
+        let app_key = exe.to_string_lossy().replace('\\', "#");
+        consent_value(&format!("{BASE}\\NonPackaged\\{app_key}")).as_deref() == Some("Deny")
+    })
+}
+
 fn audio_visualization_wanted(app: &AppHandle) -> bool {
     let setting = crate::utils::get_setting_str(app, "nectar-media-visualizer-enabled")
         .or_else(|| crate::utils::get_setting_str(app, "nectar-visualizer-enabled"));
-    ANY_MEDIA_PLAYING.load(Ordering::Relaxed) && setting.as_deref() != Some("false")
+    ANY_MEDIA_PLAYING.load(Ordering::Relaxed)
+        && setting.as_deref() != Some("false")
+        && !AUDIO_CAPTURE_REFUSED.load(Ordering::Relaxed)
+        && !microphone_blocked()
 }
 
 pub fn setup_audio_visualization(app_handle: AppHandle) {
@@ -727,6 +757,12 @@ pub fn setup_audio_visualization(app_handle: AppHandle) {
                     }
                 })();
 
+                if let Err(e) = &result {
+                    if e.contains("0x80070005") {
+                        AUDIO_CAPTURE_REFUSED.store(true, Ordering::Relaxed);
+                        crate::diagnostics::log("audio visualizer: Windows refused the capture stream, not retrying this session");
+                    }
+                }
                 failures = match &result {
                     Err(e) if e.contains(" failed") => (failures + 1).min(8),
                     _ => 0,

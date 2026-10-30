@@ -17,6 +17,7 @@ mod calendar_sync;
 mod ics;
 mod active_look;
 mod connections;
+mod audio_devices;
 
 use tauri::Manager;
 use windows::Win32::System::Console::SetConsoleCtrlHandler;
@@ -91,6 +92,7 @@ fn main() {
             open_settings_window,
             open_calendar_window,
             open_tray_window,
+            open_tray_at_cursor,
             open_wifi_settings,
             open_sound_settings,
             open_notification_center,
@@ -132,6 +134,8 @@ fn main() {
             set_window_keyboard_focus,
             get_drives,
             open_dock_extra,
+            audio_devices::get_audio_devices,
+            audio_devices::set_default_audio_device,
             connections::get_lan_status,
             connections::open_ethernet_settings,
             connections::wifi_scan,

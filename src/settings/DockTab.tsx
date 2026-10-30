@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent, CSSProperties } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Monitor, Eye, EyeOff, Circle, Search, Shuffle, MonitorCheck, CalendarDays, Maximize2, Keyboard, Sparkles, RotateCcw, LayoutGrid, Trash2, HardDrive } from "lucide-react";
+import { Monitor, Eye, EyeOff, Circle, Search, Shuffle, MonitorCheck, CalendarDays, Maximize2, Keyboard, Sparkles, RotateCcw, LayoutGrid, Trash2, HardDrive, ChevronUp } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { Dropdown } from "./Dropdown";
 import type { MonitorInfo, MonitorMode } from "./types";
@@ -45,6 +45,8 @@ interface DockTabProps {
   dockCalendarEnabled: boolean;
   toggleDockCalendar: () => void;
   legacyMode: boolean;
+  dockTray: boolean;
+  toggleDockTray: () => void;
   dockTaskView: boolean;
   toggleDockTaskView: () => void;
   dockRecycle: boolean;
@@ -83,6 +85,8 @@ export function DockTab({
   dockCalendarEnabled,
   toggleDockCalendar,
   legacyMode,
+  dockTray,
+  toggleDockTray,
   dockTaskView,
   toggleDockTaskView,
   dockRecycle,
@@ -227,6 +231,13 @@ export function DockTab({
 
             {!legacyMode && (
               <>
+                <SettingRow icon={ChevronUp} label="Hidden Icons Button" desc="Show the ^ button that opens the tray icons popup">
+                  <label className="toggle-switch">
+                    <input type="checkbox" checked={dockTray} onChange={toggleDockTray} />
+                    <span className="slider"></span>
+                  </label>
+                </SettingRow>
+
                 <SettingRow icon={LayoutGrid} label="Task View Icon" desc="Show a Task View button next to Start">
                   <label className="toggle-switch">
                     <input type="checkbox" checked={dockTaskView} onChange={toggleDockTaskView} />

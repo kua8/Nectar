@@ -60,6 +60,51 @@ fn find_show_hidden_icons_button(automation: &IUIAutomation, tray_root: &IUIAuto
     }
 }
 
+fn send_keys(keys: &[(windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY, bool)]) {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP};
+    let inputs: Vec<INPUT> = keys
+        .iter()
+        .map(|&(vk, up)| INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT { wVk: vk, wScan: 0, dwFlags: if up { KEYEVENTF_KEYUP } else { Default::default() }, time: 0, dwExtraInfo: 0 },
+            },
+        })
+        .collect();
+    unsafe { SendInput(&inputs, std::mem::size_of::<INPUT>() as i32) };
+}
+
+fn open_with_shortcut() -> bool {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{VK_B, VK_LWIN, VK_RETURN};
+    send_keys(&[(VK_LWIN, false), (VK_B, false), (VK_B, true), (VK_LWIN, true)]);
+    std::thread::sleep(std::time::Duration::from_millis(350));
+    send_keys(&[(VK_RETURN, false), (VK_RETURN, true)]);
+    for _ in 0..40 {
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        if find_overflow_window().is_some_and(|w| unsafe { IsWindowVisible(w) }.as_bool()) {
+            return true;
+        }
+    }
+    false
+}
+
+fn describe_elements(automation: &IUIAutomation, root: &IUIAutomationElement) -> String {
+    unsafe {
+        let Ok(condition) = automation.CreateTrueCondition() else { return "no condition".into() };
+        let Ok(all) = root.FindAll(TreeScope_Descendants, &condition) else { return "FindAll failed".into() };
+        let count = all.Length().unwrap_or(0);
+        let mut parts = Vec::new();
+        for i in 0..count.min(40) {
+            if let Ok(el) = all.GetElement(i) {
+                let id = el.CurrentAutomationId().map(|s| s.to_string()).unwrap_or_default();
+                let name = el.CurrentName().map(|s| s.to_string()).unwrap_or_default();
+                parts.push(format!("{id}|{name}"));
+            }
+        }
+        format!("count={count} [{}]", parts.join("; "))
+    }
+}
+
 fn place_flyout(flyout: HWND, anchor: Option<(i32, i32)>) {
     unsafe {
         let mut cursor = POINT::default();
@@ -91,6 +136,7 @@ pub fn open_native_tray(anchor: Option<(i32, i32)>) {
         let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
     }
 
+    crate::diagnostics::log(&format!("tray: open requested, anchor={anchor:?}, flyout_open={}", FLYOUT_OPEN.load(Ordering::SeqCst)));
     if FLYOUT_OPEN.load(Ordering::SeqCst) {
         if let (Ok(auto), Ok(tray)) = (automation(), find_window(c"Shell_TrayWnd")) {
             if let Ok(root) = unsafe { auto.ElementFromHandle(tray) } {
@@ -101,10 +147,19 @@ pub fn open_native_tray(anchor: Option<(i32, i32)>) {
         }
         return;
     }
-    let Ok(_guard) = AUTOMATION_LOCK.try_lock() else { return };
+    let Ok(_guard) = AUTOMATION_LOCK.try_lock() else {
+        crate::diagnostics::log("tray: another tray action is still running");
+        return;
+    };
 
-    let Ok(tray) = find_window(c"Shell_TrayWnd") else { return };
-    let Ok(auto) = automation() else { return };
+    let Ok(tray) = find_window(c"Shell_TrayWnd") else {
+        crate::diagnostics::log("tray: Shell_TrayWnd not found");
+        return;
+    };
+    let Ok(auto) = automation() else {
+        crate::diagnostics::log("tray: UI Automation unavailable");
+        return;
+    };
 
     let hidden = !unsafe { IsWindowVisible(tray) }.as_bool();
     let was_hidden_by_nectar = hidden && crate::state::NATIVE_TASKBAR_HIDDEN.swap(false, Ordering::SeqCst);
@@ -129,15 +184,26 @@ pub fn open_native_tray(anchor: Option<(i32, i32)>) {
         }
     }
 
+    if !opened {
+        crate::diagnostics::log(&format!("tray: hidden icons button not found or not invokable (taskbar hidden={hidden})"));
+        if let Ok(root) = unsafe { auto.ElementFromHandle(tray) } {
+            crate::diagnostics::log(&format!("tray: taskbar elements: {}", describe_elements(&auto, &root)));
+        }
+        opened = open_with_shortcut();
+        crate::diagnostics::log(&format!("tray: Win+B fallback opened={opened}"));
+    }
     if opened {
         FLYOUT_OPEN.store(true, Ordering::SeqCst);
+        let mut placed = false;
         for _ in 0..40 {
             std::thread::sleep(std::time::Duration::from_millis(50));
             if let Some(flyout) = find_overflow_window() {
                 place_flyout(flyout, anchor);
+                placed = true;
                 break;
             }
         }
+        crate::diagnostics::log(&format!("tray: flyout opened, placed={placed}"));
         std::thread::sleep(std::time::Duration::from_millis(500));
         for _ in 0..2400 {
             if find_overflow_window().is_none_or(|w| !unsafe { IsWindowVisible(w) }.as_bool()) { break; }
@@ -214,3 +280,4 @@ pub fn schedule_taskbar_layout_refresh() {
         crate::state::NATIVE_TASKBAR_HIDDEN.store(true, Ordering::SeqCst);
     });
 }
+

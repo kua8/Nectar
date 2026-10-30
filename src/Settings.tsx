@@ -187,6 +187,8 @@ function SettingsApp() {
               dockCalendarEnabled={settings.dockCalendarEnabled}
               toggleDockCalendar={settings.toggleDockCalendar}
               legacyMode={settings.legacyMode}
+              dockTray={settings.dockTray}
+              toggleDockTray={settings.toggleDockTray}
               dockTaskView={settings.dockTaskView}
               toggleDockTaskView={settings.toggleDockTaskView}
               dockRecycle={settings.dockRecycle}

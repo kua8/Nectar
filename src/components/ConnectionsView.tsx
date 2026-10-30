@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { ChevronLeft, Lock, X, Bluetooth } from "lucide-react";
+import { ChevronLeft, Lock, X, Bluetooth, Check, Speaker } from "lucide-react";
 
 interface WifiNetwork {
   ssid: string;
@@ -16,8 +16,14 @@ interface BluetoothDeviceInfo {
   connected: boolean;
 }
 
+interface OutputDevice {
+  id: string;
+  name: string;
+  is_default: boolean;
+}
+
 interface Props {
-  kind: "wifi" | "bluetooth";
+  kind: "wifi" | "bluetooth" | "audio";
   onBack: () => void;
   onOpenWindowsSettings: () => void;
 }
@@ -38,6 +44,7 @@ function SignalBars({ signal }: { signal: number }) {
 export function ConnectionsView({ kind, onBack, onOpenWindowsSettings }: Props) {
   const [networks, setNetworks] = useState<WifiNetwork[] | null>(null);
   const [devices, setDevices] = useState<BluetoothDeviceInfo[] | null>(null);
+  const [outputs, setOutputs] = useState<OutputDevice[] | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
   const [passwordFor, setPasswordFor] = useState<string | null>(null);
@@ -55,11 +62,13 @@ export function ConnectionsView({ kind, onBack, onOpenWindowsSettings }: Props) 
   const refresh = useCallback(async () => {
     try {
       if (kind === "wifi") setNetworks(await invoke<WifiNetwork[]>("wifi_scan"));
+      else if (kind === "audio") setOutputs(await invoke<OutputDevice[]>("get_audio_devices"));
       else setDevices(await invoke<BluetoothDeviceInfo[]>("bluetooth_devices"));
       setError("");
     } catch (e) {
       setError(String(e));
       if (kind === "wifi") setNetworks((prev) => prev ?? []);
+      else if (kind === "audio") setOutputs((prev) => prev ?? []);
       else setDevices((prev) => prev ?? []);
     }
   }, [kind]);
@@ -103,8 +112,11 @@ export function ConnectionsView({ kind, onBack, onOpenWindowsSettings }: Props) 
     void run(ssid, () => invoke("wifi_connect", { ssid, password: key }));
   };
 
-  const loading = kind === "wifi" ? networks === null : devices === null;
-  const empty = kind === "wifi" ? networks?.length === 0 : devices?.length === 0;
+  const list = kind === "wifi" ? networks : kind === "audio" ? outputs : devices;
+  const loading = list === null;
+  const empty = list?.length === 0;
+  const title = kind === "wifi" ? "Wi-Fi networks" : kind === "audio" ? "Output devices" : "Bluetooth devices";
+  const emptyText = kind === "wifi" ? "No networks found" : kind === "audio" ? "No output devices" : "No paired devices";
 
   return (
     <div className="cv-root" onClick={(e) => e.stopPropagation()}>
@@ -112,15 +124,25 @@ export function ConnectionsView({ kind, onBack, onOpenWindowsSettings }: Props) 
         <button className="cv-back" onClick={onBack} aria-label="Back">
           <ChevronLeft size={16} />
         </button>
-        <span className="cv-title">{kind === "wifi" ? "Wi-Fi networks" : "Bluetooth devices"}</span>
+        <span className="cv-title">{title}</span>
         <button className="cv-link" onClick={onOpenWindowsSettings}>Windows settings</button>
       </div>
 
       <div className="cv-list">
         {loading && <div className="cv-hint">{kind === "wifi" ? "Scanning…" : "Loading…"}</div>}
-        {!loading && empty && !error && (
-          <div className="cv-hint">{kind === "wifi" ? "No networks found" : "No paired devices"}</div>
-        )}
+        {!loading && empty && !error && <div className="cv-hint">{emptyText}</div>}
+
+        {kind === "audio" && outputs?.map((o) => (
+          <div
+            key={o.id}
+            className={`cv-row${o.is_default ? " connected" : ""}${busy === o.id ? " busy" : ""}`}
+            onClick={() => { if (!o.is_default) void run(o.id, () => invoke("set_default_audio_device", { id: o.id })); }}
+          >
+            <Speaker size={13} className="cv-bt-icon" />
+            <span className="cv-name">{o.name}</span>
+            {o.is_default ? <Check size={14} /> : <span className="cv-status">{busy === o.id ? "Switching…" : ""}</span>}
+          </div>
+        ))}
 
         {kind === "wifi" && networks?.map((n) => (
           <div key={n.ssid}>
@@ -188,3 +210,4 @@ export function ConnectionsView({ kind, onBack, onOpenWindowsSettings }: Props) 
     </div>
   );
 }
+

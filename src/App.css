@@ -2313,3 +2313,6 @@ img {
 .tour-btn { height: 26px; border: 0; border-radius: 8px; padding: 0 14px; font-size: 12px; font-weight: 600; cursor: pointer; background: var(--nectar-text, rgba(255, 255, 255, 0.92)); color: var(--nectar-bg-expanded, #000); }
 .tour-btn.ghost { background: var(--nectar-group-bg, rgba(255, 255, 255, 0.1)); color: inherit; font-weight: 500; }
 .tour-btn:hover { filter: brightness(0.9); }
+.cc-classic-slider-label.clickable { cursor: pointer; border-radius: 6px; }
+.cc-classic-slider-label.clickable:hover { background: rgba(255, 255, 255, 0.08); }
+.cc-label-more { opacity: 0.55; margin-left: 2px; font-size: 12px; line-height: 1; }
