@@ -83,6 +83,9 @@ With **All Monitors** and more than one display, the **Per-Monitor Behavior** to
 | `nectar-timer-enabled` | `"true"` / `"false"` | follows `nectar-calendar-enabled` | Show the countdown timer (presets and a custom time) in the notch's calendar panel. |
 | `nectar-timer-sound-enabled` | `"true"` / `"false"` | `"true"` | Play a short chime when the countdown timer finishes. |
 | `nectar-stopwatch-enabled` | `"true"` / `"false"` | follows `nectar-calendar-enabled` | Show the stopwatch (with laps) next to the timer. |
+| `nectar-dual-clock-enabled` | `"true"` / `"false"` | `"false"` | Show a second clock for another time zone next to the time in the notch. Follows `nectar-time-format-24h`, and shows `+1` / `−1` when that zone is on a different day. |
+| `nectar-dual-clock-zone` | IANA time zone string | `"UTC"` | Time zone of the second clock, for example `"Asia/Tokyo"`. Set by searching a city or time zone in Settings › Notch › Dual Clock. |
+| `nectar-dual-clock-label` | string | `"UTC"` | Name shown beside the second clock, for example `"Tokyo"`. |
 | `nectar-calendar-view` | `"day"` / `"week"` / `"month"` / `"agenda"` | `"month"` | Which view the notch calendar shows once a calendar source is connected. Set by the Day / Week / Month / Agenda switcher in the notch. |
 | `nectar-music-mode-enabled` | `"true"` / `"false"` | `"true"` | Enable interactive music media widget. |
 | `nectar-music-compact-notch` | `"true"` / `"false"` | `"true"` | Show compact music display (visualizer + artwork) in collapsed notch. |

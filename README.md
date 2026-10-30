@@ -55,6 +55,8 @@ A notch at the top of your screen that adapts to what you're doing. Scroll or sw
 | **Status** | Battery (hidden automatically on desktops without one) and weather, in a layout you choose. |
 | **Calendar** | A month view with a built-in Pomodoro timer. |
 
+Turn on **Dual Clock** (Settings › Notch) to show a second time zone next to the time, for a city you search for.
+
 Width, height, corner radius, and position each animate on their own spring, so every transition feels physical.
 
 **Visibility modes** (Settings › Notch):

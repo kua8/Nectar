@@ -6,6 +6,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import type { UpdateCheckResult } from "../updater";
 import { useSettingsSync } from "../hooks/useSettingsSync";
 import { hexToHsl } from "../theme";
+import { DEFAULT_DUAL_CLOCK_ZONE } from "../dualClock";
 import type { WidgetConfig, MonitorInfo, MonitorMode } from "./types";
 
 function saveSetting(key: string, value: string) {
@@ -33,6 +34,15 @@ export function useSettings() {
   const [timerEnabled, setTimerEnabled] = useState(true);
   const [timerSoundEnabled, setTimerSoundEnabled] = useState(true);
   const [stopwatchEnabled, setStopwatchEnabled] = useState(true);
+  const [dualClockEnabled, setDualClockEnabled] = useState(
+    () => localStorage.getItem("nectar-dual-clock-enabled") === "true"
+  );
+  const [dualClockZone, setDualClockZone] = useState(
+    () => localStorage.getItem("nectar-dual-clock-zone") || DEFAULT_DUAL_CLOCK_ZONE
+  );
+  const [dualClockLabel, setDualClockLabel] = useState(
+    () => localStorage.getItem("nectar-dual-clock-label") || DEFAULT_DUAL_CLOCK_ZONE
+  );
   const [musicModeEnabled, setMusicModeEnabled] = useState(true);
   const [musicCompactNotch, setMusicCompactNotch] = useState(true);
   const [volumeOverlayEnabled, setVolumeOverlayEnabled] = useState(true);
@@ -177,6 +187,9 @@ export function useSettings() {
       apply(getVal("nectar-timer-enabled") ?? getVal("nectar-calendar-enabled"), setTimerEnabled, readBool);
       apply(getVal("nectar-timer-sound-enabled"), setTimerSoundEnabled, readBool);
       apply(getVal("nectar-stopwatch-enabled") ?? getVal("nectar-calendar-enabled"), setStopwatchEnabled, readBool);
+      apply(getVal("nectar-dual-clock-enabled"), setDualClockEnabled, readBool);
+      apply(getVal("nectar-dual-clock-zone"), setDualClockZone, (v) => v);
+      apply(getVal("nectar-dual-clock-label"), setDualClockLabel, (v) => v);
       apply(getVal("nectar-music-mode-enabled"), setMusicModeEnabled, readBool);
       apply(getVal("nectar-music-compact-notch"), setMusicCompactNotch, readBool);
       apply(getVal("nectar-volume-overlay-enabled"), setVolumeOverlayEnabled, readBool);
@@ -304,6 +317,9 @@ export function useSettings() {
     "nectar-timer-enabled": setTimerEnabled,
     "nectar-timer-sound-enabled": setTimerSoundEnabled,
     "nectar-stopwatch-enabled": setStopwatchEnabled,
+    "nectar-dual-clock-enabled": setDualClockEnabled,
+    "nectar-dual-clock-zone": (v) => setDualClockZone(String(v)),
+    "nectar-dual-clock-label": (v) => setDualClockLabel(String(v)),
     "nectar-music-mode-enabled": setMusicModeEnabled,
     "nectar-music-compact-notch": setMusicCompactNotch,
     "nectar-media-ambience-enabled": setMediaAmbienceEnabled,
@@ -474,6 +490,19 @@ export function useSettings() {
     const next = !stopwatchEnabled;
     setStopwatchEnabled(next);
     saveSetting("nectar-stopwatch-enabled", String(next));
+  };
+
+  const toggleDualClock = () => {
+    const next = !dualClockEnabled;
+    setDualClockEnabled(next);
+    saveSetting("nectar-dual-clock-enabled", String(next));
+  };
+
+  const selectDualClockZone = ({ label, zone }: { label: string; zone: string }) => {
+    setDualClockZone(zone);
+    setDualClockLabel(label);
+    saveSetting("nectar-dual-clock-zone", zone);
+    saveSetting("nectar-dual-clock-label", label);
   };
 
   const toggleMusicMode = () => {
@@ -927,6 +956,11 @@ export function useSettings() {
     toggleTimerSound,
     stopwatchEnabled,
     toggleStopwatchEnabled,
+    dualClockEnabled,
+    toggleDualClock,
+    dualClockZone,
+    dualClockLabel,
+    selectDualClockZone,
     musicModeEnabled,
     toggleMusicMode,
     musicCompactNotch,
