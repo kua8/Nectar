@@ -556,8 +556,11 @@ pub fn setup_audio_visualization(app_handle: AppHandle) {
 
                     let mut last_device_check = std::time::Instant::now();
                     loop {
-                        std::thread::sleep(std::time::Duration::from_millis(32));
-                        
+                        // Idle only drains the 1s loopback buffer, so wake far less often than
+                        // while visualizing.
+                        let idle = !ANY_MEDIA_PLAYING.load(Ordering::Relaxed);
+                        std::thread::sleep(std::time::Duration::from_millis(if idle { 200 } else { 32 }));
+
                         if last_device_check.elapsed().as_secs() >= 2 {
                             last_device_check = std::time::Instant::now();
                             if let Ok(new_device) = enumerator.GetDefaultAudioEndpoint(eRender, eConsole) {
@@ -3197,7 +3200,8 @@ pub fn start_window_style_guard(app: AppHandle) {
                     GetWindowLongPtrW, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT,
                 };
                 let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as usize;
-                let want = (WS_EX_TOOLWINDOW.0 | WS_EX_NOACTIVATE.0) as usize;
+                let keyboard = is_dock && crate::state::DOCK_KEYBOARD_FOCUS.load(Ordering::Relaxed);
+                let want = if keyboard { WS_EX_TOOLWINDOW.0 as usize } else { (WS_EX_TOOLWINDOW.0 | WS_EX_NOACTIVATE.0) as usize };
                 if ex & want != want {
                     SetWindowLongPtrW(hwnd, GWL_EXSTYLE, (ex | want) as isize);
                 }

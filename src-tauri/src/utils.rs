@@ -511,7 +511,9 @@ pub fn re_assert_topmost(hwnd: HWND) {
         // Re-stamp NOACTIVATE + TOOLWINDOW — HWND_TOPMOST can cause these to be reset
         // by the shell on some Windows builds
         let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as usize;
-        let new_ex = ex | WS_EX_NOACTIVATE.0 as usize | WS_EX_TOOLWINDOW.0 as usize;
+        let keep_focusable = crate::state::DOCK_KEYBOARD_FOCUS.load(std::sync::atomic::Ordering::Relaxed);
+        let noactivate = if keep_focusable { 0 } else { WS_EX_NOACTIVATE.0 as usize };
+        let new_ex = ex | noactivate | WS_EX_TOOLWINDOW.0 as usize;
         SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_ex as isize);
     }
 }

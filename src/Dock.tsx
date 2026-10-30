@@ -1542,8 +1542,14 @@ function AddAppPopup({
     return () => clearTimeout(timer);
   }, [search]);
 
+  // The dock window is non-activating; let it take keys while this popup is open.
   useEffect(() => {
-    inputRef.current?.focus();
+    invoke('set_dock_keyboard_focus', { enabled: true })
+      .catch(() => {})
+      .finally(() => inputRef.current?.focus());
+    return () => {
+      invoke('set_dock_keyboard_focus', { enabled: false }).catch(() => {});
+    };
   }, []);
 
   // Reset selection when search changes

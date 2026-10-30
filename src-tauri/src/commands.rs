@@ -18,6 +18,27 @@ pub async fn set_menu_open(open: bool, rect: Option<IntRect>) {
     }
 }
 
+/// The dock is WS_EX_NOACTIVATE so it never steals focus, which also stops text fields in its
+/// popups from receiving keys. Lift the style while such a popup is open, restore it after.
+#[tauri::command]
+pub fn set_dock_keyboard_focus(window: Window, enabled: bool) {
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetWindowLongPtrW, SetForegroundWindow, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_NOACTIVATE,
+    };
+    crate::state::DOCK_KEYBOARD_FOCUS.store(enabled, Ordering::Relaxed);
+    let Ok(hwnd) = window.hwnd() else { return };
+    unsafe {
+        let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as usize;
+        let noactivate = WS_EX_NOACTIVATE.0 as usize;
+        if enabled {
+            SetWindowLongPtrW(hwnd, GWL_EXSTYLE, (ex & !noactivate) as isize);
+            let _ = SetForegroundWindow(hwnd);
+        } else {
+            SetWindowLongPtrW(hwnd, GWL_EXSTYLE, (ex | noactivate) as isize);
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn set_dock_hovered(window: Window, hovered: bool) {
     crate::state::set_flag(crate::state::dock_hovered(), window.label(), hovered);
