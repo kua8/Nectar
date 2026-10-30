@@ -26,6 +26,9 @@ Edit `settings.json` with any text editor while Nectar is running. Changes are a
 | `nectar-dock-preview-enabled` | `"true"` / `"false"` | `"true"` | Show window thumbnail previews when hovering dock icons. |
 | `nectar-dock-search-enabled` | `"true"` / `"false"` | `"true"` | Show a search icon next to Start that opens Windows Search (Win+S). |
 | `nectar-dock-calendar-enabled` | `"true"` / `"false"` | `"true"` | Show a calendar icon next to the search icon that opens the Calendar window. The Calendar window is also in the dock's Nectar Options menu, the tray menu, and the notch calendar's open button. |
+| `nectar-dock-taskview-enabled` | `"true"` / `"false"` | `"false"` | Show a Task View button next to the calendar icon (Win+Tab). Hidden in Legacy Mode. |
+| `nectar-dock-recycle-enabled` | `"true"` / `"false"` | `"false"` | Show the Recycle Bin in the dock. Hidden in Legacy Mode. |
+| `nectar-dock-drives` | JSON array, e.g. `["C","D"]` | `[]` | Drive letters to show as dock buttons that open the drive in Explorer. Hidden in Legacy Mode. |
 | `nectar-dock-icon-only` | `"true"` / `"false"` | `"false"` | Minimal icon-only style (no background/padding around icons). |
 | `nectar-start-icon` | `"default"` / `"windows"` / `custom:<data URI>` | `"default"` | Start button icon in the dock: the Nectar logo, the Windows logo, or an uploaded image (`custom:` followed by its data URI). |
 | `nectar-dock-adaptive` | `"true"` / `"false"` | `"false"` | Fixed dock only. Stretch the dock to full width like a traditional taskbar while a window is maximized, and contract back when it's restored. |
@@ -161,6 +164,8 @@ Example:
 | `nectar-show-update-indicator` | `"true"` / `"false"` | `"true"` | Show a green dot on the notch when an update is available. |
 | `nectar-hide-in-fullscreen` | `"true"` / `"false"` | `"true"` | Hide the dock, and disable its hover reveal, while a fullscreen app (game or video) is in front. The notch is not affected. |
 | `nectar-time-format-24h` | `"true"` / `"false"` | `"false"` | Use 24-hour clock format in the notch. When `"false"`, displays 12-hour format with AM/PM. |
+| `nectar-tour-seen` | `"1"` | unset | Set once the first-run tour has been finished or skipped. Delete it to see the tour again, or use Settings > About > Replay Tour. |
+| `nectar-legacy-mode` | `"true"` / `"false"` | `"false"` | Keep the classic notch and dock. Turns off features added after 1.4 (dock Task View, Recycle Bin and drive buttons, and later additions). Settings > General > Legacy Mode. |
 
 ### Internal (Do Not Edit Manually)
 

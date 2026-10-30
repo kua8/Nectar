@@ -98,6 +98,8 @@ function SettingsApp() {
               toggleAutostart={settings.toggleAutostart}
               timeFormat24h={settings.timeFormat24h}
               toggleTimeFormat24h={settings.toggleTimeFormat24h}
+              legacyMode={settings.legacyMode}
+              toggleLegacyMode={settings.toggleLegacyMode}
               showUpdateIndicator={settings.showUpdateIndicator}
               toggleUpdateIndicator={settings.toggleUpdateIndicator}
               lowBatteryThreshold={settings.lowBatteryThreshold}
@@ -184,6 +186,13 @@ function SettingsApp() {
               toggleDockSearch={settings.toggleDockSearch}
               dockCalendarEnabled={settings.dockCalendarEnabled}
               toggleDockCalendar={settings.toggleDockCalendar}
+              legacyMode={settings.legacyMode}
+              dockTaskView={settings.dockTaskView}
+              toggleDockTaskView={settings.toggleDockTaskView}
+              dockRecycle={settings.dockRecycle}
+              toggleDockRecycle={settings.toggleDockRecycle}
+              dockDrives={settings.dockDrives}
+              toggleDockDrive={settings.toggleDockDrive}
               dockIconOnly={settings.dockIconOnly}
               toggleDockIconOnly={settings.toggleDockIconOnly}
               dockAdaptive={settings.dockAdaptive}

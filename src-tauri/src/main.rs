@@ -16,6 +16,7 @@ mod caldav;
 mod calendar_sync;
 mod ics;
 mod active_look;
+mod connections;
 
 use tauri::Manager;
 use windows::Win32::System::Console::SetConsoleCtrlHandler;
@@ -128,7 +129,17 @@ fn main() {
             remove_custom_icon,
             get_custom_icons,
             set_menu_open,
-            set_dock_keyboard_focus,
+            set_window_keyboard_focus,
+            get_drives,
+            open_dock_extra,
+            connections::get_lan_status,
+            connections::open_ethernet_settings,
+            connections::wifi_scan,
+            connections::wifi_connect,
+            connections::wifi_disconnect,
+            connections::wifi_forget,
+            connections::bluetooth_devices,
+            connections::bluetooth_unpair,
             focus_window,
             focus_app_windows,
             close_window,

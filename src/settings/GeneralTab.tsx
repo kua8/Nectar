@@ -1,4 +1,4 @@
-import { Power, Download, Clock, BatteryWarning, RefreshCw, LogOut } from "lucide-react";
+import { Power, Download, Clock, History, BatteryWarning, RefreshCw, LogOut } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 
 interface GeneralTabProps {
@@ -6,6 +6,8 @@ interface GeneralTabProps {
   toggleAutostart: () => void;
   timeFormat24h: boolean;
   toggleTimeFormat24h: () => void;
+  legacyMode: boolean;
+  toggleLegacyMode: () => void;
   showUpdateIndicator: boolean;
   toggleUpdateIndicator: () => void;
   lowBatteryThreshold: number;
@@ -19,6 +21,8 @@ export function GeneralTab({
   toggleAutostart,
   timeFormat24h,
   toggleTimeFormat24h,
+  legacyMode,
+  toggleLegacyMode,
   showUpdateIndicator,
   toggleUpdateIndicator,
   lowBatteryThreshold,
@@ -47,6 +51,17 @@ export function GeneralTab({
         <SettingRow icon={Clock} label="24-Hour Time" desc="Use 24-hour clock format">
           <label className="toggle-switch">
             <input type="checkbox" checked={timeFormat24h} onChange={toggleTimeFormat24h} />
+            <span className="slider"></span>
+          </label>
+        </SettingRow>
+
+        <SettingRow
+          icon={History}
+          label="Legacy Mode"
+          desc="Keep the classic notch and dock. Turns off features added since 1.4"
+        >
+          <label className="toggle-switch">
+            <input type="checkbox" checked={legacyMode} onChange={toggleLegacyMode} />
             <span className="slider"></span>
           </label>
         </SettingRow>

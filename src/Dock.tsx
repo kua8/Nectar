@@ -84,6 +84,15 @@ const isIdentifier = (p: string) => !p.includes('/') && !p.includes('\\');
 const isNectarWindow = (app: { name: string; path: string }) =>
   app.path.toLowerCase().includes('nectar.exe') || app.name.toLowerCase() === 'nectar';
 
+function parseDrives(val: string | null): string[] {
+  try {
+    const parsed = JSON.parse(val ?? "[]");
+    return Array.isArray(parsed) ? parsed.filter((d): d is string => typeof d === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 // Start button icon: a public asset, or the data URI of an uploaded icon ("custom:" prefix).
 function resolveStartIcon(startIcon: string): string {
   if (startIcon === "windows") return "/windows.png";
@@ -121,6 +130,36 @@ function CalendarIcon() {
   );
 }
 
+function TaskViewIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="5" width="14" height="11" rx="2.5" />
+      <path d="M7 19.5h12a2.5 2.5 0 0 0 2.5-2.5V9.5" />
+    </svg>
+  );
+}
+
+function RecycleIcon() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 7h16" />
+      <path d="M9 7V4.5h6V7" />
+      <path d="M6 7l1 13h10l1-13" />
+      <line x1="10" y1="11" x2="10" y2="16" />
+      <line x1="14" y1="11" x2="14" y2="16" />
+    </svg>
+  );
+}
+
+function DriveIcon({ letter }: { letter: string }) {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2.5" y="7" width="19" height="10" rx="3" />
+      <text x="12" y="14.6" textAnchor="middle" fontSize="7.5" fontWeight="700" fill="currentColor" stroke="none">{letter}</text>
+    </svg>
+  );
+}
+
 // One dot per open window, capped at three.
 function WindowDots({ count }: { count: number }) {
   return (
@@ -149,6 +188,10 @@ const Dock = memo(function Dock() {
   const [dockPreviewEnabled, setDockPreviewEnabled] = useState(() => localStorage.getItem("nectar-dock-preview-enabled") !== "false");
   const [dockSearchEnabled, setDockSearchEnabled] = useState(() => localStorage.getItem("nectar-dock-search-enabled") !== "false");
   const [dockCalendarEnabled, setDockCalendarEnabled] = useState(() => localStorage.getItem("nectar-dock-calendar-enabled") !== "false");
+  const [legacyMode, setLegacyMode] = useState(() => localStorage.getItem("nectar-legacy-mode") === "true");
+  const [dockTaskView, setDockTaskView] = useState(() => localStorage.getItem("nectar-dock-taskview-enabled") === "true");
+  const [dockRecycle, setDockRecycle] = useState(() => localStorage.getItem("nectar-dock-recycle-enabled") === "true");
+  const [dockDrives, setDockDrives] = useState<string[]>(() => parseDrives(localStorage.getItem("nectar-dock-drives")));
   const [dockIconOnly, setDockIconOnly] = useState(() => localStorage.getItem("nectar-dock-icon-only") === "true");
   const [dockAdaptive, setDockAdaptive] = useState(() => localStorage.getItem("nectar-dock-adaptive") === "true");
   const [startIcon, setStartIcon] = useState(() => localStorage.getItem("nectar-start-icon") || "default");
@@ -333,6 +376,11 @@ const Dock = memo(function Dock() {
       const calendarEnabled = getVal("nectar-dock-calendar-enabled", "true");
       setDockCalendarEnabled(calendarEnabled === "true");
 
+      setLegacyMode(getVal("nectar-legacy-mode", "false") === "true");
+      setDockTaskView(getVal("nectar-dock-taskview-enabled", "false") === "true");
+      setDockRecycle(getVal("nectar-dock-recycle-enabled", "false") === "true");
+      setDockDrives(parseDrives(getVal("nectar-dock-drives", "[]")));
+
       const iconOnly = getVal("nectar-dock-icon-only", "false");
       setDockIconOnly(iconOnly === "true");
 
@@ -397,6 +445,10 @@ const Dock = memo(function Dock() {
       "nectar-dock-preview-enabled": setDockPreviewEnabled,
       "nectar-dock-search-enabled": setDockSearchEnabled,
       "nectar-dock-calendar-enabled": setDockCalendarEnabled,
+      "nectar-legacy-mode": setLegacyMode,
+      "nectar-dock-taskview-enabled": setDockTaskView,
+      "nectar-dock-recycle-enabled": setDockRecycle,
+      "nectar-dock-drives": (v) => setDockDrives(parseDrives(v)),
       "nectar-dock-icon-only": setDockIconOnly,
       "nectar-dock-adaptive": setDockAdaptive,
       "nectar-start-icon": setStartIcon,
@@ -899,6 +951,31 @@ const Dock = memo(function Dock() {
     tap: { scale: 0.95 }
   };
 
+  const renderShortcut = (id: string, label: string, delay: number, onClick: () => void, icon: React.ReactNode) => (
+    <motion.div
+      key={id}
+      initial={{ opacity: 0, scale: 0 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ opacity: { duration: 0.15, delay }, scale: { type: "spring", stiffness: 400, damping: 25, delay } }}
+      className="dock-icon-wrapper"
+      onMouseEnter={() => setHoveredApp(id)}
+      onMouseLeave={() => { setHoveredApp(null); setPressedApp(null); }}
+    >
+      {(!dockPreviewEnabled || hoveredApp === id) && <div className="tooltip">{label}</div>}
+      <motion.div
+        className="dock-icon"
+        variants={iconVariants}
+        animate={pressedApp === id ? "tap" : (hoveredApp === id ? "hover" : "idle")}
+        onPointerDown={() => setPressedApp(id)}
+        onPointerUp={() => setPressedApp(null)}
+        onPointerCancel={() => setPressedApp(null)}
+        onClick={(e) => { e.stopPropagation(); onClick(); }}
+      >
+        {icon}
+      </motion.div>
+    </motion.div>
+  );
+
   return (
     <div className={`dock-container ${isDragging ? 'dragging' : ''}`} onClick={closeMenu}>
       <div style={{ width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'flex-end' }}>
@@ -1031,6 +1108,24 @@ const Dock = memo(function Dock() {
                     <CalendarIcon />
                   </motion.div>
                 </motion.div>
+              )}
+
+              {!legacyMode && dockTaskView && renderShortcut(
+                'taskview', 'Task View', 0.22,
+                () => invoke('open_app', { appName: 'taskview' }).catch((err) => console.error('Failed to open Task View:', err)),
+                <TaskViewIcon />
+              )}
+
+              {!legacyMode && dockDrives.map((letter, i) => renderShortcut(
+                `drive-${letter}`, `Drive ${letter}:`, 0.24 + i * 0.02,
+                () => invoke('open_dock_extra', { target: letter }).catch((err) => console.error('Failed to open drive:', err)),
+                <DriveIcon letter={letter} />
+              ))}
+
+              {!legacyMode && dockRecycle && renderShortcut(
+                'recycle', 'Recycle Bin', 0.26 + dockDrives.length * 0.02,
+                () => invoke('open_dock_extra', { target: 'recycle' }).catch((err) => console.error('Failed to open Recycle Bin:', err)),
+                <RecycleIcon />
               )}
 
               {!dockMixedReorder ? (
@@ -1542,13 +1637,12 @@ function AddAppPopup({
     return () => clearTimeout(timer);
   }, [search]);
 
-  // The dock window is non-activating; let it take keys while this popup is open.
   useEffect(() => {
-    invoke('set_dock_keyboard_focus', { enabled: true })
+    invoke('set_window_keyboard_focus', { enabled: true })
       .catch(() => {})
       .finally(() => inputRef.current?.focus());
     return () => {
-      invoke('set_dock_keyboard_focus', { enabled: false }).catch(() => {});
+      invoke('set_window_keyboard_focus', { enabled: false }).catch(() => {});
     };
   }, []);
 
