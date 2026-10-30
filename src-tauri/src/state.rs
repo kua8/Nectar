@@ -11,9 +11,7 @@ pub static NATIVE_TASKBAR_HIDDEN: AtomicBool = AtomicBool::new(false);
 pub static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
 /// This launch follows a restart or a crash, so calendars should sync right away.
 pub static RELAUNCHED: AtomicBool = AtomicBool::new(false);
-/// A dock popup has a text field open, so the dock window may take keyboard focus.
-/// While set, the NOACTIVATE style is not re-stamped.
-pub static DOCK_KEYBOARD_FOCUS: AtomicBool = AtomicBool::new(false);
+pub static KEYBOARD_FOCUS_LABEL: Mutex<Option<String>> = Mutex::new(None);
 
 macro_rules! label_map {
     ($fn_name:ident, $val_ty:ty) => {

@@ -14,6 +14,8 @@ import { useTrailingThrottle } from "./hooks/useTrailingThrottle";
 import { useCaldav } from "./hooks/useCaldav";
 import { NotchCalendar } from "./components/NotchCalendar";
 import { NotchClock, StopwatchReadout } from "./components/NotchClock";
+import { ConnectionsView } from "./components/ConnectionsView";
+import { NotchTour } from "./components/NotchTour";
 import { useStopwatch } from "./hooks/useStopwatch";
 import type { WidgetConfig } from "./components/StatusWidgetConfig";
 import {
@@ -92,6 +94,32 @@ function WifiIcon({ enabled, connected }: { enabled: boolean; connected: boolean
       <path d="M1.42 9a16 16 0 0 1 21.16 0" />
       <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
       <line x1="12" y1="20" x2="12.01" y2="20" />
+    </svg>
+  );
+}
+
+function formatDuration(seconds: number): string {
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+function batteryTooltip(charging: boolean, level: number, secondsLeft: number | null): string {
+  if (charging && level >= 100) return "Fully charged";
+  const state = charging ? "Charging" : "On battery";
+  if (secondsLeft === null || secondsLeft <= 0) return `${state} — ${level}%`;
+  return `${state} — ${level}%, ${formatDuration(secondsLeft)} ${charging ? "until full" : "left"}`;
+}
+
+function EthernetIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="4" width="16" height="11" rx="2" />
+      <path d="M8 15v3h8v-3" />
+      <line x1="9" y1="8" x2="9" y2="11" />
+      <line x1="12" y1="8" x2="12" y2="11" />
+      <line x1="15" y1="8" x2="15" y2="11" />
     </svg>
   );
 }
@@ -324,6 +352,8 @@ function App() {
 
   const [batteryLevel, setBatteryLevel] = useState(100);
   const [isCharging, setIsCharging] = useState(false);
+  const [batterySecondsLeft, setBatterySecondsLeft] = useState<number | null>(null);
+  const [widgetTip, setWidgetTip] = useState<string | null>(null);
   const [hasBattery, setHasBattery] = useState(true);
   const [showPowerPulse, setShowPowerPulse] = useState(false);
   const [showLowBatteryPulse, setShowLowBatteryPulse] = useState(false);
@@ -396,6 +426,11 @@ function App() {
   const wifiEnabled = wifiStatus?.enabled ?? false;
   const wifiConnected = wifiStatus?.connected ?? false;
   const [bluetoothEnabled, setBluetoothEnabled] = useState(true);
+  const [settingsLegacyMode, setSettingsLegacyMode] = useState(() => localStorage.getItem("nectar-legacy-mode") === "true");
+  const [ccView, setCcView] = useState<'main' | 'wifi' | 'bluetooth'>('main');
+  const showConnections = !settingsLegacyMode && ccView !== 'main';
+  const [lanStatus, setLanStatus] = useState<{ present: boolean; connected: boolean; name: string } | null>(null);
+  const showLan = !settingsLegacyMode && !!lanStatus?.connected && !(wifiStatus?.enabled && wifiStatus.connected);
   const [batterySaverEnabled, setBatterySaverEnabled] = useState(false);
   const [currentBrightness, setCurrentBrightness] = useState(50);
 
@@ -648,8 +683,12 @@ function App() {
     invoke<string>('get_notch_mode_for_window').then(setNotchMode).catch(() => {});
   };
 
+  const refreshDockMode = () => {
+    invoke<string>('get_dock_mode_for_window').then(setDockMode).catch(() => {});
+  };
+
   useEffect(() => {
-    const unlisten = listen("monitors-changed", refreshNotchMode);
+    const unlisten = listen("monitors-changed", () => { refreshNotchMode(); refreshDockMode(); });
     return () => { unlisten.then(f => f()); };
   }, []);
 
@@ -682,11 +721,13 @@ function App() {
       setSettingsCompactGlowEnabled(getVal("nectar-media-compact-glow-enabled", "true") !== "false");
       setSettingsCornersEnabled(getVal("nectar-corners-enabled", "false") === "true");
       setTimeFormat24h(getVal("nectar-time-format-24h") === "true");
+      setSettingsLegacyMode(getVal("nectar-legacy-mode") === "true");
 
       const thresholdStr = getVal("nectar-low-battery-threshold", "20");
       if (thresholdStr) setLowBatteryThreshold(parseInt(thresholdStr as string));
 
       refreshNotchMode();
+      refreshDockMode();
 
       if (windowLabel === 'main') {
         const firstRun = localStorage.getItem("nectar-first-run") === null;
@@ -815,7 +856,10 @@ function App() {
       "nectar-scale": setScale,
       "nectar-low-battery-threshold": setLowBatteryThreshold,
       "nectar-dock-enabled": setDockEnabled,
-      "nectar-dock-mode": setDockMode,
+      "nectar-dock-mode": refreshDockMode,
+      "nectar-dock-mode-by-monitor": refreshDockMode,
+      "nectar-dock-monitor-mode": refreshDockMode,
+      "nectar-dock-monitor-id": refreshDockMode,
       "nectar-notch-mode": refreshNotchMode,
       "nectar-notch-mode-by-monitor": refreshNotchMode,
       "nectar-notch-monitor-mode": refreshNotchMode,
@@ -830,6 +874,7 @@ function App() {
       },
       "nectar-show-update-indicator": (value) => setShowUpdateIndicator(String(value) === "true"),
       "nectar-time-format-24h": setTimeFormat24h,
+      "nectar-legacy-mode": setSettingsLegacyMode,
     },
     [windowLabel]
   );
@@ -861,7 +906,38 @@ function App() {
     invoke("change_notch_mode", { mode: notchMode });
   }, [notchMode, windowLabel]);
 
-  const [nectarMode, setNectarMode] = useState<'music' | 'calendar' | 'command-center' | 'status'>('status');
+  const [nectarMode, setNectarMode] = useState<'music' | 'calendar' | 'command-center' | 'status' | 'tour'>('status');
+  const [tourStep, setTourStep] = useState(0);
+  const tourAutoStartedRef = useRef(false);
+
+  const startTour = useCallback(() => {
+    setTourStep(0);
+    setNectarMode('tour');
+  }, []);
+
+  const closeTour = useCallback(() => {
+    setNectarMode('status');
+    localStorage.setItem("nectar-tour-seen", "1");
+    invoke("save_setting", { key: "nectar-tour-seen", value: "1" }).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    if (windowLabel !== 'main' || settingsLegacyMode || !isReady || !isExpanded || tourAutoStartedRef.current) return;
+    tourAutoStartedRef.current = true;
+    if (localStorage.getItem("nectar-tour-seen") === "1") return;
+    const timer = setTimeout(startTour, 1500);
+    return () => clearTimeout(timer);
+  }, [windowLabel, settingsLegacyMode, isReady, isExpanded, startTour]);
+
+  useEffect(() => {
+    if (windowLabel !== 'main') return;
+    const unlisten = listen("start-tour", startTour);
+    return () => { unlisten.then(f => f()); };
+  }, [windowLabel, startTour]);
+
+  useEffect(() => {
+    if (ccView !== 'main' && (!isHovered || nectarMode !== 'command-center')) setCcView('main');
+  }, [ccView, isHovered, nectarMode]);
   const caldav = useCaldav();
 
   // Window height is now kept constant to prevent rendering layout lag and sharp corners
@@ -904,6 +980,7 @@ function App() {
       return true;
     });
 
+    if (nectarMode === 'tour') return;
     const currentIndex = availableModes.indexOf(nectarMode);
     if (currentIndex === -1) return;
 
@@ -995,13 +1072,10 @@ function App() {
       triggerEventPeek(3000);
     }
 
-    // Only auto-switch if music mode is enabled
-    if (settingsMusicModeEnabled && mediaInfo.has_media && isPlaying && nectarMode !== 'calendar' && (isNewTrackWhilePlaying || justStartedPlaying)) {
-      // Switch if compact notch display is enabled OR we are hovered
-      if (settingsMusicCompactNotch || isHovered) {
-        manualMusicRef.current = false;
-        setNectarMode('music');
-      }
+    if (settingsMusicModeEnabled && settingsMusicCompactNotch && mediaInfo.has_media && isPlaying
+        && nectarMode === 'status' && !isHovered && (isNewTrackWhilePlaying || justStartedPlaying)) {
+      manualMusicRef.current = false;
+      setNectarMode('music');
     }
 
     lastTrackRef.current = mediaInfo.title;
@@ -1091,16 +1165,22 @@ function App() {
         const updateBattery = () => {
           setBatteryLevel(Math.round(battery.level * 100));
           setIsCharging(battery.charging);
+          const seconds = battery.charging ? battery.chargingTime : battery.dischargingTime;
+          setBatterySecondsLeft(Number.isFinite(seconds) ? seconds : null);
         };
 
         updateBattery();
 
         battery.addEventListener("levelchange", updateBattery);
         battery.addEventListener("chargingchange", updateBattery);
+        battery.addEventListener("chargingtimechange", updateBattery);
+        battery.addEventListener("dischargingtimechange", updateBattery);
 
         return () => {
           battery.removeEventListener("levelchange", updateBattery);
           battery.removeEventListener("chargingchange", updateBattery);
+          battery.removeEventListener("chargingtimechange", updateBattery);
+          battery.removeEventListener("dischargingtimechange", updateBattery);
         };
       } catch (e) {
         // Battery API not supported
@@ -1122,6 +1202,7 @@ function App() {
   // Wi-Fi has three states (off, on, connected) and the radio state can't tell them apart.
   // Returns false so startup can retry.
   const refreshWifiStatus = useCallback(async (): Promise<boolean> => {
+    invoke<{ present: boolean; connected: boolean; name: string }>("get_lan_status").then(setLanStatus).catch(() => {});
     try {
       setWifiStatus(await invoke<WifiStatus>("get_wifi_status"));
       return true;
@@ -1372,8 +1453,9 @@ function App() {
   const handleWifiRightClick = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    openWifiSettings();
-  }, [openWifiSettings]);
+    if (settingsLegacyMode) openWifiSettings();
+    else setCcView('wifi');
+  }, [openWifiSettings, settingsLegacyMode]);
 
   const toggleDockModeSetting = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -1403,8 +1485,9 @@ function App() {
   const handleBluetoothRightClick = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    invoke("open_bluetooth_settings");
-  }, []);
+    if (settingsLegacyMode) invoke("open_bluetooth_settings");
+    else setCcView('bluetooth');
+  }, [settingsLegacyMode]);
 
 
 
@@ -1425,13 +1508,18 @@ function App() {
     });
   };
 
+  const tip = (text: string | undefined) =>
+    settingsLegacyMode
+      ? { "data-tooltip": text }
+      : { onMouseEnter: () => setWidgetTip(text ?? null), onMouseLeave: () => setWidgetTip(null) };
+
   // Render a status widget by ID
   const renderStatusWidget = (id: string) => {
     switch (id) {
       case "weather":
         if (!settingsWeatherEnabled || temperature === null) return null;
         return (
-          <div className="passive-feature" key="weather" data-tooltip={cityName ? `${weatherCondition} — ${cityName}` : weatherCondition}>
+          <div className="passive-feature" key="weather" {...tip(cityName ? `${weatherCondition} — ${cityName}` : weatherCondition)}>
             <WeatherIcon size={12} strokeWidth={2.2} />
             <span className="label">{temperature}°{tempUnit === "fahrenheit" ? "F" : "C"}</span>
           </div>
@@ -1439,35 +1527,35 @@ function App() {
       case "battery":
         if (!hasBattery) return null;
         return (
-          <div className="passive-feature" key="battery">
+          <div className="passive-feature" key="battery" {...tip(batteryTooltip(isCharging, batteryLevel, batterySecondsLeft))}>
             <BatteryIcon charging={isCharging} level={batteryLevel} threshold={lowBatteryThreshold} />
             <span className="label">{batteryLevel}%</span>
           </div>
         );
       case "cpu":
         return (
-          <div className="passive-feature" key="cpu" data-tooltip="CPU Usage">
+          <div className="passive-feature" key="cpu" {...tip("CPU Usage")}>
             <Cpu size={12} strokeWidth={2} />
             <span className="label">{cpuUsage}%</span>
           </div>
         );
       case "ram":
         return (
-          <div className="passive-feature" key="ram" data-tooltip="RAM Usage">
+          <div className="passive-feature" key="ram" {...tip("RAM Usage")}>
             <MemoryStick size={12} strokeWidth={2} />
             <span className="label">{Math.round(ramUsage)}%</span>
           </div>
         );
       case "disk":
         return (
-          <div className="passive-feature" key="disk" data-tooltip="Free Disk Space">
+          <div className="passive-feature" key="disk" {...tip("Free Disk Space")}>
             <HardDrive size={12} strokeWidth={2} />
             <span className="label">{diskSpace}GB</span>
           </div>
         );
       case "net":
         return (
-          <div className="passive-feature" key="net" data-tooltip="Network Speed">
+          <div className="passive-feature" key="net" {...tip("Network Speed")}>
             <ArrowUpDown size={12} strokeWidth={2} />
             <span className="label">↑{formatBytes(netUpSpeed)} ↓{formatBytes(netDownSpeed)}</span>
           </div>
@@ -1530,6 +1618,7 @@ function App() {
     if (!isExpanded || isHidden) {
       return isImpacted ? 28.9 : 44.2;
     }
+    if (nectarMode === 'tour') return 178;
     if (nectarMode === 'calendar') return settingsCalendarEnabled ? (caldav.connected ? 350 : 310) : 262;
     if (nectarMode === 'command-center') return isHovered ? 230 : 36;
     if (nectarMode === 'status') return 36;
@@ -1605,7 +1694,7 @@ function App() {
         }}
         onHoverStart={() => {
           setIsHovered(true);
-          setNectarMode(mediaInfo.has_media && isPlaying ? 'music' : 'status');
+          if (nectarMode !== 'tour') setNectarMode(mediaInfo.has_media && isPlaying ? 'music' : 'status');
         }}
         onHoverEnd={() => {
           setIsHovered(false);
@@ -1629,6 +1718,7 @@ function App() {
           default: { type: "spring", stiffness: 500, damping: 30, mass: 1 }
         }}
       >
+        {widgetTip && isHovered && <div className="widget-tip">{widgetTip}</div>}
 
         <AnimatePresence>
           {isMusicMode && settingsAmbienceEnabled && albumArtUrl && isHovered && !isCalendarMode && (
@@ -2078,21 +2168,33 @@ function App() {
                     exit={{ opacity: 0, filter: "blur(4px)", transition: { duration: 0.1 } }}
                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                   >
+                    {showConnections && (
+                      <ConnectionsView
+                        kind={ccView}
+                        onBack={() => setCcView('main')}
+                        onOpenWindowsSettings={() => { invoke(ccView === 'wifi' ? 'open_wifi_settings' : 'open_bluetooth_settings'); }}
+                      />
+                    )}
+
+                    <div style={{ display: showConnections ? 'none' : 'contents' }}>
                     {/* Pills Grid */}
                     <div className="cc-pills-grid">
                       {/* Wi-Fi Pill */}
                       <div
-                        className={`cc-pill-tile ${wifiEnabled ? 'active' : ''}`}
-                        onClick={(e) => { e.stopPropagation(); toggleWifi(); }}
+                        className={`cc-pill-tile ${showLan || wifiEnabled ? 'active' : ''}`}
+                        onClick={(e) => { e.stopPropagation(); if (showLan) invoke('open_ethernet_settings'); else toggleWifi(); }}
                         onContextMenu={handleWifiRightClick}
                       >
                         <div className="cc-pill-icon-wrapper">
-                          <WifiIcon enabled={wifiEnabled} connected={wifiConnected} />
+                          {showLan ? <EthernetIcon /> : <WifiIcon enabled={wifiEnabled} connected={wifiConnected} />}
                         </div>
                         <div className="cc-pill-info">
-                          <span className="cc-pill-title">Wi-Fi</span>
-                          <span className="cc-pill-status">{wifiStatus === null ? '…' : !wifiEnabled ? 'Off' : wifiConnected ? 'Connected' : 'Not connected'}</span>
+                          <span className="cc-pill-title">{showLan ? 'Ethernet' : 'Wi-Fi'}</span>
+                          <span className="cc-pill-status">{showLan ? 'Connected' : wifiStatus === null ? '…' : !wifiEnabled ? 'Off' : wifiConnected ? 'Connected' : 'Not connected'}</span>
                         </div>
+                        {!settingsLegacyMode && !showLan && (
+                          <span className="cc-pill-more" title="Networks" onClick={(e) => { e.stopPropagation(); setCcView('wifi'); }}>›</span>
+                        )}
                       </div>
 
                       {/* Dock Mode Pill */}
@@ -2122,6 +2224,9 @@ function App() {
                           <span className="cc-pill-title">Bluetooth</span>
                           <span className="cc-pill-status">{bluetoothEnabled ? 'On' : 'Off'}</span>
                         </div>
+                        {!settingsLegacyMode && (
+                          <span className="cc-pill-more" title="Devices" onClick={(e) => { e.stopPropagation(); setCcView('bluetooth'); }}>›</span>
+                        )}
                       </div>
 
                       {/* Notch Mode Pill */}
@@ -2143,36 +2248,42 @@ function App() {
                     <div className="cc-circular-actions-row">
                       <button
                         className={`cc-circular-btn ${dndActive ? 'active' : ''}`}
+                        title="Do Not Disturb"
                         onClick={(e) => { e.stopPropagation(); setDndActive(prev => !prev); }}
                       >
                         <MoonIcon />
                       </button>
                       <button
                         className={`cc-circular-btn ${batterySaverEnabled ? 'active' : ''}`}
+                        title="Battery Saver"
                         onClick={(e) => { e.stopPropagation(); openBatterySaverSettings(); }}
                       >
                         <BatterySaverIcon />
                       </button>
                       <button
                         className="cc-circular-btn"
+                        title="System Tray"
                         onClick={(e) => { e.stopPropagation(); invoke("open_tray_window"); }}
                       >
                         <TrayIcon />
                       </button>
                       <button
                         className="cc-circular-btn"
+                        title="Notifications"
                         onClick={(e) => { e.stopPropagation(); invoke("open_notification_center"); }}
                       >
                         <BellIcon />
                       </button>
                       <button
                         className="cc-circular-btn"
+                        title="Nectar Settings"
                         onClick={(e) => { e.stopPropagation(); openSettingsWindow(); }}
                       >
                         <SettingsIcon />
                       </button>
                       <button
                         className="cc-circular-btn"
+                        title="Restart Nectar"
                         onClick={(e) => { e.stopPropagation(); invoke("restart_nectar"); }}
                       >
                         <ReloadIcon />
@@ -2227,6 +2338,30 @@ function App() {
                         <span className="cc-classic-percentage">{currentBrightness}%</span>
                       </div>
                     </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <AnimatePresence>
+                {nectarMode === 'tour' && (
+                  <motion.div
+                    key="tour"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0, transition: { duration: 0.1 } }}
+                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                  >
+                    <NotchTour
+                      step={tourStep}
+                      onStep={setTourStep}
+                      onClose={closeTour}
+                      onAction={(id) => {
+                        closeTour();
+                        if (id === 'control-center') setNectarMode('command-center');
+                        else openSettingsWindow();
+                      }}
+                    />
                   </motion.div>
                 )}
               </AnimatePresence>

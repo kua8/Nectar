@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Download, RefreshCw, FileDown, Upload, RotateCcw, Trash2, ClipboardCopy, FolderOpen, Crosshair, Image as ImageIcon } from "lucide-react";
+import { emit } from "@tauri-apps/api/event";
+import { Compass, Download, RefreshCw, FileDown, Upload, RotateCcw, Trash2, ClipboardCopy, FolderOpen, Crosshair, Image as ImageIcon } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 
 interface AboutTabProps {
@@ -207,6 +208,7 @@ export function AboutTab({
         Data
       </div>
       <div className="setting-group">
+        <SettingRow icon={Compass} label="Replay Tour" desc="Walk through the notch, Control Center and dock again" action onClick={() => emit("start-tour")} />
         <SettingRow icon={FileDown} label={getExportLabel()} desc="Save settings to a file" action onClick={handleExportSettings} />
         <SettingRow icon={Upload} label={getImportLabel()} desc="Load settings from a file" action onClick={handleImportSettings} />
         <SettingRow

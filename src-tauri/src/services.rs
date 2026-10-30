@@ -26,6 +26,7 @@ fn hook_overlay_enabled(key: &str) -> bool {
 static WIN_KEY_DOWN: AtomicBool = AtomicBool::new(false);
 /// Digit of the held Win+Number combo (0 = none). Auto-repeat re-fires keydown, only the first press counts.
 static WIN_NUMBER_HELD: AtomicU8 = AtomicU8::new(0);
+static WIN_B_HELD: AtomicBool = AtomicBool::new(false);
 /// Unassigned virtual key used as the mask key (see send_start_menu_mask).
 const MASK_VK: u16 = 0xE8;
 
@@ -56,6 +57,11 @@ fn dock_win_number_enabled() -> bool {
     crate::utils::get_setting_str(app, "nectar-dock-win-number-enabled")
         .map(|v| v != "false")
         .unwrap_or(true)
+}
+
+fn legacy_mode() -> bool {
+    let Some(app) = KEYBOARD_HOOK_APP_HANDLE.get() else { return false };
+    crate::utils::get_setting_str(app, "nectar-legacy-mode").is_some_and(|v| v == "true")
 }
 
 /// Win state straight from the OS. The tracked flag goes stale if a keyup never arrives.
@@ -110,11 +116,29 @@ unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: windows::Win32::
                     WIN_KEY_DOWN.store(true, Ordering::Relaxed);
                     // A new Win press starts a fresh combo, even if a digit keyup got missed.
                     WIN_NUMBER_HELD.store(0, Ordering::Relaxed);
+                    WIN_B_HELD.store(false, Ordering::Relaxed);
                 } else if is_up {
                     WIN_KEY_DOWN.store(false, Ordering::Relaxed);
                     WIN_NUMBER_HELD.store(0, Ordering::Relaxed);
+                    WIN_B_HELD.store(false, Ordering::Relaxed);
                 }
             } else if WIN_KEY_DOWN.load(Ordering::Relaxed) {
+                if vk_code.0 == 0x42 {
+                    if is_up {
+                        WIN_B_HELD.store(false, Ordering::Relaxed);
+                    } else if is_down && win_key_physically_down()
+                        && NATIVE_TASKBAR_HIDDEN.load(Ordering::Relaxed)
+                        && !legacy_mode()
+                    {
+                        if !WIN_B_HELD.swap(true, Ordering::Relaxed) {
+                            send_start_menu_mask();
+                            if let Some(app) = KEYBOARD_HOOK_APP_HANDLE.get().cloned() {
+                                crate::commands::open_tray_window(app);
+                            }
+                        }
+                        return windows::Win32::Foundation::LRESULT(1);
+                    }
+                }
                 if let Some(index) = win_number_index(vk_code.0) {
                     let slot = index + 1;
                     if is_up {
@@ -480,6 +504,12 @@ unsafe extern "system" fn taskbar_event_proc(
 }
 
 
+fn audio_visualization_wanted(app: &AppHandle) -> bool {
+    let setting = crate::utils::get_setting_str(app, "nectar-media-visualizer-enabled")
+        .or_else(|| crate::utils::get_setting_str(app, "nectar-visualizer-enabled"));
+    ANY_MEDIA_PLAYING.load(Ordering::Relaxed) && setting.as_deref() != Some("false")
+}
+
 pub fn setup_audio_visualization(app_handle: AppHandle) {
     std::thread::spawn(move || {
         use windows::Win32::Media::Audio::{
@@ -497,8 +527,13 @@ pub fn setup_audio_visualization(app_handle: AppHandle) {
             let mut max_band_energies = [0.01f32; NUM_BANDS];
             let mut prev_values = [0.1f32; NUM_BANDS];
 
+            let mut failures = 0u32;
             loop {
-                let _: Result<(), String> = (|| {
+                if !audio_visualization_wanted(&app_handle) {
+                    std::thread::sleep(std::time::Duration::from_millis(1000));
+                    continue;
+                }
+                let result: Result<(), String> = (|| {
                     let enumerator: IMMDeviceEnumerator =
                         CoCreateInstance(&windows::Win32::Media::Audio::MMDeviceEnumerator, None, CLSCTX_ALL)
                             .map_err(|e| format!("CoCreateInstance failed: {:?}", e))?;
@@ -555,10 +590,14 @@ pub fn setup_audio_visualization(app_handle: AppHandle) {
                     let fft = planner.plan_fft_forward(FFT_SIZE);
 
                     let mut last_device_check = std::time::Instant::now();
+                    let mut idle_since = std::time::Instant::now();
                     loop {
-                        // Idle only drains the 1s loopback buffer, so wake far less often than
-                        // while visualizing.
                         let idle = !ANY_MEDIA_PLAYING.load(Ordering::Relaxed);
+                        if !idle {
+                            idle_since = std::time::Instant::now();
+                        } else if idle_since.elapsed() > std::time::Duration::from_secs(15) {
+                            return Ok(());
+                        }
                         std::thread::sleep(std::time::Duration::from_millis(if idle { 200 } else { 32 }));
 
                         if last_device_check.elapsed().as_secs() >= 2 {
@@ -687,9 +726,13 @@ pub fn setup_audio_visualization(app_handle: AppHandle) {
                         }
                     }
                 })();
-                
-                // Wait before retrying (increased to 2500ms to allow Windows to fully update default endpoint)
-                std::thread::sleep(std::time::Duration::from_millis(2500));
+
+                failures = match &result {
+                    Err(e) if e.contains(" failed") => (failures + 1).min(8),
+                    _ => 0,
+                };
+                let wait_ms = 2500u64 << failures.min(7);
+                std::thread::sleep(std::time::Duration::from_millis(wait_ms.min(300_000)));
             }
             // if com_initialized { CoUninitialize(); }
         }
@@ -2751,6 +2794,14 @@ pub unsafe extern "system" fn enum_windows_proc(hwnd: HWND, lparam: LPARAM) -> B
                         || window_class == "ExploreWClass"
                         || (window_class == "#32770" && dialog_has_tab_control(hwnd));
 
+                    let has_visible_owner = windows::Win32::UI::WindowsAndMessaging::GetWindow(hwnd, windows::Win32::UI::WindowsAndMessaging::GW_OWNER)
+                        .map(|owner| !owner.0.is_null() && IsWindowVisible(owner).as_bool())
+                        .unwrap_or(false);
+                    if has_visible_owner && !is_explorer_window {
+                        let _ = CloseHandle(process_handle);
+                        return true.into();
+                    }
+
                     if (lowercase_path.contains("nectar.exe") && title != "Settings") ||
                        lowercase_path.contains("conhost.exe") ||
                        (lowercase_path.contains("explorer.exe") && !is_explorer_window) ||
@@ -3200,7 +3251,7 @@ pub fn start_window_style_guard(app: AppHandle) {
                     GetWindowLongPtrW, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT,
                 };
                 let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as usize;
-                let keyboard = is_dock && crate::state::DOCK_KEYBOARD_FOCUS.load(Ordering::Relaxed);
+                let keyboard = crate::state::KEYBOARD_FOCUS_LABEL.lock().ok().is_some_and(|l| l.as_deref() == Some(label.as_str()));
                 let want = if keyboard { WS_EX_TOOLWINDOW.0 as usize } else { (WS_EX_TOOLWINDOW.0 | WS_EX_NOACTIVATE.0) as usize };
                 if ex & want != want {
                     SetWindowLongPtrW(hwnd, GWL_EXSTYLE, (ex | want) as isize);

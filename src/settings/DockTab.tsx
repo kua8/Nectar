@@ -1,5 +1,7 @@
+import { useEffect, useState } from "react";
 import type { ChangeEvent, CSSProperties } from "react";
-import { Monitor, Eye, EyeOff, Circle, Search, Shuffle, MonitorCheck, CalendarDays, Maximize2, Keyboard, Sparkles, RotateCcw } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
+import { Monitor, Eye, EyeOff, Circle, Search, Shuffle, MonitorCheck, CalendarDays, Maximize2, Keyboard, Sparkles, RotateCcw, LayoutGrid, Trash2, HardDrive } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { Dropdown } from "./Dropdown";
 import type { MonitorInfo, MonitorMode } from "./types";
@@ -25,6 +27,12 @@ const startIconTileStyle = (active: boolean): CSSProperties => ({
   color: "rgba(255,255,255,0.5)",
 });
 
+interface DriveInfo {
+  letter: string;
+  label: string;
+  removable: boolean;
+}
+
 interface DockTabProps {
   dockEnabled: boolean;
   toggleDock: () => void;
@@ -36,6 +44,13 @@ interface DockTabProps {
   toggleDockSearch: () => void;
   dockCalendarEnabled: boolean;
   toggleDockCalendar: () => void;
+  legacyMode: boolean;
+  dockTaskView: boolean;
+  toggleDockTaskView: () => void;
+  dockRecycle: boolean;
+  toggleDockRecycle: () => void;
+  dockDrives: string[];
+  toggleDockDrive: (letter: string) => void;
   dockIconOnly: boolean;
   toggleDockIconOnly: () => void;
   dockAdaptive: boolean;
@@ -67,6 +82,13 @@ export function DockTab({
   toggleDockSearch,
   dockCalendarEnabled,
   toggleDockCalendar,
+  legacyMode,
+  dockTaskView,
+  toggleDockTaskView,
+  dockRecycle,
+  toggleDockRecycle,
+  dockDrives,
+  toggleDockDrive,
   dockIconOnly,
   toggleDockIconOnly,
   dockAdaptive,
@@ -89,6 +111,11 @@ export function DockTab({
   const perMonitor = usePerMonitor(dockMode, dockModeByMonitor, replaceDockModes, monitors);
   const multiMonitor = dockMonitorMode === "all" && monitors.length > 1;
   const showPerMonitor = multiMonitor && perMonitor.enabled;
+  const [drives, setDrives] = useState<DriveInfo[]>([]);
+
+  useEffect(() => {
+    invoke<DriveInfo[]>("get_drives").then(setDrives).catch(() => {});
+  }, []);
 
   const handleStartIconUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -197,6 +224,38 @@ export function DockTab({
                 <span className="slider"></span>
               </label>
             </SettingRow>
+
+            {!legacyMode && (
+              <>
+                <SettingRow icon={LayoutGrid} label="Task View Icon" desc="Show a Task View button next to Start">
+                  <label className="toggle-switch">
+                    <input type="checkbox" checked={dockTaskView} onChange={toggleDockTaskView} />
+                    <span className="slider"></span>
+                  </label>
+                </SettingRow>
+
+                <SettingRow icon={Trash2} label="Recycle Bin" desc="Show the Recycle Bin in the dock">
+                  <label className="toggle-switch">
+                    <input type="checkbox" checked={dockRecycle} onChange={toggleDockRecycle} />
+                    <span className="slider"></span>
+                  </label>
+                </SettingRow>
+
+                {drives.map((d) => (
+                  <SettingRow
+                    key={d.letter}
+                    icon={HardDrive}
+                    label={`Drive ${d.letter}:`}
+                    desc={d.label ? `${d.label}${d.removable ? " (removable)" : ""}` : d.removable ? "Removable drive" : "Local disk"}
+                  >
+                    <label className="toggle-switch">
+                      <input type="checkbox" checked={dockDrives.includes(d.letter)} onChange={() => toggleDockDrive(d.letter)} />
+                      <span className="slider"></span>
+                    </label>
+                  </SettingRow>
+                ))}
+              </>
+            )}
 
             <SettingRow icon={Circle} label="Icon Only" desc="Remove icon background and padding">
               <label className="toggle-switch">

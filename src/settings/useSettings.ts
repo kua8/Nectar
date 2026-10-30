@@ -18,6 +18,15 @@ function readBool(val: string | null): boolean {
   return val === "true";
 }
 
+function parseDrives(val: string | null): string[] {
+  try {
+    const parsed = JSON.parse(val ?? "[]");
+    return Array.isArray(parsed) ? parsed.filter((d): d is string => typeof d === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 export function useSettings() {
   const [autostart, setAutostart] = useState(false);
   const [weatherEnabled, setWeatherEnabled] = useState(true);
@@ -60,6 +69,9 @@ export function useSettings() {
   const [timeFormat24h, setTimeFormat24h] = useState(
     () => localStorage.getItem("nectar-time-format-24h") === "true"
   );
+  const [legacyMode, setLegacyMode] = useState(
+    () => localStorage.getItem("nectar-legacy-mode") === "true"
+  );
   const [tempUnitFahrenheit, setTempUnitFahrenheit] = useState(false);
   const [cityName, setCityName] = useState("");
   const [citySearchResults, setCitySearchResults] = useState<
@@ -74,6 +86,13 @@ export function useSettings() {
   const [dockPreviewEnabled, setDockPreviewEnabled] = useState(true);
   const [dockSearchEnabled, setDockSearchEnabled] = useState(true);
   const [dockCalendarEnabled, setDockCalendarEnabled] = useState(true);
+  const [dockTaskView, setDockTaskView] = useState(
+    () => localStorage.getItem("nectar-dock-taskview-enabled") === "true"
+  );
+  const [dockRecycle, setDockRecycle] = useState(
+    () => localStorage.getItem("nectar-dock-recycle-enabled") === "true"
+  );
+  const [dockDrives, setDockDrives] = useState<string[]>(() => parseDrives(localStorage.getItem("nectar-dock-drives")));
   const [dockIconOnly, setDockIconOnly] = useState(
     () => localStorage.getItem("nectar-dock-icon-only") === "true"
   );
@@ -176,6 +195,7 @@ export function useSettings() {
       apply(getVal("nectar-media-compact-glow-enabled"), setMediaCompactGlowEnabled, readBool);
       apply(getVal("nectar-corners-enabled"), setCornersEnabled, readBool);
       apply(getVal("nectar-time-format-24h"), setTimeFormat24h, readBool);
+      apply(getVal("nectar-legacy-mode"), setLegacyMode, readBool);
       apply(getVal("nectar-show-update-indicator"), setShowUpdateIndicator, readBool);
       apply(getVal("nectar-auto-update"), setAutoUpdate, readBool);
       apply(getVal("nectar-volume-edge-enabled"), setVolumeEdgeEnabled, readBool);
@@ -184,6 +204,9 @@ export function useSettings() {
       apply(getVal("nectar-dock-preview-enabled"), setDockPreviewEnabled, readBool);
       apply(getVal("nectar-dock-search-enabled"), setDockSearchEnabled, readBool);
       apply(getVal("nectar-dock-calendar-enabled"), setDockCalendarEnabled, readBool);
+      apply(getVal("nectar-dock-taskview-enabled"), setDockTaskView, readBool);
+      apply(getVal("nectar-dock-recycle-enabled"), setDockRecycle, readBool);
+      apply(getVal("nectar-dock-drives"), setDockDrives, parseDrives);
       apply(getVal("nectar-dock-icon-only"), setDockIconOnly, readBool);
       apply(getVal("nectar-start-icon"), setStartIcon, (v) => v);
       apply(getVal("nectar-dock-adaptive"), setDockAdaptive, readBool);
@@ -273,6 +296,9 @@ export function useSettings() {
     "nectar-dock-mode-by-monitor": (v) => { try { setDockModeByMonitor(JSON.parse(v)); } catch {} },
     "nectar-notch-mode-by-monitor": (v) => { try { setNotchModeByMonitor(JSON.parse(v)); } catch {} },
     "nectar-dock-enabled": setDockEnabled,
+    "nectar-dock-taskview-enabled": setDockTaskView,
+    "nectar-dock-recycle-enabled": setDockRecycle,
+    "nectar-dock-drives": (v) => setDockDrives(parseDrives(v)),
     "nectar-dock-icon-only": setDockIconOnly,
     "nectar-start-icon": setStartIcon,
     "nectar-dock-adaptive": setDockAdaptive,
@@ -297,6 +323,7 @@ export function useSettings() {
     "nectar-corners-enabled": setCornersEnabled,
     "nectar-show-update-indicator": setShowUpdateIndicator,
     "nectar-time-format-24h": setTimeFormat24h,
+    "nectar-legacy-mode": setLegacyMode,
     "nectar-low-battery-threshold": setLowBatteryThreshold,
     "nectar-scale": setScale,
     "nectar-temp-unit": (v) => setTempUnitFahrenheit(v === "fahrenheit"),
@@ -544,6 +571,12 @@ export function useSettings() {
     saveSetting("nectar-time-format-24h", String(next));
   };
 
+  const toggleLegacyMode = () => {
+    const next = !legacyMode;
+    setLegacyMode(next);
+    saveSetting("nectar-legacy-mode", String(next));
+  };
+
   const toggleTempUnit = () => {
     const next = !tempUnitFahrenheit;
     setTempUnitFahrenheit(next);
@@ -566,6 +599,24 @@ export function useSettings() {
     const next = !dockSearchEnabled;
     setDockSearchEnabled(next);
     saveSetting("nectar-dock-search-enabled", String(next));
+  };
+
+  const toggleDockTaskView = () => {
+    const next = !dockTaskView;
+    setDockTaskView(next);
+    saveSetting("nectar-dock-taskview-enabled", String(next));
+  };
+
+  const toggleDockRecycle = () => {
+    const next = !dockRecycle;
+    setDockRecycle(next);
+    saveSetting("nectar-dock-recycle-enabled", String(next));
+  };
+
+  const toggleDockDrive = (letter: string) => {
+    const next = dockDrives.includes(letter) ? dockDrives.filter((d) => d !== letter) : [...dockDrives, letter].sort();
+    setDockDrives(next);
+    saveSetting("nectar-dock-drives", JSON.stringify(next));
   };
 
   const toggleDockCalendar = () => {
@@ -862,6 +913,8 @@ export function useSettings() {
     handleThresholdChange,
     timeFormat24h,
     toggleTimeFormat24h,
+    legacyMode,
+    toggleLegacyMode,
     showUpdateIndicator,
     toggleUpdateIndicator,
     scale,
@@ -937,6 +990,12 @@ export function useSettings() {
     toggleDockSearch,
     dockCalendarEnabled,
     toggleDockCalendar,
+    dockTaskView,
+    toggleDockTaskView,
+    dockRecycle,
+    toggleDockRecycle,
+    dockDrives,
+    toggleDockDrive,
     dockIconOnly,
     toggleDockIconOnly,
     startIcon,

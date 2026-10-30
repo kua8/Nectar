@@ -18,14 +18,18 @@ pub async fn set_menu_open(open: bool, rect: Option<IntRect>) {
     }
 }
 
-/// The dock is WS_EX_NOACTIVATE so it never steals focus, which also stops text fields in its
-/// popups from receiving keys. Lift the style while such a popup is open, restore it after.
 #[tauri::command]
-pub fn set_dock_keyboard_focus(window: Window, enabled: bool) {
+pub fn set_window_keyboard_focus(window: Window, enabled: bool) {
     use windows::Win32::UI::WindowsAndMessaging::{
         GetWindowLongPtrW, SetForegroundWindow, SetWindowLongPtrW, GWL_EXSTYLE, WS_EX_NOACTIVATE,
     };
-    crate::state::DOCK_KEYBOARD_FOCUS.store(enabled, Ordering::Relaxed);
+    if let Ok(mut label) = crate::state::KEYBOARD_FOCUS_LABEL.lock() {
+        if enabled {
+            *label = Some(window.label().to_string());
+        } else if label.as_deref() == Some(window.label()) {
+            *label = None;
+        }
+    }
     let Ok(hwnd) = window.hwnd() else { return };
     unsafe {
         let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as usize;
@@ -505,6 +509,62 @@ fn toggle_start_menu() {
     });
 }
 
+fn send_win_chord(key: windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY) {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_LWIN};
+    let input = |vk: VIRTUAL_KEY, up: bool| INPUT {
+        r#type: INPUT_KEYBOARD,
+        Anonymous: INPUT_0 {
+            ki: KEYBDINPUT { wVk: vk, wScan: 0, dwFlags: if up { KEYEVENTF_KEYUP } else { Default::default() }, time: 0, dwExtraInfo: 0 },
+        },
+    };
+    let inputs = [input(VK_LWIN, false), input(key, false), input(key, true), input(VK_LWIN, true)];
+    unsafe { SendInput(&inputs, std::mem::size_of::<INPUT>() as i32) };
+}
+
+#[derive(serde::Serialize)]
+pub struct DockDrive {
+    letter: String,
+    label: String,
+    removable: bool,
+}
+
+#[tauri::command]
+pub fn get_drives() -> Vec<DockDrive> {
+    use windows::core::PCWSTR;
+    use windows::Win32::Storage::FileSystem::{GetDriveTypeW, GetLogicalDrives, GetVolumeInformationW};
+    const DRIVE_REMOVABLE: u32 = 2;
+    const DRIVE_FIXED: u32 = 3;
+    let mask = unsafe { GetLogicalDrives() };
+    let mut drives = Vec::new();
+    for i in 0..26u32 {
+        if mask & (1 << i) == 0 { continue; }
+        let letter = (b'A' + i as u8) as char;
+        let root: Vec<u16> = format!("{letter}:\\").encode_utf16().chain(std::iter::once(0)).collect();
+        let kind = unsafe { GetDriveTypeW(PCWSTR(root.as_ptr())) };
+        if kind != DRIVE_FIXED && kind != DRIVE_REMOVABLE { continue; }
+        let mut name = [0u16; 64];
+        let label = unsafe {
+            GetVolumeInformationW(PCWSTR(root.as_ptr()), Some(&mut name), None, None, None, None)
+                .map(|_| String::from_utf16_lossy(&name[..name.iter().position(|&c| c == 0).unwrap_or(name.len())]))
+                .unwrap_or_default()
+        };
+        drives.push(DockDrive { letter: letter.to_string(), label, removable: kind == DRIVE_REMOVABLE });
+    }
+    drives
+}
+
+#[tauri::command]
+pub fn open_dock_extra(target: String) -> Result<(), String> {
+    let path = if target == "recycle" {
+        "shell:RecycleBinFolder".to_string()
+    } else if target.len() == 1 && target.as_bytes()[0].is_ascii_uppercase() {
+        format!("{target}:\\")
+    } else {
+        return Err(format!("unknown dock extra: {target}"));
+    };
+    std::process::Command::new("explorer.exe").arg(path).spawn().map(|_| ()).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub async fn open_app(app: AppHandle, app_name: String, args: Option<String>) {
     if app_name == "start" {
@@ -513,23 +573,12 @@ pub async fn open_app(app: AppHandle, app_name: String, args: Option<String>) {
     }
 
     if app_name == "search" {
-        tauri::async_runtime::spawn_blocking(move || unsafe {
-            use windows::Win32::UI::Input::KeyboardAndMouse::{SendInput, INPUT, INPUT_0, KEYBDINPUT, VK_LWIN, VK_S, KEYEVENTF_KEYUP};
-            let key_down = |vk: windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY| INPUT {
-                r#type: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_KEYBOARD,
-                Anonymous: INPUT_0 {
-                    ki: KEYBDINPUT { wVk: vk, wScan: 0, dwFlags: Default::default(), time: 0, dwExtraInfo: 0 },
-                },
-            };
-            let key_up = |vk: windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY| INPUT {
-                r#type: windows::Win32::UI::Input::KeyboardAndMouse::INPUT_KEYBOARD,
-                Anonymous: INPUT_0 {
-                    ki: KEYBDINPUT { wVk: vk, wScan: 0, dwFlags: KEYEVENTF_KEYUP, time: 0, dwExtraInfo: 0 },
-                },
-            };
-            let inputs = [key_down(VK_LWIN), key_down(VK_S), key_up(VK_S), key_up(VK_LWIN)];
-            SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
-        });
+        tauri::async_runtime::spawn_blocking(|| send_win_chord(windows::Win32::UI::Input::KeyboardAndMouse::VK_S));
+        return;
+    }
+
+    if app_name == "taskview" {
+        tauri::async_runtime::spawn_blocking(|| send_win_chord(windows::Win32::UI::Input::KeyboardAndMouse::VK_TAB));
         return;
     }
 

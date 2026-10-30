@@ -150,7 +150,7 @@ export function CompactMediaPlayer({
       setDisplayPosition(pos);
     };
     tick();
-    if (!isPlaying) return; // paused: position is static, nothing to extrapolate
+    if (!isPlaying) return;
     const interval = setInterval(tick, 250);
     return () => clearInterval(interval);
   }, [isPlaying, durationMs]);
