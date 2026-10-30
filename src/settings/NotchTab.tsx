@@ -15,11 +15,14 @@ import {
   Hourglass,
   Timer,
   BellRing,
+  Globe,
 } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { Dropdown } from "./Dropdown";
 import { useCaldav } from "../hooks/useCaldav";
 import { StatusWidgetConfig } from "../components/StatusWidgetConfig";
+import { DualClockPicker } from "../components/DualClockPicker";
+import { zoneOffsetLabel } from "../dualClock";
 import type { WidgetConfig, MonitorInfo, MonitorMode } from "./types";
 import { usePerMonitor } from "./usePerMonitor";
 
@@ -42,6 +45,11 @@ interface NotchTabProps {
   toggleTimerSound: () => void;
   stopwatchEnabled: boolean;
   toggleStopwatchEnabled: () => void;
+  dualClockEnabled: boolean;
+  toggleDualClock: () => void;
+  dualClockZone: string;
+  dualClockLabel: string;
+  selectDualClockZone: (option: { label: string; zone: string }) => void;
   musicModeEnabled: boolean;
   toggleMusicMode: () => void;
   musicCompactNotch: boolean;
@@ -88,6 +96,11 @@ export function NotchTab({
   toggleTimerSound,
   stopwatchEnabled,
   toggleStopwatchEnabled,
+  dualClockEnabled,
+  toggleDualClock,
+  dualClockZone,
+  dualClockLabel,
+  selectDualClockZone,
   musicModeEnabled,
   toggleMusicMode,
   musicCompactNotch,
@@ -227,6 +240,24 @@ export function NotchTab({
             <span className="slider"></span>
           </label>
         </SettingRow>
+
+        <SettingRow
+          icon={Globe}
+          label="Dual Clock"
+          desc={dualClockEnabled ? [dualClockLabel, zoneOffsetLabel(dualClockZone)].filter(Boolean).join(" · ") : "Show a second time zone next to the time"}
+        >
+          <label className="toggle-switch">
+            <input type="checkbox" checked={dualClockEnabled} onChange={toggleDualClock} />
+            <span className="slider"></span>
+          </label>
+        </SettingRow>
+
+        {dualClockEnabled && (
+          <>
+            <DualClockPicker onSelect={selectDualClockZone} />
+            <div className="setting-divider" />
+          </>
+        )}
 
         <SettingRow icon={Music} label="Music Mode" desc="Interactive live music widget">
           <label className="toggle-switch">

@@ -1,5 +1,5 @@
 import { motion, AnimatePresence, useAnimation } from "framer-motion";
-import { useEffect, useState, useCallback, useRef, memo } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo, memo } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -16,6 +16,15 @@ import { NotchCalendar } from "./components/NotchCalendar";
 import { NotchClock, StopwatchReadout } from "./components/NotchClock";
 import { useStopwatch } from "./hooks/useStopwatch";
 import type { WidgetConfig } from "./components/StatusWidgetConfig";
+import {
+  DEFAULT_DUAL_CLOCK_ZONE,
+  dayShiftLabel,
+  formatZoneTime,
+  measureDualClock,
+  zoneDayShift,
+  zoneDifferenceLabel,
+  zoneOffsetLabel,
+} from "./dualClock";
 import {
   Cpu,
   MemoryStick,
@@ -305,6 +314,8 @@ function App() {
   }, []);
 
   const [time, setTime] = useState("");
+  const [dualTime, setDualTime] = useState("");
+  const [dualDayShift, setDualDayShift] = useState(0);
   const [isHovered, setIsHovered] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [scale, setScale] = useState(() => parseFloat(localStorage.getItem("nectar-scale") || "1.0"));
@@ -616,6 +627,9 @@ function App() {
     () => (localStorage.getItem("nectar-stopwatch-enabled") ?? localStorage.getItem("nectar-calendar-enabled")) !== "false",
   );
   const showClockColumn = settingsTimerEnabled || settingsStopwatchEnabled;
+  const [settingsDualClockEnabled, setSettingsDualClockEnabled] = useState(() => localStorage.getItem("nectar-dual-clock-enabled") === "true");
+  const [dualClockZone, setDualClockZone] = useState(() => localStorage.getItem("nectar-dual-clock-zone") || DEFAULT_DUAL_CLOCK_ZONE);
+  const [dualClockLabel, setDualClockLabel] = useState(() => localStorage.getItem("nectar-dual-clock-label") || DEFAULT_DUAL_CLOCK_ZONE);
   const productivityEnabled = settingsCalendarEnabled || showClockColumn;
   const [settingsMusicModeEnabled, setSettingsMusicModeEnabled] = useState(() => localStorage.getItem("nectar-music-mode-enabled") !== "false");
   const [settingsMusicCompactNotch, setSettingsMusicCompactNotch] = useState(() => localStorage.getItem("nectar-music-compact-notch") !== "false");
@@ -656,6 +670,9 @@ function App() {
       setSettingsTimerEnabled((getVal("nectar-timer-enabled") ?? getVal("nectar-calendar-enabled", "true")) !== "false");
       setSettingsTimerSoundEnabled(getVal("nectar-timer-sound-enabled", "true") !== "false");
       setSettingsStopwatchEnabled((getVal("nectar-stopwatch-enabled") ?? getVal("nectar-calendar-enabled", "true")) !== "false");
+      setSettingsDualClockEnabled(getVal("nectar-dual-clock-enabled", "false") === "true");
+      setDualClockZone(getVal("nectar-dual-clock-zone") || DEFAULT_DUAL_CLOCK_ZONE);
+      setDualClockLabel(getVal("nectar-dual-clock-label") || DEFAULT_DUAL_CLOCK_ZONE);
       setSettingsMusicModeEnabled(getVal("nectar-music-mode-enabled", "true") !== "false");
       setSettingsMusicCompactNotch(getVal("nectar-music-compact-notch", "true") !== "false");
       const viz = getVal("nectar-media-visualizer-enabled") ?? getVal("nectar-visualizer-enabled", "true");
@@ -783,6 +800,9 @@ function App() {
       "nectar-timer-enabled": setSettingsTimerEnabled,
       "nectar-timer-sound-enabled": setSettingsTimerSoundEnabled,
       "nectar-stopwatch-enabled": setSettingsStopwatchEnabled,
+      "nectar-dual-clock-enabled": setSettingsDualClockEnabled,
+      "nectar-dual-clock-zone": (value) => setDualClockZone(String(value)),
+      "nectar-dual-clock-label": (value) => setDualClockLabel(String(value)),
       "nectar-music-mode-enabled": setSettingsMusicModeEnabled,
       "nectar-music-compact-notch": setSettingsMusicCompactNotch,
       "nectar-media-visualizer-enabled": setSettingsVisualizerEnabled,
@@ -1035,6 +1055,10 @@ function App() {
           hour12: !timeFormat24h,
         })
       );
+      if (settingsDualClockEnabled) {
+        setDualTime(formatZoneTime(now, dualClockZone, !timeFormat24h));
+        setDualDayShift(zoneDayShift(now, dualClockZone));
+      }
     };
 
     updateTime();
@@ -1054,7 +1078,7 @@ function App() {
       clearInterval(interval);
       if (timerToggleInterval) clearInterval(timerToggleInterval);
     };
-  }, [isTimerRunning, stopwatch.running, nectarMode, timeFormat24h]);
+  }, [isTimerRunning, stopwatch.running, nectarMode, timeFormat24h, settingsDualClockEnabled, dualClockZone]);
 
   // Battery API
   useEffect(() => {
@@ -1462,23 +1486,35 @@ function App() {
   // Music mode shows any time we have media info (playing or paused) and music mode setting is enabled
   const isMusicMode = mediaInfo.has_media && nectarMode === 'music' && settingsMusicModeEnabled;
 
+  // Second clock beside the time
+  const showDualClock = settingsDualClockEnabled && dualTime !== "";
+  const dualClockSize = useMemo(
+    () => (showDualClock ? measureDualClock(time, dualClockLabel, dualTime, dualDayShift) : null),
+    [showDualClock, time, dualClockLabel, dualTime, dualDayShift]
+  );
+  const dualClockExtra = dualClockSize?.extra ?? 0;
+  const dualClockTooltip = useMemo(
+    () => (showDualClock ? [dualClockLabel, zoneOffsetLabel(dualClockZone), zoneDifferenceLabel(dualClockZone)].filter(Boolean).join(" · ") : ""),
+    // dualTime changes every minute, which picks up DST changes in either zone.
+    [showDualClock, dualClockLabel, dualClockZone, dualTime]
+  );
+
   // Calculate width dynamically based on enabled features
   const getDynamicWidth = () => {
-    if (isCalendarMode) return settingsCalendarEnabled && showClockColumn ? 480 : settingsCalendarEnabled ? 310 : 270;
+    if (isCalendarMode) return Math.max(settingsCalendarEnabled && showClockColumn ? 480 : settingsCalendarEnabled ? 310 : 270, 140 + dualClockExtra);
     if (nectarMode === 'command-center' && isHovered) {
       const totalWidgets = statusWidgets.left.length + statusWidgets.right.length;
-      return Math.max(350, Math.min(200 + totalWidgets * 65, 460));
+      return Math.max(350, Math.min(200 + totalWidgets * 65, 460)) + dualClockExtra;
     }
     if (nectarMode === 'status' && isHovered) {
       const totalWidgets = statusWidgets.left.length + statusWidgets.right.length;
-      return Math.min(200 + totalWidgets * 65, 460);
+      return Math.min(200 + totalWidgets * 65, 460) + dualClockExtra;
     }
     if (isMusicMode && isHovered) return mediaLayout === 'compact' ? 300 : 340;
     if ((showPowerPulse || showLowBatteryPulse || showUpdatePulse) && !isHovered) return 200;
 
-    let w = 140;
+    let w = 140 + dualClockExtra;
     if (isMusicMode) {
-      w = 140;
       if (settingsVisualizerEnabled && isPlaying) w += 30;
       if (settingsAlbumArtEnabled) w += 30;
 
@@ -1896,7 +1932,11 @@ function App() {
 
                             {/* Center - Time (always visible) */}
                             <div className="time-center">
-                              <div className="time-flip-container" onClick={toggleCalendarMode}>
+                              <div
+                                className="time-flip-container"
+                                onClick={toggleCalendarMode}
+                                style={dualClockSize ? { minWidth: dualClockSize.main } : undefined}
+                              >
                                 <AnimatePresence initial={false}>
                                   {isCompactTimerVisible || isTimerFinished ? (
                                     <motion.span
@@ -1925,6 +1965,13 @@ function App() {
                                   )}
                                 </AnimatePresence>
                               </div>
+                              {showDualClock && (
+                                <div className="time-secondary" onClick={toggleCalendarMode} data-tooltip={dualClockTooltip}>
+                                  <span className="time-secondary-label">{dualClockLabel}</span>
+                                  <span className="time-secondary-value">{dualTime}</span>
+                                  {dualDayShift !== 0 && <span className="time-secondary-shift">{dayShiftLabel(dualDayShift)}</span>}
+                                </div>
+                              )}
                             </div>
 
                             {/* Right: album art (music) or battery (command-center, calendar) */}
