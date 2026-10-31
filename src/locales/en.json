@@ -459,6 +459,6 @@
   "music.openCalendar": "Open calendar and timer",
   "notch.timerProgress": "Timer Progress Bar",
   "notch.timerProgress.desc": "Show an edge progress bar on the notch while a timer is active",
-  "notch.scrollVolume": "Scroll on Volume Sliders",
-  "notch.scrollVolume.desc": "Scroll with mouse wheel over volume sliders to adjust system volume"
+  "notch.scrollVolume": "Scroll on Sliders",
+  "notch.scrollVolume.desc": "Scroll with mouse wheel over the volume and brightness sliders to adjust them"
 }

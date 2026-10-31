@@ -35,7 +35,8 @@ pub fn resolve_shortcut(path: &str) -> Option<(String, String)> {
 }
 
 pub static ORIGINAL_TRAY_RECT: std::sync::Mutex<Option<windows::Win32::Foundation::RECT>> = std::sync::Mutex::new(None);
-static ORIGINAL_SEC_TRAY_RECT: std::sync::Mutex<Option<windows::Win32::Foundation::RECT>> = std::sync::Mutex::new(None);
+// One entry per secondary taskbar, keyed by HWND: three monitors means two of them.
+static ORIGINAL_SEC_TRAY_RECTS: std::sync::Mutex<Vec<(isize, windows::Win32::Foundation::RECT)>> = std::sync::Mutex::new(Vec::new());
 static ORIGINAL_TASKBAR_STATE: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(-1);
 
 static TASKBAR_MARKER: OnceLock<PathBuf> = OnceLock::new();
@@ -72,11 +73,13 @@ unsafe fn monitor_rects() -> Vec<(windows::Win32::Foundation::RECT, bool)> {
     monitors
 }
 
-fn taskbar_monitor(monitors: &[(windows::Win32::Foundation::RECT, bool)], primary: bool, width: i32) -> Option<windows::Win32::Foundation::RECT> {
+fn taskbar_monitor(monitors: &[(windows::Win32::Foundation::RECT, bool)], primary: bool, taskbar: &windows::Win32::Foundation::RECT) -> Option<windows::Win32::Foundation::RECT> {
     if primary {
         monitors.iter().find(|(_, is_primary)| *is_primary).map(|(r, _)| *r)
     } else {
-        monitors.iter().find(|(r, is_primary)| !*is_primary && r.right - r.left == width)
+        let width = taskbar.right - taskbar.left;
+        monitors.iter().find(|(r, is_primary)| !*is_primary && r.left == taskbar.left && r.right == taskbar.right)
+            .or_else(|| monitors.iter().find(|(r, is_primary)| !*is_primary && r.right - r.left == width))
             .or_else(|| monitors.iter().find(|(_, is_primary)| !*is_primary))
             .map(|(r, _)| *r)
     }
@@ -87,7 +90,7 @@ unsafe fn park_below_monitor(hwnd: windows::Win32::Foundation::HWND, primary: bo
     use windows::Win32::UI::WindowsAndMessaging::{GetWindowRect, SetWindowPos, SWP_NOACTIVATE, SWP_NOSIZE, SWP_NOZORDER};
     let mut cur = RECT::default();
     let _ = GetWindowRect(hwnd, &mut cur);
-    let (x, y) = match taskbar_monitor(&monitor_rects(), primary, cur.right - cur.left) {
+    let (x, y) = match taskbar_monitor(&monitor_rects(), primary, &cur) {
         Some(m) => (m.left, m.bottom),
         None => (-10000, -10000),
     };
@@ -107,12 +110,12 @@ unsafe fn restore_tray_position(hwnd: windows::Win32::Foundation::HWND, primary:
 
     let mut cur = RECT::default();
     let _ = GetWindowRect(hwnd, &mut cur);
-    let (w, h) = (cur.right - cur.left, cur.bottom - cur.top);
+    let h = cur.bottom - cur.top;
     let monitors = monitor_rects();
     let inside_a_monitor = monitors.iter().any(|(m, _)| cur.left >= m.left && cur.top >= m.top && cur.right <= m.right && cur.bottom <= m.bottom);
     if inside_a_monitor { return; }
 
-    if let Some(mon) = taskbar_monitor(&monitors, primary, w) {
+    if let Some(mon) = taskbar_monitor(&monitors, primary, &cur) {
         let _ = SetWindowPos(hwnd, None, mon.left, mon.bottom - h, 0, 0, SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
     }
 }
@@ -139,6 +142,26 @@ pub fn restore_taskbar_after_crash() {
     set_taskbar_visibility(true, true);
 }
 
+/// Every secondary taskbar; Windows creates one per extra monitor.
+pub fn secondary_taskbars() -> Vec<windows::Win32::Foundation::HWND> {
+    use windows::Win32::UI::WindowsAndMessaging::FindWindowExA;
+    let mut taskbars = Vec::new();
+    let mut previous = None;
+    loop {
+        let next = unsafe {
+            FindWindowExA(None, previous, windows::core::PCSTR(c"Shell_SecondaryTrayWnd".as_ptr() as *const u8), windows::core::PCSTR::null())
+        };
+        match next {
+            Ok(hwnd) if !hwnd.0.is_null() => {
+                taskbars.push(hwnd);
+                previous = Some(hwnd);
+            }
+            _ => break,
+        }
+    }
+    taskbars
+}
+
 pub fn set_taskbar_visibility(visible: bool, always_on_top: bool) {
     if visible {
         crate::state::NATIVE_TASKBAR_HIDDEN.store(false, std::sync::atomic::Ordering::SeqCst);
@@ -154,7 +177,6 @@ pub fn set_taskbar_visibility(visible: bool, always_on_top: bool) {
         }
 
         let tray_class = windows::core::PCSTR(c"Shell_TrayWnd".as_ptr() as *const u8);
-        let secondary_tray_class = windows::core::PCSTR(c"Shell_SecondaryTrayWnd".as_ptr() as *const u8);
 
         // Save original taskbar state before modifying
         if ORIGINAL_TASKBAR_STATE.load(std::sync::atomic::Ordering::Relaxed) == -1 {
@@ -239,10 +261,11 @@ pub fn set_taskbar_visibility(visible: bool, always_on_top: bool) {
         }
 
         // 3. Control visibility of secondary taskbars (multi-monitor)
-        if let Ok(secondary_tray_hwnd) = FindWindowA(secondary_tray_class, windows::core::PCSTR::null()) {
+        for secondary_tray_hwnd in secondary_taskbars() {
             use windows::Win32::UI::WindowsAndMessaging::{IsWindowVisible};
+            let key = secondary_tray_hwnd.0 as isize;
             if visible {
-                let saved = ORIGINAL_SEC_TRAY_RECT.lock().ok().and_then(|g| *g);
+                let saved = ORIGINAL_SEC_TRAY_RECTS.lock().ok().and_then(|g| g.iter().find(|(k, _)| *k == key).map(|(_, r)| *r));
                 restore_tray_position(secondary_tray_hwnd, false, saved);
                 let _ = ShowWindow(secondary_tray_hwnd, SW_SHOW);
                 {
@@ -250,13 +273,13 @@ pub fn set_taskbar_visibility(visible: bool, always_on_top: bool) {
                     let _ = RedrawWindow(Some(secondary_tray_hwnd), None, None, RDW_INVALIDATE | RDW_ALLCHILDREN | RDW_UPDATENOW | RDW_FRAME | RDW_ERASE);
                 }
             } else {
-                let has_sec_rect = ORIGINAL_SEC_TRAY_RECT.lock().map(|g| g.is_some()).unwrap_or(false);
+                let has_sec_rect = ORIGINAL_SEC_TRAY_RECTS.lock().map(|g| g.iter().any(|(k, _)| *k == key)).unwrap_or(false);
                 if !has_sec_rect {
                     let mut rect = windows::Win32::Foundation::RECT::default();
                     let _ = GetWindowRect(secondary_tray_hwnd, &mut rect);
                     if rect_is_on_screen(&rect) && IsWindowVisible(secondary_tray_hwnd).as_bool() {
-                        if let Ok(mut guard) = ORIGINAL_SEC_TRAY_RECT.lock() {
-                            *guard = Some(rect);
+                        if let Ok(mut guard) = ORIGINAL_SEC_TRAY_RECTS.lock() {
+                            guard.push((key, rect));
                         }
                     }
                 }
@@ -898,6 +921,29 @@ mod tests {
 
         // Plain paths are untouched
         assert_eq!(expand_env_vars("C:\\plain\\path"), "C:\\plain\\path");
+    }
+
+    #[test]
+    fn each_secondary_taskbar_keeps_its_own_monitor() {
+        use super::taskbar_monitor;
+        use windows::Win32::Foundation::RECT;
+
+        let rect = |left, right, top, bottom| RECT { left, top, right, bottom };
+        let primary = rect(0, 1920, 0, 1080);
+        let left = rect(-1920, 0, 0, 1080);
+        let right = rect(1920, 3840, 0, 1080);
+        let monitors = [(primary, true), (left, false), (right, false)];
+
+        // Same width as both secondaries, so only the position tells them apart.
+        let on_right = rect(1920, 3840, 1032, 1080);
+        assert_eq!(taskbar_monitor(&monitors, false, &on_right), Some(right));
+        let on_left = rect(-1920, 0, 1032, 1080);
+        assert_eq!(taskbar_monitor(&monitors, false, &on_left), Some(left));
+
+        // A taskbar stranded off-screen still lands on a same-width secondary.
+        let stranded = rect(-10000, -8080, -10000, -9952);
+        assert_eq!(taskbar_monitor(&monitors, false, &stranded), Some(left));
+        assert_eq!(taskbar_monitor(&monitors, true, &on_right), Some(primary));
     }
 
     #[test]

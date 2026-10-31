@@ -1304,16 +1304,13 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                 if NATIVE_TASKBAR_HIDDEN.load(Ordering::Relaxed) {
                     use windows::Win32::UI::WindowsAndMessaging::{FindWindowA, IsWindowVisible};
                     let tray_class = windows::core::PCSTR(c"Shell_TrayWnd".as_ptr() as *const u8);
-                    let secondary_tray_class = windows::core::PCSTR(c"Shell_SecondaryTrayWnd".as_ptr() as *const u8);
-                    
+
                     let mut should_rehide = false;
                     if let Ok(tray_hwnd) = FindWindowA(tray_class, windows::core::PCSTR::null()) {
                         if IsWindowVisible(tray_hwnd).as_bool() { should_rehide = true; }
                     }
                     if !should_rehide {
-                        if let Ok(secondary_tray_hwnd) = FindWindowA(secondary_tray_class, windows::core::PCSTR::null()) {
-                            if IsWindowVisible(secondary_tray_hwnd).as_bool() { should_rehide = true; }
-                        }
+                        should_rehide = crate::utils::secondary_taskbars().iter().any(|&hwnd| IsWindowVisible(hwnd).as_bool());
                     }
 
                     if should_rehide {

@@ -1,6 +1,6 @@
 [package]
 name = "nectar-installer"
-version = "1.5.5"
+version = "1.5.6"
 description = "Nectar installer"
 authors = ["kua8"]
 edition = "2021"

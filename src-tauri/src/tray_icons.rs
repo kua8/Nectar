@@ -9,7 +9,7 @@ use windows::Win32::UI::Accessibility::{
     UIA_InvokePatternId,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    FindWindowA, FindWindowExA, GetCursorPos, GetWindowLongA, GetWindowRect, IsWindowVisible, SetForegroundWindow,
+    FindWindowA, GetCursorPos, GetWindowLongA, GetWindowRect, IsWindowVisible, SetForegroundWindow,
     SetLayeredWindowAttributes, SetWindowLongA, SetWindowPos, ShowWindow, GWL_EXSTYLE, HWND_TOPMOST, LWA_ALPHA,
     SWP_NOSIZE, SWP_SHOWWINDOW, SW_HIDE, SW_SHOWNA, WS_EX_LAYERED, WS_EX_TRANSPARENT,
 };
@@ -240,19 +240,7 @@ fn all_taskbars() -> Vec<HWND> {
     if let Ok(primary) = find_window(c"Shell_TrayWnd") {
         taskbars.push(primary);
     }
-    let mut previous = None;
-    loop {
-        let next = unsafe {
-            FindWindowExA(None, previous, windows::core::PCSTR(c"Shell_SecondaryTrayWnd".as_ptr() as *const u8), windows::core::PCSTR::null())
-        };
-        match next {
-            Ok(hwnd) if !hwnd.0.is_null() => {
-                taskbars.push(hwnd);
-                previous = Some(hwnd);
-            }
-            _ => break,
-        }
-    }
+    taskbars.extend(crate::utils::secondary_taskbars());
     taskbars
 }
 
