@@ -510,7 +510,7 @@ fn toggle_start_menu() {
     });
 }
 
-fn send_win_chord(key: windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY) {
+pub fn send_win_chord(key: windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY) {
     use windows::Win32::UI::Input::KeyboardAndMouse::{SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_LWIN};
     let input = |vk: VIRTUAL_KEY, up: bool| INPUT {
         r#type: INPUT_KEYBOARD,

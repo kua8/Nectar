@@ -28,6 +28,7 @@ Edit `settings.json` with any text editor while Nectar is running. Changes are a
 | `nectar-dock-calendar-enabled` | `"true"` / `"false"` | `"true"` | Show a calendar icon next to the search icon that opens the Calendar window. The Calendar window is also in the dock's Nectar Options menu, the tray menu, and the notch calendar's open button. |
 | `nectar-dock-tray-enabled` | `"true"` / `"false"` | `"true"` | Show a ^ button in the dock that opens the hidden tray icons popup. Hidden in Legacy Mode. |
 | `nectar-dock-taskview-enabled` | `"true"` / `"false"` | `"false"` | Show a Task View button next to the calendar icon (Win+Tab). Hidden in Legacy Mode. |
+| `nectar-dock-show-desktop-corner` | `"true"` / `"false"` | `"false"` | Click the very bottom-right corner of the screen (a 6 px square on the dock's monitor) to show the desktop, like Win+D. Not while a fullscreen app is in front. |
 | `nectar-dock-recycle-enabled` | `"true"` / `"false"` | `"false"` | Show the Recycle Bin in the dock. Hidden in Legacy Mode. |
 | `nectar-dock-drives` | JSON array, e.g. `["C","D"]` | `[]` | Drive letters to show as dock buttons that open the drive in Explorer. Hidden in Legacy Mode. |
 | `nectar-dock-icon-only` | `"true"` / `"false"` | `"false"` | Minimal icon-only style (no background/padding around icons). |
@@ -46,6 +47,8 @@ Edit `settings.json` with any text editor while Nectar is running. Changes are a
 | `nectar-notch-scroll-volume` | `"true"` / `"false"` | `"false"` | Scroll with mouse wheel over the volume, brightness and mixer sliders to adjust them. |
 | `nectar-shelf-persist` | `"true"` / `"false"` | `"false"` | Keep the notch shelf's items after Nectar restarts. The shelf holds files (as links, not copies) and text dropped on the notch; at most 10, newest first. Off clears them when Nectar closes. Files that no longer exist are dropped on start. |
 | `nectar-notch-remember-mode` | `"true"` / `"false"` | `"false"` | When the cursor leaves the notch and comes back, reopen the Control Center or Calendar panel you were on instead of resetting to the default (status or music). |
+| `nectar-panel-control-center-enabled` | `"true"` / `"false"` | `"true"` | Include the Control Center when scrolling through the notch panels. |
+| `nectar-panel-shelf-enabled` | `"true"` / `"false"` | `"true"` | Include the Shelf panel and accept files and text dropped on the notch. |
 
 ### Monitors
 

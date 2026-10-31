@@ -50,6 +50,8 @@ interface DockTabProps {
   toggleDockTray: () => void;
   dockTaskView: boolean;
   toggleDockTaskView: () => void;
+  dockShowDesktop: boolean;
+  toggleDockShowDesktop: () => void;
   dockRecycle: boolean;
   toggleDockRecycle: () => void;
   dockDrives: string[];
@@ -90,6 +92,8 @@ export function DockTab({
   toggleDockTray,
   dockTaskView,
   toggleDockTaskView,
+  dockShowDesktop,
+  toggleDockShowDesktop,
   dockRecycle,
   toggleDockRecycle,
   dockDrives,
@@ -243,6 +247,13 @@ export function DockTab({
                 <SettingRow icon={LayoutGrid} label={t("dock.taskView")} desc={t("dock.taskView.desc")}>
                   <label className="toggle-switch">
                     <input type="checkbox" checked={dockTaskView} onChange={toggleDockTaskView} />
+                    <span className="slider"></span>
+                  </label>
+                </SettingRow>
+
+                <SettingRow icon={Monitor} label={t("dock.showDesktop")} desc={t("dock.showDesktop.desc")}>
+                  <label className="toggle-switch">
+                    <input type="checkbox" checked={dockShowDesktop} onChange={toggleDockShowDesktop} />
                     <span className="slider"></span>
                   </label>
                 </SettingRow>

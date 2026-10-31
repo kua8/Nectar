@@ -102,6 +102,15 @@ export function useSettings() {
   const [dockTray, setDockTray] = useState(
     () => localStorage.getItem("nectar-dock-tray-enabled") !== "false"
   );
+  const [dockShowDesktop, setDockShowDesktop] = useState(
+    () => localStorage.getItem("nectar-dock-show-desktop-corner") === "true"
+  );
+  const [panelControlCenter, setPanelControlCenter] = useState(
+    () => localStorage.getItem("nectar-panel-control-center-enabled") !== "false"
+  );
+  const [panelShelf, setPanelShelf] = useState(
+    () => localStorage.getItem("nectar-panel-shelf-enabled") !== "false"
+  );
   const [dockTaskView, setDockTaskView] = useState(
     () => localStorage.getItem("nectar-dock-taskview-enabled") === "true"
   );
@@ -226,6 +235,9 @@ export function useSettings() {
       apply(getVal("nectar-dock-calendar-enabled"), setDockCalendarEnabled, readBool);
       apply(getVal("nectar-dock-tray-enabled"), setDockTray, (v) => v !== "false");
       apply(getVal("nectar-dock-taskview-enabled"), setDockTaskView, readBool);
+      apply(getVal("nectar-dock-show-desktop-corner"), setDockShowDesktop, readBool);
+      apply(getVal("nectar-panel-control-center-enabled"), setPanelControlCenter, (v) => v !== "false");
+      apply(getVal("nectar-panel-shelf-enabled"), setPanelShelf, (v) => v !== "false");
       apply(getVal("nectar-dock-recycle-enabled"), setDockRecycle, readBool);
       apply(getVal("nectar-dock-drives"), setDockDrives, parseDrives);
       apply(getVal("nectar-dock-icon-only"), setDockIconOnly, readBool);
@@ -325,6 +337,9 @@ export function useSettings() {
     "nectar-dock-enabled": setDockEnabled,
     "nectar-dock-tray-enabled": (v) => setDockTray(v !== false && v !== "false"),
     "nectar-dock-taskview-enabled": setDockTaskView,
+    "nectar-dock-show-desktop-corner": setDockShowDesktop,
+    "nectar-panel-control-center-enabled": (v) => setPanelControlCenter(v !== false && v !== "false"),
+    "nectar-panel-shelf-enabled": (v) => setPanelShelf(v !== false && v !== "false"),
     "nectar-dock-recycle-enabled": setDockRecycle,
     "nectar-dock-drives": (v) => setDockDrives(parseDrives(v)),
     "nectar-dock-icon-only": setDockIconOnly,
@@ -664,6 +679,24 @@ export function useSettings() {
     const next = !dockTray;
     setDockTray(next);
     saveSetting("nectar-dock-tray-enabled", String(next));
+  };
+
+  const toggleDockShowDesktop = () => {
+    const next = !dockShowDesktop;
+    setDockShowDesktop(next);
+    saveSetting("nectar-dock-show-desktop-corner", String(next));
+  };
+
+  const togglePanelControlCenter = () => {
+    const next = !panelControlCenter;
+    setPanelControlCenter(next);
+    saveSetting("nectar-panel-control-center-enabled", String(next));
+  };
+
+  const togglePanelShelf = () => {
+    const next = !panelShelf;
+    setPanelShelf(next);
+    saveSetting("nectar-panel-shelf-enabled", String(next));
   };
 
   const toggleDockTaskView = () => {
@@ -1056,6 +1089,12 @@ export function useSettings() {
     toggleDockTray,
     dockTaskView,
     toggleDockTaskView,
+    dockShowDesktop,
+    toggleDockShowDesktop,
+    panelControlCenter,
+    togglePanelControlCenter,
+    panelShelf,
+    togglePanelShelf,
     dockRecycle,
     toggleDockRecycle,
     dockDrives,

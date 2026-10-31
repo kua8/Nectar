@@ -469,5 +469,11 @@
   "notch.shelfPersist.desc": "Keep files and text on the notch shelf after Nectar restarts. Files are kept as links, not copies. Up to 10 items",
   "notch.rememberMode": "Remember Last Panel",
   "notch.rememberMode.desc": "When the cursor leaves and comes back, reopen the Control Center or Calendar instead of the default panel",
-  "dockmenu.taskManager": "Task Manager"
+  "dockmenu.taskManager": "Task Manager",
+  "dock.showDesktop": "Show Desktop Corner",
+  "dock.showDesktop.desc": "Click the very bottom-right corner of the screen to show the desktop (Win+D)",
+  "notch.panelControlCenter": "Control Center Panel",
+  "notch.panelControlCenter.desc": "Include the Control Center when scrolling through the notch panels",
+  "notch.panelShelf": "Shelf Panel",
+  "notch.panelShelf.desc": "Include the Shelf and accept files and text dropped on the notch"
 }

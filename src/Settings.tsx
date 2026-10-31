@@ -175,6 +175,10 @@ function SettingsApp() {
               toggleShelfPersist={settings.toggleShelfPersist}
               rememberMode={settings.rememberMode}
               toggleRememberMode={settings.toggleRememberMode}
+              panelControlCenter={settings.panelControlCenter}
+              togglePanelControlCenter={settings.togglePanelControlCenter}
+              panelShelf={settings.panelShelf}
+              togglePanelShelf={settings.togglePanelShelf}
               weatherEnabled={settings.weatherEnabled}
               toggleWeather={settings.toggleWeather}
               tempUnitFahrenheit={settings.tempUnitFahrenheit}
@@ -209,6 +213,8 @@ function SettingsApp() {
               toggleDockTray={settings.toggleDockTray}
               dockTaskView={settings.dockTaskView}
               toggleDockTaskView={settings.toggleDockTaskView}
+              dockShowDesktop={settings.dockShowDesktop}
+              toggleDockShowDesktop={settings.toggleDockShowDesktop}
               dockRecycle={settings.dockRecycle}
               toggleDockRecycle={settings.toggleDockRecycle}
               dockDrives={settings.dockDrives}

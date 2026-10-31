@@ -681,6 +681,8 @@ function App() {
   const [settingsScrollVolume, setSettingsScrollVolume] = useState(() => localStorage.getItem("nectar-notch-scroll-volume") === "true");
   const [settingsShelfPersist, setSettingsShelfPersist] = useState(() => localStorage.getItem("nectar-shelf-persist") === "true");
   const [settingsRememberMode, setSettingsRememberMode] = useState(() => localStorage.getItem("nectar-notch-remember-mode") === "true");
+  const [panelControlCenter, setPanelControlCenter] = useState(() => localStorage.getItem("nectar-panel-control-center-enabled") !== "false");
+  const [panelShelf, setPanelShelf] = useState(() => localStorage.getItem("nectar-panel-shelf-enabled") !== "false");
   const rememberedModeRef = useRef<"command-center" | "calendar" | null>(null);
   const [settingsVisualizerEnabled, setSettingsVisualizerEnabled] = useState(() => localStorage.getItem("nectar-visualizer-enabled") !== "false");
   const [settingsAlbumArtEnabled, setSettingsAlbumArtEnabled] = useState(() => localStorage.getItem("nectar-media-album-art-enabled") !== "false");
@@ -864,6 +866,8 @@ function App() {
       "nectar-notch-scroll-volume": setSettingsScrollVolume,
       "nectar-shelf-persist": setSettingsShelfPersist,
       "nectar-notch-remember-mode": setSettingsRememberMode,
+      "nectar-panel-control-center-enabled": (v) => setPanelControlCenter(v !== false && v !== "false"),
+      "nectar-panel-shelf-enabled": (v) => setPanelShelf(v !== false && v !== "false"),
       "nectar-media-visualizer-enabled": setSettingsVisualizerEnabled,
       "nectar-visualizer-enabled": setSettingsVisualizerEnabled,
       "nectar-media-album-art-enabled": setSettingsAlbumArtEnabled,
@@ -975,7 +979,8 @@ function App() {
     return modes.filter(m => {
       if (m === 'music' && (!settingsMusicModeEnabled || !mediaInfo.has_media)) return false;
       if (m === 'calendar' && !productivityEnabled) return false;
-      if (m === 'shelf' && (!isNotchWindow || settingsLegacyMode)) return false;
+      if (m === 'shelf' && (!isNotchWindow || settingsLegacyMode || !panelShelf)) return false;
+      if (m === 'command-center' && !panelControlCenter) return false;
       return true;
     });
   };
@@ -1642,7 +1647,7 @@ function App() {
     setIsNotchHovered(false);
     setNectarMode(mediaInfo.has_media && isPlaying && settingsMusicCompactNotch ? 'music' : 'status');
   };
-  const shelf = useShelf(windowLabel, isNotchWindow && !settingsLegacyMode, settingsShelfPersist, {
+  const shelf = useShelf(windowLabel, isNotchWindow && !settingsLegacyMode && panelShelf, settingsShelfPersist, {
     onDragEnter: () => {
       setIsHovered(true);
       setIsNotchHovered(true);
@@ -1651,6 +1656,12 @@ function App() {
     onDragLeave: collapseAfterShelfDrag,
     onDrop: () => setNectarMode('shelf'),
   });
+
+  useEffect(() => {
+    if ((nectarMode === 'command-center' && !panelControlCenter) || (nectarMode === 'shelf' && !panelShelf)) {
+      setNectarMode('status');
+    }
+  }, [nectarMode, panelControlCenter, panelShelf]);
 
   // Music mode shows any time we have media info (playing or paused) and music mode setting is enabled
   const isMusicMode = mediaInfo.has_media && nectarMode === 'music' && settingsMusicModeEnabled;

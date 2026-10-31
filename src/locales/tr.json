@@ -469,5 +469,11 @@
   "notch.shelfPersist.desc": "Nectar yeniden başlatıldıktan sonra çentik rafındaki dosya ve metinleri koru. Dosyalar kopya değil bağlantı olarak tutulur. En fazla 10 öğe",
   "notch.rememberMode": "Son Paneli Hatırla",
   "notch.rememberMode.desc": "İmleç çıkıp geri geldiğinde varsayılan panel yerine Denetim Merkezi'ni veya Takvim'i yeniden aç",
-  "dockmenu.taskManager": "Görev Yöneticisi"
+  "dockmenu.taskManager": "Görev Yöneticisi",
+  "dock.showDesktop": "Masaüstü Köşesi",
+  "dock.showDesktop.desc": "Masaüstünü göstermek için ekranın en sağ alt köşesine tıklayın (Win+D)",
+  "notch.panelControlCenter": "Denetim Merkezi Paneli",
+  "notch.panelControlCenter.desc": "Çentik panelleri arasında gezinirken Denetim Merkezi'ni dahil et",
+  "notch.panelShelf": "Raf Paneli",
+  "notch.panelShelf.desc": "Rafı dahil et ve çentiğe bırakılan dosya ve metinleri kabul et"
 }

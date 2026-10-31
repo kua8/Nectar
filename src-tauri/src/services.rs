@@ -4,7 +4,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
 use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
 use windows::core::BOOL;
-use windows::Win32::UI::WindowsAndMessaging::{GetWindowThreadProcessId, IsWindowVisible, GetWindowLongW, GWL_EXSTYLE, WS_EX_TOOLWINDOW, WH_MOUSE_LL, MSLLHOOKSTRUCT, WM_MOUSEMOVE, SetWindowsHookExW, CallNextHookEx};
+use windows::Win32::UI::WindowsAndMessaging::{GetWindowThreadProcessId, IsWindowVisible, GetWindowLongW, GWL_EXSTYLE, WS_EX_TOOLWINDOW, WH_MOUSE_LL, MSLLHOOKSTRUCT, WM_MOUSEMOVE, WM_LBUTTONDOWN, SetWindowsHookExW, CallNextHookEx};
 use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_EXTENDED_FRAME_BOUNDS};
 use windows::Win32::System::Threading::{OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_NAME_WIN32};
 use windows::Win32::Foundation::CloseHandle;
@@ -1782,7 +1782,37 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
             worker.unpark();
         }
     }
+    if code >= 0 && wparam.0 == WM_LBUTTONDOWN as usize && !SHUTTING_DOWN.load(Ordering::Relaxed) {
+        let pt = (*(lparam.0 as *const MSLLHOOKSTRUCT)).pt;
+        if in_show_desktop_corner(pt.x, pt.y) {
+            std::thread::spawn(|| crate::commands::send_win_chord(windows::Win32::UI::Input::KeyboardAndMouse::VK_D));
+        }
+    }
     CallNextHookEx(None, code, wparam, lparam)
+}
+
+fn in_show_desktop_corner(x: i32, y: i32) -> bool {
+    const CORNER: i32 = 6;
+    if CURRENT_FOREGROUND_FULLSCREEN.load(Ordering::Relaxed) {
+        return false;
+    }
+    let setting = |key: &str| {
+        crate::state::SETTINGS_CACHE
+            .get()
+            .and_then(|cache| cache.lock().ok())
+            .and_then(|guard| guard.get(key).and_then(|v| v.as_str().map(|s| s.to_string())))
+    };
+    if setting("nectar-dock-show-desktop-corner").as_deref() != Some("true") || setting("nectar-dock-enabled").as_deref() == Some("false") {
+        return false;
+    }
+    let (Some((mx, my)), Some((mw, mh))) = (
+        MH_CACHED_DOCK_MON_POS.lock().ok().and_then(|g| *g),
+        MH_CACHED_DOCK_MON_SIZE.lock().ok().and_then(|g| *g),
+    ) else {
+        return false;
+    };
+    let (right, bottom) = (mx + mw as i32, my + mh as i32);
+    x >= right - CORNER && x < right && y >= bottom - CORNER && y < bottom
 }
 
 unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Foundation::POINT) {
