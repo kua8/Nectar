@@ -1324,6 +1324,9 @@ img {
 
 .header-visualizer-wrap {
     position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
     padding-top: 4px;
 }
 
@@ -1530,21 +1533,18 @@ img {
 }
 
 .music-calendar-btn {
-    position: absolute;
-    top: 2px;
-    right: 6px;
-    z-index: 5;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 22px;
-    height: 22px;
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
     padding: 0;
     border: none;
     border-radius: 50%;
     background: transparent;
     color: var(--nectar-text, white);
-    opacity: 0.45;
+    opacity: 0.6;
     cursor: pointer;
     transition: opacity 0.15s ease, background 0.15s ease;
 }

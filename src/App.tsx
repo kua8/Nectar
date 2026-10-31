@@ -1776,11 +1776,6 @@ function App() {
                     exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.1 } }}
                     transition={{ type: "spring", stiffness: 500, damping: 30 }}
                   >
-                    {productivityEnabled && (
-                      <button className="music-calendar-btn" onClick={toggleCalendarMode} title={t("music.openCalendar")} aria-label={t("music.openCalendar")}>
-                        <CalendarDays size={13} strokeWidth={2} />
-                      </button>
-                    )}
                     {mediaLayout === 'compact' ? (
                       <CompactMediaPlayer
                         mediaInfo={mediaInfo}
@@ -1798,6 +1793,7 @@ function App() {
                         nextBack={nextBack}
                         onAnimatePrev={animatePrev}
                         onAnimateNext={animateNext}
+                        onOpenCalendar={productivityEnabled ? toggleCalendarMode : undefined}
                         onLayoutChange={(layout) => {
                           setMediaLayout(layout);
                           localStorage.setItem("nectar-media-layout", layout);
@@ -1854,6 +1850,11 @@ function App() {
                             <span className="premium-artist">{mediaInfo.artist}</span>
                           </div>
                           <div className="header-visualizer-wrap">
+                            {productivityEnabled && (
+                              <button className="music-calendar-btn" onClick={toggleCalendarMode} title={t("music.openCalendar")} aria-label={t("music.openCalendar")}>
+                                <CalendarDays size={16} strokeWidth={1.75} />
+                              </button>
+                            )}
                             <div className="header-visualizer">
                               <Visualizer isPlaying={isPlaying} bars={5} height={18} />
                             </div>
@@ -1918,7 +1919,7 @@ function App() {
                         </div>
 
                         <div className="volume-slider-container">
-                          <VolumeLowIcon size={12} style={{ opacity: 0.5 }} />
+                          <VolumeLowIcon size={14} style={{ opacity: 0.65 }} />
                           <div className="slider-track-premium">
                             <input
                               type="range"
@@ -1933,7 +1934,7 @@ function App() {
                             />
                             <div className="slider-progress-fill" style={{ width: `${displayVolume * 100}%` }} />
                           </div>
-                          <VolumeHighIcon size={14} style={{ opacity: 0.5 }} />
+                          <VolumeHighIcon size={16} style={{ opacity: 0.65 }} />
                         </div>
                       </div>
 

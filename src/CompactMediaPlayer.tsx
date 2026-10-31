@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { Visualizer } from './App';
 import { useT } from './i18n';
 import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, MusicNoteIcon, SpeakerIcon, AudioOutputIcon, VolumeLowIcon, VolumeHighIcon } from './icons';
+import { CalendarDays } from 'lucide-react';
 
 interface MediaInfo {
   title: string;
@@ -34,6 +35,7 @@ interface CompactMediaPlayerProps {
   onAnimatePrev: () => void;
   onAnimateNext: () => void;
   onLayoutChange: (layout: 'classic' | 'compact') => void;
+  onOpenCalendar?: (e: React.MouseEvent) => void;
 }
 
 const MARQUEE_SPEED = 30;
@@ -115,6 +117,7 @@ export function CompactMediaPlayer({
   onAnimatePrev,
   onAnimateNext,
   onLayoutChange,
+  onOpenCalendar,
 }: CompactMediaPlayerProps) {
   const t = useT();
   const seekRef = useRef<HTMLInputElement>(null);
@@ -212,6 +215,11 @@ export function CompactMediaPlayer({
           <TitleMarquee title={mediaInfo.title} />
           <span className="cmp-artist">{mediaInfo.artist}</span>
         </div>
+        {onOpenCalendar && (
+          <button className="music-calendar-btn" onClick={onOpenCalendar} title={t("music.openCalendar")} aria-label={t("music.openCalendar")}>
+            <CalendarDays size={16} strokeWidth={1.75} />
+          </button>
+        )}
         <div className="cmp-visualizer">
           <Visualizer isPlaying={isPlaying} bars={5} height={16} />
         </div>
@@ -311,7 +319,7 @@ export function CompactMediaPlayer({
             transition={{ type: "spring", stiffness: 500, damping: 30 }}
           >
             <div className="cmp-volume-row">
-              <VolumeLowIcon size={12} style={{ opacity: 0.5, flexShrink: 0 }} />
+              <VolumeLowIcon size={14} style={{ opacity: 0.65, flexShrink: 0 }} />
               <div className="cmp-volume-track">
                 <div className="cmp-volume-fill" style={{ width: `${volume * 100}%` }} />
                 <input
@@ -322,7 +330,7 @@ export function CompactMediaPlayer({
                   onClick={(e) => e.stopPropagation()}
                 />
               </div>
-              <VolumeHighIcon size={14} style={{ opacity: 0.5, flexShrink: 0 }} />
+              <VolumeHighIcon size={16} style={{ opacity: 0.65, flexShrink: 0 }} />
             </div>
           </motion.div>
         )}

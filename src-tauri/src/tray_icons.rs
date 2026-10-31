@@ -131,6 +131,18 @@ fn place_flyout(flyout: HWND, anchor: Option<(i32, i32)>) {
     }
 }
 
+/// Loads UI Automation and walks the taskbar once, so the first real click isn't the slow one.
+pub fn warm_up() {
+    unsafe {
+        let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+    }
+    let Ok(_guard) = AUTOMATION_LOCK.try_lock() else { return };
+    let (Ok(tray), Ok(auto)) = (find_window(c"Shell_TrayWnd"), automation()) else { return };
+    if let Ok(root) = unsafe { auto.ElementFromHandle(tray) } {
+        let _ = find_show_hidden_icons_button(&auto, &root);
+    }
+}
+
 pub fn open_native_tray(anchor: Option<(i32, i32)>) {
     unsafe {
         let _ = CoInitializeEx(None, COINIT_MULTITHREADED);

@@ -349,6 +349,10 @@ fn main() {
             {
                 use tauri::menu::{Menu, MenuItem};
                 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+                std::thread::spawn(|| {
+                    std::thread::sleep(std::time::Duration::from_secs(5));
+                    crate::tray_icons::warm_up();
+                });
                 let handle = app.handle();
                 let make = |id: &str, key: &'static str| -> tauri::Result<MenuItem<tauri::Wry>> {
                     let item = MenuItem::with_id(app, id, crate::i18n::tr(handle, key), true, None::<&str>)?;
