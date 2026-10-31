@@ -2345,7 +2345,7 @@ img {
 .cc-pill-tile.active .cc-pill-more:hover { opacity: 1; background: rgba(0, 0, 0, 0.12); }
 .widget-tip { position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 20; padding: 5px 10px; border-radius: 6px; background: rgba(0, 0, 0, 0.85); color: white; font-size: 11px; font-weight: 500; white-space: nowrap; pointer-events: none; animation: widget-tip-in 0.12s ease-out 0.25s backwards; }
 @keyframes widget-tip-in { from { opacity: 0; } to { opacity: 1; } }
-.tour-content { position: absolute; top: 36px; left: 0; width: 100%; height: calc(100% - 36px); box-sizing: border-box; z-index: 2; padding: 8px 18px 14px; display: flex; flex-direction: column; gap: 8px; color: var(--nectar-text, rgba(255, 255, 255, 0.9)); }
+.tour-content { position: absolute; top: 36px; left: 0; width: 100%; height: calc(100% - 36px); box-sizing: border-box; z-index: 2; padding: 8px 18px 14px; display: flex; flex-direction: column; gap: 8px; color: var(--nectar-text, rgba(255, 255, 255, 0.9)); pointer-events: auto; }
 .tour-head { display: flex; align-items: center; gap: 8px; }
 .tour-icon { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: var(--nectar-group-bg, rgba(255, 255, 255, 0.1)); flex-shrink: 0; }
 .tour-title { flex: 1; font-size: 13px; font-weight: 600; }
