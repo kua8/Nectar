@@ -3183,9 +3183,14 @@ pub async fn has_battery() -> Result<bool, String> {
             );
         }
         use windows::System::Power::{BatteryStatus, PowerManager};
+        use windows::Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
+        let mut status = SYSTEM_POWER_STATUS::default();
+        if unsafe { GetSystemPowerStatus(&mut status) }.is_ok() && status.BatteryFlag == 128 {
+            return Ok(false);
+        }
         match PowerManager::BatteryStatus() {
             Ok(status) => Ok(status != BatteryStatus::NotPresent),
-            Err(_) => Ok(true), // Unknown — default to showing it rather than hiding a real battery
+            Err(_) => Ok(true),
         }
     }).await.map_err(|e| e.to_string())?
 }

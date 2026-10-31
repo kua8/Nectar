@@ -854,7 +854,7 @@ export function useSettings() {
     await invoke("save_setting", { key: "nectar-weather-lat", value: city.latitude.toString() }).catch(() => {});
     await invoke("save_setting", { key: "nectar-weather-lon", value: city.longitude.toString() }).catch(() => {});
     await invoke("save_setting", { key: "nectar-weather-city", value: city.name }).catch(() => {});
-    emit("weather-refresh", { lat: city.latitude, lon: city.longitude });
+    emit("weather-refresh", { lat: city.latitude, lon: city.longitude, city: city.name });
   };
 
   const handleCityClear = async () => {

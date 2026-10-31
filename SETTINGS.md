@@ -72,7 +72,7 @@ With **All Monitors** and more than one display, the **Per-Monitor Behavior** to
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `nectar-weather-enabled` | `"true"` / `"false"` | `"true"` | Show weather widget in the notch status bar. |
-| `nectar-weather-city` | string | `""` | Manually set city name for weather. Empty string = auto-detect via IP geolocation (HTTPS only), falling back to London if that fails. |
+| `nectar-weather-city` | string | `""` | Manually set city name for weather. Empty string = auto-detect via IP geolocation (HTTPS only). If detection fails and no city is set, no weather is shown. |
 | `nectar-weather-lat` | number string | (auto) | Latitude coordinate for weather. Set automatically when a city is selected. |
 | `nectar-weather-lon` | number string | (auto) | Longitude coordinate for weather. Set automatically when a city is selected. |
 | `nectar-weather-cached-temp` | number string | (none) | Cached temperature value shown before next API fetch. |

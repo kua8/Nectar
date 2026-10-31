@@ -65,7 +65,7 @@
   "notch.compactGlow.desc": "Daraltılmış küçük resmin etrafında ışıma",
   "notch.weather.group": "Hava Durumu",
   "notch.weather": "Hava Durumu Bilgisi",
-  "notch.weather.auto": "Konumu otomatik algıla (algılanamazsa Londra, ayarlamak için bir şehir arayın)",
+  "notch.weather.auto": "Konumu otomatik algıla (bulunamazsa bir şehir arayın)",
   "notch.weather.search": "Şehir ara...",
   "notch.weather.clear": "Şehri temizle",
   "notch.widgets.group": "Widget'lar",

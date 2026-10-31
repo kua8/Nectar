@@ -53,8 +53,6 @@ const WMO_CODES: Record<number, string> = {
   99: "Stormy",
 };
 
-const LONDON_LAT = 51.5074;
-const LONDON_LON = -0.1278;
 const REFRESH_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 
 interface WeatherState {
@@ -149,7 +147,7 @@ function lastIpLocation(): ResolvedLocation | null {
   }
 }
 
-async function resolveLocation(): Promise<ResolvedLocation> {
+async function resolveLocation(): Promise<ResolvedLocation | null> {
   // 1. Check saved coordinates from settings or localStorage
   try {
     const settings = (await invoke("load_settings").catch(() => ({}))) as Record<
@@ -202,10 +200,26 @@ async function resolveLocation(): Promise<ResolvedLocation> {
     // fall through to default
   }
 
-  // 4. Default to London
-  const last = lastIpLocation();
-  if (last) return last;
-  return { lat: LONDON_LAT, lon: LONDON_LON, city: "London" };
+  // 4. More IP geolocation providers
+  for (const provider of [
+    { url: "https://ipwho.is/", city: "city" },
+    { url: "https://get.geojs.io/v1/ip/geo.json", city: "city" },
+  ]) {
+    try {
+      const res = await fetch(provider.url);
+      if (!res.ok) continue;
+      const data = await res.json();
+      const lat = parseFloat(data.latitude);
+      const lon = parseFloat(data.longitude);
+      if (Number.isFinite(lat) && Number.isFinite(lon)) {
+        return rememberIpLocation({ lat, lon, city: data[provider.city] || undefined });
+      }
+    } catch {
+      // try the next one
+    }
+  }
+
+  return lastIpLocation();
 }
 
 async function persistWeather(
@@ -252,13 +266,12 @@ export function useWeather(enabled: boolean) {
 
   // Core fetch + refresh logic
   const doFetch = useCallback(
-    async (showStaleOnError = true, coords?: { lat: number; lon: number }) => {
+    async (showStaleOnError = true, coords?: { lat: number; lon: number }, city?: string) => {
       if (!enabledRef.current) return;
 
       try {
-        const location = coords
-          ? { ...coords, city: undefined }
-          : await resolveLocation();
+        const location = coords ? { ...coords, city: city } : await resolveLocation();
+        if (!location) return;
         const result = await fetchWeatherForCoords(
           location.lat,
           location.lon,
@@ -326,8 +339,8 @@ export function useWeather(enabled: boolean) {
       "settings-changed",
       (event) => {
         const { key, value } = event.payload;
-        if (key === "temp-unit") {
-          setTempUnit(value ? "fahrenheit" : "celsius");
+        if (key === "nectar-temp-unit") {
+          setTempUnit(String(value));
         }
       },
     );
@@ -350,7 +363,7 @@ export function useWeather(enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
 
-    const unlisten = listen<{ lat: number; lon: number } | true>(
+    const unlisten = listen<{ lat: number; lon: number; city?: string } | true>(
       "weather-refresh",
       (event) => {
         const payload = event.payload;
@@ -360,7 +373,7 @@ export function useWeather(enabled: boolean) {
           "lat" in payload &&
           "lon" in payload
         ) {
-          doFetch(false, { lat: (payload as any).lat, lon: (payload as any).lon });
+          doFetch(false, { lat: (payload as any).lat, lon: (payload as any).lon }, (payload as any).city);
         } else {
           doFetch(false);
         }
@@ -377,7 +390,7 @@ export function useWeather(enabled: boolean) {
       "settings-changed",
       (event) => {
         const { key, value } = event.payload;
-        if (key === "weather-city") {
+        if (key === "nectar-weather-city") {
           setCityName(String(value || ""));
         }
       },

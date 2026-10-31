@@ -65,7 +65,7 @@
   "notch.compactGlow.desc": "Glow around collapsed thumbnail",
   "notch.weather.group": "Weather",
   "notch.weather": "Weather Status",
-  "notch.weather.auto": "Auto-detect location (London if detection fails, search a city to set it)",
+  "notch.weather.auto": "Auto-detect location (search a city if it can't be found)",
   "notch.weather.search": "Search city...",
   "notch.weather.clear": "Clear city",
   "notch.widgets.group": "Widgets",

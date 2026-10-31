@@ -359,7 +359,7 @@ function App() {
   const [isCharging, setIsCharging] = useState(false);
   const [batterySecondsLeft, setBatterySecondsLeft] = useState<number | null>(null);
   const [widgetTip, setWidgetTip] = useState<string | null>(null);
-  const [hasBattery, setHasBattery] = useState(true);
+  const [hasBattery, setHasBattery] = useState(() => localStorage.getItem("nectar-has-battery") !== "false");
   const [showPowerPulse, setShowPowerPulse] = useState(false);
   const [showLowBatteryPulse, setShowLowBatteryPulse] = useState(false);
   const [lowBatteryThreshold, setLowBatteryThreshold] = useState(() => parseInt(localStorage.getItem("nectar-low-battery-threshold") || "20"));
@@ -1284,7 +1284,10 @@ function App() {
   useEffect(() => {
     invoke<boolean>("get_bluetooth_state").then(setBluetoothEnabled).catch(() => { });
     invoke<boolean>("get_battery_saver_state").then(setBatterySaverEnabled).catch(() => { });
-    invoke<boolean>("has_battery").then(setHasBattery).catch(() => { });
+    invoke<boolean>("has_battery").then((present) => {
+      setHasBattery(present);
+      localStorage.setItem("nectar-has-battery", String(present));
+    }).catch(() => { });
     invoke<{ volume: number; is_muted: boolean }>("get_volume_state")
       .then((state) => { setVolume(state.volume); setIsMuted(state.is_muted); })
       .catch(() => { });
