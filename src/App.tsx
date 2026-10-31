@@ -662,6 +662,9 @@ function App() {
   const [settingsTimerSoundEnabled, setSettingsTimerSoundEnabled] = useState(
     () => localStorage.getItem("nectar-timer-sound-enabled") !== "false",
   );
+  const [settingsTimerProgressEnabled, setSettingsTimerProgressEnabled] = useState(
+    () => localStorage.getItem("nectar-notch-timer-progress") !== "false",
+  );
   const [settingsStopwatchEnabled, setSettingsStopwatchEnabled] = useState(
     () => (localStorage.getItem("nectar-stopwatch-enabled") ?? localStorage.getItem("nectar-calendar-enabled")) !== "false",
   );
@@ -844,6 +847,7 @@ function App() {
       "nectar-calendar-enabled": setSettingsCalendarEnabled,
       "nectar-timer-enabled": setSettingsTimerEnabled,
       "nectar-timer-sound-enabled": setSettingsTimerSoundEnabled,
+      "nectar-notch-timer-progress": setSettingsTimerProgressEnabled,
       "nectar-stopwatch-enabled": setSettingsStopwatchEnabled,
       "nectar-dual-clock-enabled": setSettingsDualClockEnabled,
       "nectar-dual-clock-zone": (value) => setDualClockZone(String(value)),
@@ -997,6 +1001,7 @@ function App() {
 
   // Timer state
   const [timerSeconds, setTimerSeconds] = useState(0);
+  const [timerTotalSeconds, setTimerTotalSeconds] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [isCompactTimerVisible, setIsCompactTimerVisible] = useState(false);
   const [isTimerFinished, setIsTimerFinished] = useState(false);
@@ -1011,20 +1016,36 @@ function App() {
   const startTimerSeconds = (seconds: number) => {
     // Unlock audio on this click so the chime can play later.
     getTimerChimeCtx();
+    setTimerTotalSeconds(seconds);
     setTimerSeconds(seconds);
     setIsTimerRunning(true);
     setIsTimerFinished(false);
   };
 
   const toggleTimer = () => {
-    if (!isTimerRunning) getTimerChimeCtx();
+    if (!isTimerRunning) {
+      getTimerChimeCtx();
+      if (timerTotalSeconds === 0 && timerSeconds > 0) {
+        setTimerTotalSeconds(timerSeconds);
+      }
+    }
     setIsTimerRunning(!isTimerRunning);
   };
   const resetTimer = () => {
     setIsTimerRunning(false);
     setTimerSeconds(0);
+    setTimerTotalSeconds(0);
     setIsTimerFinished(false);
   };
+
+  const timerProgressRatio = timerTotalSeconds > 0
+    ? Math.min(1, Math.max(0, (timerTotalSeconds - timerSeconds) / timerTotalSeconds))
+    : (isTimerFinished ? 1 : 0);
+  const timerProgressPercent = Math.round(timerProgressRatio * 1000) / 10;
+  const showTimerProgressBar = settingsTimerProgressEnabled && settingsTimerEnabled && (
+    (timerTotalSeconds > 0 && (isTimerRunning || timerSeconds > 0)) || isTimerFinished
+  );
+  const isBreakTimer = timerTotalSeconds > 0 && timerTotalSeconds <= 15 * 60;
 
   const stopwatch = useStopwatch();
 
@@ -2419,6 +2440,24 @@ function App() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {showTimerProgressBar && (
+          <div
+            className={`notch-timer-progress-track ${isTimerRunning ? 'active' : 'paused'} ${isTimerFinished ? 'finished' : ''} ${isBreakTimer ? 'is-break' : 'is-focus'}`}
+            style={{
+              borderBottomLeftRadius: isCalendarMode ? 28 : 18,
+              borderBottomRightRadius: isCalendarMode ? 28 : 18,
+            }}
+            title={`${formatTimerTime(timerSeconds)} (${Math.round(timerProgressRatio * 100)}%)`}
+          >
+            <div
+              className="notch-timer-progress-fill"
+              style={{
+                width: `${timerProgressPercent}%`
+              }}
+            />
+          </div>
+        )}
 
       </motion.div>
     </div>

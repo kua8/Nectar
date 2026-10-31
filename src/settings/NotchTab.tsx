@@ -44,6 +44,8 @@ interface NotchTabProps {
   toggleTimerEnabled: () => void;
   timerSoundEnabled: boolean;
   toggleTimerSound: () => void;
+  notchTimerProgress: boolean;
+  toggleNotchTimerProgress: () => void;
   stopwatchEnabled: boolean;
   toggleStopwatchEnabled: () => void;
   legacyMode: boolean;
@@ -96,6 +98,8 @@ export function NotchTab({
   toggleTimerEnabled,
   timerSoundEnabled,
   toggleTimerSound,
+  notchTimerProgress,
+  toggleNotchTimerProgress,
   stopwatchEnabled,
   toggleStopwatchEnabled,
   legacyMode,
@@ -233,6 +237,15 @@ export function NotchTab({
           <SettingRow icon={BellRing} label={t("notch.timerSound")} desc={t("notch.timerSound.desc")}>
             <label className="toggle-switch">
               <input type="checkbox" checked={timerSoundEnabled} onChange={toggleTimerSound} />
+              <span className="slider"></span>
+            </label>
+          </SettingRow>
+        )}
+
+        {timerEnabled && (
+          <SettingRow icon={Timer} label={t("notch.timerProgress")} desc={t("notch.timerProgress.desc")}>
+            <label className="toggle-switch">
+              <input type="checkbox" checked={notchTimerProgress} onChange={toggleNotchTimerProgress} />
               <span className="slider"></span>
             </label>
           </SettingRow>

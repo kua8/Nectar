@@ -42,6 +42,7 @@ Edit `settings.json` with any text editor while Nectar is running. Changes are a
 |-----|------|---------|-------------|
 | `nectar-notch-edge-delay` | number string (ms) | `"200"` | Smart and peek notch only. How long the cursor has to rest on the top edge before the notch peeks, so sweeping across a maximized window's tabs doesn't trigger it. `0` peeks instantly. Maximum `2000`. |
 | `nectar-notch-mode` | `"fixed"` / `"smart"` / `"peek"` | `"fixed"` | Notch (top bar) visibility behavior. **fixed** = always visible, never auto-hides (including over fullscreen apps — matches a real hardware notch, which doesn't disappear either). **smart** = hides when overlapped by another window/fullscreen app, reveals on hover. **peek** = hidden until cursor approaches the top edge, a media event, or a notification. Smart/peek reveal and are fully clickable on hover even over a fullscreen app (only a thin strip right at the screen edge stays click-through, so it never steals input meant for another app). Unlike the Dock, the notch never reserves desktop work-area space, so it never leaves a gap above maximized windows' content. |
+| `nectar-notch-timer-progress` | `"true"` / `"false"` | `"true"` | Show an edge progress bar along the bottom of the notch while a timer or Pomodoro session is active. |
 
 ### Monitors
 

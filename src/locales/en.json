@@ -451,5 +451,7 @@
   "dualClock.sameTime": "Same time as here",
   "dualClock.ahead": "{amount} ahead",
   "dualClock.behind": "{amount} behind",
-  "battery.updateAvailable": "Update Available"
+  "battery.updateAvailable": "Update Available",
+  "notch.timerProgress": "Timer Progress Bar",
+  "notch.timerProgress.desc": "Show an edge progress bar on the notch while a timer is active"
 }

@@ -33,6 +33,9 @@ export function useSettings() {
   const [calendarEnabled, setCalendarEnabled] = useState(true);
   const [timerEnabled, setTimerEnabled] = useState(true);
   const [timerSoundEnabled, setTimerSoundEnabled] = useState(true);
+  const [notchTimerProgress, setNotchTimerProgress] = useState(
+    () => localStorage.getItem("nectar-notch-timer-progress") !== "false"
+  );
   const [stopwatchEnabled, setStopwatchEnabled] = useState(true);
   const [dualClockEnabled, setDualClockEnabled] = useState(
     () => localStorage.getItem("nectar-dual-clock-enabled") === "true"
@@ -186,6 +189,7 @@ export function useSettings() {
       apply(getVal("nectar-calendar-enabled"), setCalendarEnabled, readBool);
       apply(getVal("nectar-timer-enabled") ?? getVal("nectar-calendar-enabled"), setTimerEnabled, readBool);
       apply(getVal("nectar-timer-sound-enabled"), setTimerSoundEnabled, readBool);
+      apply(getVal("nectar-notch-timer-progress"), setNotchTimerProgress, readBool);
       apply(getVal("nectar-stopwatch-enabled") ?? getVal("nectar-calendar-enabled"), setStopwatchEnabled, readBool);
       apply(getVal("nectar-dual-clock-enabled"), setDualClockEnabled, readBool);
       apply(getVal("nectar-dual-clock-zone"), setDualClockZone, (v) => v);
@@ -316,6 +320,7 @@ export function useSettings() {
     "nectar-calendar-enabled": setCalendarEnabled,
     "nectar-timer-enabled": setTimerEnabled,
     "nectar-timer-sound-enabled": setTimerSoundEnabled,
+    "nectar-notch-timer-progress": setNotchTimerProgress,
     "nectar-stopwatch-enabled": setStopwatchEnabled,
     "nectar-dual-clock-enabled": setDualClockEnabled,
     "nectar-dual-clock-zone": (v) => setDualClockZone(String(v)),
@@ -484,6 +489,12 @@ export function useSettings() {
     const next = !timerSoundEnabled;
     setTimerSoundEnabled(next);
     saveSetting("nectar-timer-sound-enabled", String(next));
+  };
+
+  const toggleNotchTimerProgress = () => {
+    const next = !notchTimerProgress;
+    setNotchTimerProgress(next);
+    saveSetting("nectar-notch-timer-progress", String(next));
   };
 
   const toggleStopwatchEnabled = () => {
@@ -940,6 +951,8 @@ export function useSettings() {
     toggleTimerEnabled,
     timerSoundEnabled,
     toggleTimerSound,
+    notchTimerProgress,
+    toggleNotchTimerProgress,
     stopwatchEnabled,
     toggleStopwatchEnabled,
     dualClockEnabled,
