@@ -451,5 +451,14 @@
   "dualClock.sameTime": "Burayla aynı saat",
   "dualClock.ahead": "{amount} ileri",
   "dualClock.behind": "{amount} geri",
-  "battery.updateAvailable": "Güncelleme Mevcut"
+  "battery.updateAvailable": "Güncelleme Mevcut",
+  "media.previous": "Önceki",
+  "media.next": "Sonraki",
+  "media.play": "Oynat",
+  "media.pause": "Duraklat",
+  "music.openCalendar": "Takvimi ve zamanlayıcıyı aç",
+  "notch.timerProgress": "Zamanlayıcı İlerleme Çubuğu",
+  "notch.timerProgress.desc": "Zamanlayıcı etkinken çentik kenarında ilerleme çubuğu göster",
+  "notch.scrollVolume": "Kaydırıcılarda Kaydırma",
+  "notch.scrollVolume.desc": "Ayarlamak için ses ve parlaklık kaydırıcıları üzerinde fare tekerleğini kaydırın"
 }
