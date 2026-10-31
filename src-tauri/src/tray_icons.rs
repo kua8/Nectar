@@ -105,6 +105,32 @@ fn describe_elements(automation: &IUIAutomation, root: &IUIAutomationElement) ->
     }
 }
 
+fn nectar_theme_is_light() -> bool {
+    crate::state::SETTINGS_CACHE
+        .get()
+        .and_then(|cache| cache.lock().ok())
+        .and_then(|guard| guard.get("nectar-theme-mode").and_then(|v| v.as_str()).map(|m| m == "light"))
+        .unwrap_or(false)
+}
+
+/// Rounded corners, an acrylic backdrop and a dark or light frame to match Nectar's theme.
+fn style_flyout(flyout: HWND) {
+    use windows::Win32::Graphics::Dwm::{
+        DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_SYSTEMBACKDROP_TYPE,
+        DWMWA_USE_IMMERSIVE_DARK_MODE, DWMWA_WINDOW_CORNER_PREFERENCE,
+    };
+    let dark = windows::core::BOOL(if nectar_theme_is_light() { 0 } else { 1 });
+    let corner_pref: u32 = 2; // DWMWCP_ROUND
+    let backdrop_type: u32 = 3; // DWMSBT_TRANSIENTWINDOW (acrylic)
+    let border_color: u32 = if nectar_theme_is_light() { 0x00D0D0D0 } else { 0x00333333 };
+    unsafe {
+        let _ = DwmSetWindowAttribute(flyout, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark as *const _ as _, std::mem::size_of::<windows::core::BOOL>() as u32);
+        let _ = DwmSetWindowAttribute(flyout, DWMWA_WINDOW_CORNER_PREFERENCE, &corner_pref as *const _ as _, 4);
+        let _ = DwmSetWindowAttribute(flyout, DWMWA_SYSTEMBACKDROP_TYPE, &backdrop_type as *const _ as _, 4);
+        let _ = DwmSetWindowAttribute(flyout, DWMWA_BORDER_COLOR, &border_color as *const _ as _, 4);
+    }
+}
+
 fn place_flyout(flyout: HWND, anchor: Option<(i32, i32)>) {
     unsafe {
         let mut cursor = POINT::default();
@@ -126,46 +152,9 @@ fn place_flyout(flyout: HWND, anchor: Option<(i32, i32)>) {
         let x = (ax - w / 2).clamp(work.left + 8, (work.right - w - 8).max(work.left + 8));
         let below = ay + 10;
         let y = if below + h <= work.bottom - 8 { below } else { (ay - h - 10).max(work.top + 8) };
+        style_flyout(flyout);
         let _ = SetWindowPos(flyout, Some(HWND_TOPMOST), x, y, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW);
         let _ = SetForegroundWindow(flyout);
-
-        // Apply dark mode, rounded corners and acrylic glass backdrop to match Nectar's liquid glass theme
-        use windows::Win32::Graphics::Dwm::{
-            DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_SYSTEMBACKDROP_TYPE,
-            DWMWA_USE_IMMERSIVE_DARK_MODE, DWMWA_WINDOW_CORNER_PREFERENCE,
-        };
-
-        let dark = windows::core::BOOL(1);
-        let _ = DwmSetWindowAttribute(
-            flyout,
-            DWMWA_USE_IMMERSIVE_DARK_MODE,
-            &dark as *const _ as _,
-            std::mem::size_of::<windows::core::BOOL>() as u32,
-        );
-
-        let corner_pref: u32 = 2; // DWMWCP_ROUND (Round corners)
-        let _ = DwmSetWindowAttribute(
-            flyout,
-            DWMWA_WINDOW_CORNER_PREFERENCE,
-            &corner_pref as *const _ as _,
-            std::mem::size_of::<u32>() as u32,
-        );
-
-        let backdrop_type: u32 = 3; // DWMSBT_TRANSIENTWINDOW (Acrylic)
-        let _ = DwmSetWindowAttribute(
-            flyout,
-            DWMWA_SYSTEMBACKDROP_TYPE,
-            &backdrop_type as *const _ as _,
-            std::mem::size_of::<u32>() as u32,
-        );
-
-        let border_color: u32 = 0x00333333; // Subtle dark translucent border
-        let _ = DwmSetWindowAttribute(
-            flyout,
-            DWMWA_BORDER_COLOR,
-            &border_color as *const _ as _,
-            std::mem::size_of::<u32>() as u32,
-        );
     }
 }
 
