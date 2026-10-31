@@ -1351,22 +1351,57 @@ input:checked + .slider:before {
     margin-bottom: 4px;
 }
 
-.setting-section-header {
+.setting-group-label.setting-section-header {
     font-family: inherit;
-    padding: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 8px;
     width: 100%;
-    background: none;
-    border: none;
-    cursor: pointer;
+    box-sizing: border-box;
+    margin: 12px 0 6px;
+    padding: 11px 14px;
+    background: var(--group-bg);
+    border: 1px solid var(--nectar-border, rgba(255, 255, 255, 0.05));
+    border-radius: 12px;
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    text-transform: none;
+    color: var(--nectar-text, #fff);
     text-align: left;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.setting-group-label.setting-section-header:hover {
+    background: var(--nectar-border, rgba(255, 255, 255, 0.08));
+}
+
+.setting-group-label.setting-section-header:focus {
+    outline: none;
+}
+
+.setting-group-label.setting-section-header:focus-visible {
+    box-shadow: 0 0 0 1px var(--nectar-text-muted, rgba(255, 255, 255, 0.4));
+}
+
+.setting-section:not(.collapsed) > .setting-group-label.setting-section-header {
+    margin-bottom: 0;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-bottom: none;
+}
+
+.setting-section:not(.collapsed) > .setting-group {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
 }
 
 .setting-section-chevron {
+    flex-shrink: 0;
     transition: transform 0.15s ease;
-    opacity: 0.6;
+    opacity: 0.7;
 }
 
 .setting-section.collapsed .setting-section-chevron {
