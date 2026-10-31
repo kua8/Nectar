@@ -131,6 +131,26 @@ async function fetchWeatherForCoords(
   };
 }
 
+const IP_LOCATION_KEY = "nectar-weather-ip-location";
+
+function rememberIpLocation(location: ResolvedLocation): ResolvedLocation {
+  try {
+    localStorage.setItem(IP_LOCATION_KEY, JSON.stringify(location));
+  } catch {
+    // storage unavailable
+  }
+  return location;
+}
+
+function lastIpLocation(): ResolvedLocation | null {
+  try {
+    const saved = JSON.parse(localStorage.getItem(IP_LOCATION_KEY) ?? "null");
+    return typeof saved?.lat === "number" && typeof saved?.lon === "number" ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
 async function resolveLocation(): Promise<ResolvedLocation> {
   // 1. Check saved coordinates from settings or localStorage
   try {
@@ -164,7 +184,7 @@ async function resolveLocation(): Promise<ResolvedLocation> {
       const lat = data.latitude || data.lat;
       const lon = data.longitude || data.lon;
       if (lat && lon) {
-        return { lat, lon, city: data.city || undefined };
+        return rememberIpLocation({ lat, lon, city: data.city || undefined });
       }
     }
   } catch {
@@ -177,14 +197,16 @@ async function resolveLocation(): Promise<ResolvedLocation> {
     if (res.ok) {
       const data = await res.json();
       if (data.latitude && data.longitude) {
-        return { lat: data.latitude, lon: data.longitude, city: data.cityName || undefined };
+        return rememberIpLocation({ lat: data.latitude, lon: data.longitude, city: data.cityName || undefined });
       }
     }
   } catch {
     // fall through to default
   }
 
-  // 4. Default to London
+  // 4. Last location an IP lookup found, then London
+  const last = lastIpLocation();
+  if (last) return last;
   return { lat: LONDON_LAT, lon: LONDON_LON, city: "London" };
 }
 

@@ -150,7 +150,7 @@ export function CalendarSyncPage({ onBack }: { onBack: () => void }) {
       </div>
 
       <div className="setting-group-label">{t("notch.calendarSync")}</div>
-      <div className="setting-group">
+      <div className="setting-group setting-group--menu">
         <SettingRow
           icon={Timer}
           label={t("calsync.interval")}
