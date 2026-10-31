@@ -1,4 +1,5 @@
 use tauri::{AppHandle, Emitter, Manager, Window};
+use tauri_plugin_dialog::DialogExt;
 use windows::core::Interface;
 use windows::Win32::Foundation::{HWND, LPARAM};
 use windows::Win32::UI::WindowsAndMessaging::EnumWindows;
@@ -3266,17 +3267,40 @@ pub fn get_running_processes() -> Result<Vec<ProcessInfo>, String> {
 }
 
 #[tauri::command]
-pub fn kill_process(pid: u32, name: String) -> Result<(), String> {
-    if PROTECTED_PROCESS_NAMES.contains(&name.to_lowercase().as_str()) {
-        return Err(format!("Refusing to end protected process: {name}"));
-    }
+pub fn kill_process(pid: u32, _name: Option<String>) -> Result<(), String> {
     unsafe {
         use windows::Win32::Foundation::CloseHandle;
-        use windows::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
+        use windows::Win32::System::Threading::{
+            OpenProcess, QueryFullProcessImageNameW, TerminateProcess,
+            PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_TERMINATE,
+        };
 
-        let handle = OpenProcess(PROCESS_TERMINATE, false, pid).map_err(|e| e.to_string())?;
-        let result = TerminateProcess(handle, 1).map_err(|e| e.to_string());
-        let _ = CloseHandle(handle);
+        // Resolve the real image name from the PID instead of trusting the client-supplied name
+        let query_handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid)
+            .map_err(|e| format!("Cannot inspect process {}: {}", pid, e))?;
+
+        let mut buf = [0u16; 520];
+        let mut len = buf.len() as u32;
+        let res = QueryFullProcessImageNameW(query_handle, PROCESS_NAME_WIN32, windows::core::PWSTR(buf.as_mut_ptr()), &mut len);
+        let _ = CloseHandle(query_handle);
+
+        // Fail closed: a process whose identity can't be verified is never terminated
+        res.map_err(|e| format!("Cannot verify process {}: {}", pid, e))?;
+
+        let full_path = String::from_utf16_lossy(&buf[..len as usize]);
+        let exe_name = std::path::Path::new(&full_path)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+
+        if exe_name.is_empty() || PROTECTED_PROCESS_NAMES.contains(&exe_name.as_str()) {
+            return Err(format!("Refusing to end protected process: {}", exe_name));
+        }
+
+        let term_handle = OpenProcess(PROCESS_TERMINATE, false, pid)
+            .map_err(|e| format!("Cannot open process {} for termination: {}", pid, e))?;
+        let result = TerminateProcess(term_handle, 1).map_err(|e| e.to_string());
+        let _ = CloseHandle(term_handle);
         result
     }
 }
@@ -3426,14 +3450,54 @@ pub fn export_settings(app: AppHandle) -> Result<String, String> {
     }
 }
 
+/// Opens native save dialog in Rust and exports settings directly to the chosen path
 #[tauri::command]
-pub fn read_settings_from_path(path: String) -> Result<String, String> {
-    std::fs::read_to_string(&path).map_err(|e| format!("Failed to read file: {}", e))
+pub async fn export_settings_dialog(app: AppHandle) -> Result<bool, String> {
+    let settings_json = export_settings(app.clone())?;
+
+    let file_path = app
+        .dialog()
+        .file()
+        .set_title("Export Nectar Settings")
+        .set_file_name("nectar-settings.json")
+        .add_filter("JSON", &["json"])
+        .blocking_save_file();
+
+    if let Some(path) = file_path {
+        let path_buf = path.into_path().map_err(|e| e.to_string())?;
+        std::fs::write(&path_buf, settings_json).map_err(|e| format!("Failed to write settings: {}", e))?;
+        Ok(true)
+    } else {
+        Ok(false) // User cancelled dialog
+    }
 }
 
+/// Opens native file picker in Rust, validates content, and imports settings
 #[tauri::command]
-pub fn write_settings_to_path(path: String, content: String) -> Result<(), String> {
-    std::fs::write(&path, content).map_err(|e| format!("Failed to write file: {}", e))
+pub async fn import_settings_dialog(app: AppHandle) -> Result<bool, String> {
+    const MAX_SETTINGS_SIZE_BYTES: u64 = 2 * 1024 * 1024; // 2 MB limit
+
+    let file_path = app
+        .dialog()
+        .file()
+        .set_title("Import Nectar Settings")
+        .add_filter("JSON", &["json"])
+        .blocking_pick_file();
+
+    if let Some(path) = file_path {
+        let path_buf = path.into_path().map_err(|e| e.to_string())?;
+
+        let metadata = std::fs::metadata(&path_buf).map_err(|e| e.to_string())?;
+        if metadata.len() > MAX_SETTINGS_SIZE_BYTES {
+            return Err("Settings file is too large (maximum 2MB allowed)".into());
+        }
+
+        let content = std::fs::read_to_string(&path_buf).map_err(|e| format!("Failed to read file: {}", e))?;
+        import_settings(app, content)?;
+        Ok(true)
+    } else {
+        Ok(false) // User cancelled dialog
+    }
 }
 
 #[tauri::command]

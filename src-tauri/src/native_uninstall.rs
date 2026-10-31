@@ -134,6 +134,76 @@ fn remove_registry(all_users: bool) {
     }
 }
 
+// Files Nectar itself puts in the install folder (the payload is just nectar.exe)
+const APP_FILES: &[&str] = &["nectar.exe", "uninstall.exe", ".install-scope"];
+
+// True when the folder belongs to Nectar alone and can be removed as a whole
+fn is_dedicated_install_dir(dir: &Path) -> bool {
+    let Some(name) = dir.file_name().map(|n| n.to_string_lossy().to_lowercase()) else {
+        return false;
+    };
+
+    // Folder name must identify a Nectar install
+    if !name.contains("nectar") {
+        return false;
+    }
+
+    // Never a drive root
+    if dir.parent().is_none() {
+        return false;
+    }
+
+    // Never the user profile, Desktop or Downloads
+    if let Ok(userprofile) = std::env::var("USERPROFILE") {
+        let user_path = Path::new(&userprofile);
+        if dir == user_path || dir == user_path.join("Desktop") || dir == user_path.join("Downloads") {
+            return false;
+        }
+    }
+
+    true
+}
+
+fn remove_dir_command(install_dir: &Path, run_once: &str) -> String {
+    let dir = install_dir.to_string_lossy().replace('\'', "''");
+    format!(
+        "Wait-Process -Id {pid} -ErrorAction SilentlyContinue; \
+         for ($i = 0; $i -lt 40 -and (Test-Path -LiteralPath '{dir}'); $i++) {{ \
+           Remove-Item -LiteralPath '{dir}' -Recurse -Force -ErrorAction SilentlyContinue -ErrorVariable failed; \
+           if (Test-Path -LiteralPath '{dir}') {{ Start-Sleep -Milliseconds 500 }} \
+         }}; \
+         if (Test-Path -LiteralPath '{dir}') {{ \
+           Add-Content (Join-Path $env:TEMP 'nectar-uninstall.log') (\"Could not remove {dir}: \" + ($failed | Out-String)); \
+           New-ItemProperty -Path '{run_once}' -Name 'NectarCleanup' -Value 'cmd /c rd /s /q \"{dir}\"' -Force -ErrorAction SilentlyContinue | Out-Null \
+         }}",
+        pid = std::process::id(),
+    )
+}
+
+fn remove_app_files_command(install_dir: &Path, run_once: &str) -> String {
+    let dir = install_dir.to_string_lossy().replace('\'', "''");
+    let paths: Vec<String> = APP_FILES
+        .iter()
+        .map(|f| install_dir.join(f).to_string_lossy().replace('\'', "''"))
+        .collect();
+    let files = paths.iter().map(|p| format!("'{p}'")).collect::<Vec<_>>().join(", ");
+    let del_args = paths.iter().map(|p| format!("\"{p}\"")).collect::<Vec<_>>().join(" ");
+    format!(
+        "Wait-Process -Id {pid} -ErrorAction SilentlyContinue; \
+         $files = @({files}); \
+         $left = {{ @($files | Where-Object {{ Test-Path -LiteralPath $_ }}) }}; \
+         for ($i = 0; $i -lt 40 -and (& $left).Count; $i++) {{ \
+           & $left | ForEach-Object {{ Remove-Item -LiteralPath $_ -Force -ErrorAction SilentlyContinue -ErrorVariable +failed }}; \
+           if ((& $left).Count) {{ Start-Sleep -Milliseconds 500 }} \
+         }}; \
+         if ((& $left).Count) {{ \
+           Add-Content (Join-Path $env:TEMP 'nectar-uninstall.log') (\"Could not remove Nectar files from {dir}: \" + ($failed | Out-String)); \
+           New-ItemProperty -Path '{run_once}' -Name 'NectarCleanup' -Value 'cmd /c del /f /q {del_args}' -Force -ErrorAction SilentlyContinue | Out-Null \
+         }}",
+        pid = std::process::id(),
+    )
+}
+
 pub fn run() {
     let Ok(exe) = std::env::current_exe() else { return };
     let Some(install_dir) = exe.parent().map(Path::to_path_buf) else { return };
@@ -160,25 +230,18 @@ pub fn run() {
     remove_shortcuts(all_users);
     remove_registry(all_users);
 
-    let dir_str = install_dir.to_string_lossy().replace('\'', "''");
-    let ps_command = format!(
-        "Wait-Process -Id {pid} -ErrorAction SilentlyContinue; \
-         for ($i = 0; $i -lt 40 -and (Test-Path -LiteralPath '{dir}'); $i++) {{ \
-           Remove-Item -LiteralPath '{dir}' -Recurse -Force -ErrorAction SilentlyContinue -ErrorVariable failed; \
-           if (Test-Path -LiteralPath '{dir}') {{ Start-Sleep -Milliseconds 500 }} \
-         }}; \
-         if (Test-Path -LiteralPath '{dir}') {{ \
-           Add-Content (Join-Path $env:TEMP 'nectar-uninstall.log') (\"Could not remove {dir}: \" + ($failed | Out-String)); \
-           New-ItemProperty -Path '{run_once}' -Name 'NectarCleanup' -Value 'cmd /c rd /s /q \"{dir}\"' -Force -ErrorAction SilentlyContinue | Out-Null \
-         }}",
-        pid = std::process::id(),
-        dir = dir_str,
-        run_once = if all_users {
-            r"HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce"
-        } else {
-            r"HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce"
-        }
-    );
+    let dedicated = is_dedicated_install_dir(&install_dir);
+    let run_once = if all_users {
+        r"HKLM:\Software\Microsoft\Windows\CurrentVersion\RunOnce"
+    } else {
+        r"HKCU:\Software\Microsoft\Windows\CurrentVersion\RunOnce"
+    };
+    let ps_command = if dedicated {
+        remove_dir_command(&install_dir, run_once)
+    } else {
+        // Shared folder (e.g. D:\Apps): remove only Nectar's own files, never the folder
+        remove_app_files_command(&install_dir, run_once)
+    };
     let spawn = |flags: u32| {
         std::process::Command::new("powershell")
             .args(["-NoProfile", "-WindowStyle", "Hidden", "-Command", &ps_command])
@@ -189,11 +252,39 @@ pub fn run() {
     let spawned = spawn(CREATE_NO_WINDOW | 0x0100_0000).or_else(|_| spawn(CREATE_NO_WINDOW));
 
     if spawned.is_err() {
-        message(
-            &format!("Nectar was unregistered, but its folder couldn't be removed automatically. You can delete it yourself:\n\n{}", install_dir.display()),
-            MB_OK | MB_ICONINFORMATION,
-        );
+        let text = if dedicated {
+            format!("Nectar was unregistered, but its folder couldn't be removed automatically. You can delete it yourself:\n\n{}", install_dir.display())
+        } else {
+            format!("Nectar was unregistered, but its files couldn't be removed automatically. You can delete {} yourself from:\n\n{}", APP_FILES.join(", "), install_dir.display())
+        };
+        message(&text, MB_OK | MB_ICONINFORMATION);
         return;
     }
     message("Nectar has been uninstalled.", MB_OK | MB_ICONINFORMATION);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dedicated_dir_needs_nectar_in_its_name() {
+        assert!(is_dedicated_install_dir(Path::new(r"C:\Users\u\AppData\Local\Programs\Nectar")));
+        assert!(is_dedicated_install_dir(Path::new(r"D:\Apps\nectar-beta")));
+        assert!(!is_dedicated_install_dir(Path::new(r"D:\Apps")));
+    }
+
+    #[test]
+    fn drive_root_is_never_dedicated() {
+        assert!(!is_dedicated_install_dir(Path::new(r"D:\")));
+    }
+
+    #[test]
+    fn shared_folder_cleanup_only_targets_app_files() {
+        let cmd = remove_app_files_command(Path::new(r"D:\Apps"), r"HKCU:\RunOnce");
+        assert!(cmd.contains(r"'D:\Apps\nectar.exe'"));
+        assert!(cmd.contains(r"'D:\Apps\uninstall.exe'"));
+        assert!(!cmd.contains("-Recurse"));
+        assert!(!cmd.contains("rd /s"));
+    }
 }

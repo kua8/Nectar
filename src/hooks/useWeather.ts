@@ -171,15 +171,13 @@ async function resolveLocation(): Promise<ResolvedLocation> {
     // try fallback
   }
 
-  // 3. Fallback IP geolocation
+  // 3. Fallback IP geolocation via HTTPS
   try {
-    const res = await fetch(
-      "http://ip-api.com/json/?fields=status,lat,lon,city,country",
-    );
+    const res = await fetch("https://freeipapi.com/api/json");
     if (res.ok) {
       const data = await res.json();
-      if (data.lat && data.lon) {
-        return { lat: data.lat, lon: data.lon, city: data.city || undefined };
+      if (data.latitude && data.longitude) {
+        return { lat: data.latitude, lon: data.longitude, city: data.cityName || undefined };
       }
     }
   } catch {

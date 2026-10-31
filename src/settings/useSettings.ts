@@ -830,15 +830,8 @@ export function useSettings() {
   const handleExportSettings = async () => {
     setExportStatus("exporting");
     try {
-      const { save: saveDialog } = await import("@tauri-apps/plugin-dialog");
-      const settingsJson = await invoke<string>("export_settings");
-      const filePath = await saveDialog({
-        title: "Export Nectar Settings",
-        defaultPath: "nectar-settings.json",
-        filters: [{ name: "JSON", extensions: ["json"] }],
-      });
-      if (filePath) {
-        await invoke("write_settings_to_path", { path: filePath, content: settingsJson });
+      const saved = await invoke<boolean>("export_settings_dialog");
+      if (saved) {
         setExportStatus("success");
         setTimeout(() => setExportStatus("idle"), 2000);
       } else {
@@ -854,15 +847,8 @@ export function useSettings() {
   const handleImportSettings = async () => {
     setImportStatus("importing");
     try {
-      const { open: openDialog } = await import("@tauri-apps/plugin-dialog");
-      const filePath = await openDialog({
-        title: "Import Nectar Settings",
-        filters: [{ name: "JSON", extensions: ["json"] }],
-        multiple: false,
-      });
-      if (filePath) {
-        const content = await invoke<string>("read_settings_from_path", { path: filePath as string });
-        await invoke("import_settings", { settings: content });
+      const imported = await invoke<boolean>("import_settings_dialog");
+      if (imported) {
         await loadAllSettings();
         setImportStatus("success");
         setTimeout(() => setImportStatus("idle"), 2000);
