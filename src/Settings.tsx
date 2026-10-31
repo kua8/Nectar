@@ -148,6 +148,8 @@ function SettingsApp() {
               toggleTimerEnabled={settings.toggleTimerEnabled}
               timerSoundEnabled={settings.timerSoundEnabled}
               toggleTimerSound={settings.toggleTimerSound}
+              notchTimerProgress={settings.notchTimerProgress}
+              toggleNotchTimerProgress={settings.toggleNotchTimerProgress}
               stopwatchEnabled={settings.stopwatchEnabled}
               toggleStopwatchEnabled={settings.toggleStopwatchEnabled}
               legacyMode={settings.legacyMode}
