@@ -373,6 +373,10 @@ function VolumeNotch({
       >
         <motion.div
           className="volume-notch-content-group"
+          onWheel={(e) => {
+            if (localStorage.getItem("nectar-notch-scroll-volume") !== "true") return;
+            onVolumeChange(Math.min(1, Math.max(0, Math.round((volume + (e.deltaY < 0 ? 0.02 : -0.02)) * 100) / 100)));
+          }}
           initial={{ opacity: 0, x: -10 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -5, transition: { duration: 0.15 } }}

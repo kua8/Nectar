@@ -18,6 +18,7 @@ import { ConnectionsView } from "./components/ConnectionsView";
 import { NotchTour } from "./components/NotchTour";
 import { useStopwatch } from "./hooks/useStopwatch";
 import { t as translate, useT } from "./i18n";
+import { NotchProgressBorder } from "./components/NotchProgressBorder";
 import type { WidgetConfig } from "./components/StatusWidgetConfig";
 import {
   DEFAULT_DUAL_CLOCK_ZONE,
@@ -1048,7 +1049,6 @@ function App() {
   const showTimerProgressBar = settingsTimerProgressEnabled && settingsTimerEnabled && (
     (timerTotalSeconds > 0 && (isTimerRunning || timerSeconds > 0)) || isTimerFinished
   );
-  const isBreakTimer = timerTotalSeconds > 0 && timerTotalSeconds <= 15 * 60;
 
   const stopwatch = useStopwatch();
 
@@ -1083,6 +1083,12 @@ function App() {
     }
     prevTimerFinishedRef.current = isTimerFinished;
   }, [isTimerFinished, settingsTimerSoundEnabled, notchMode, triggerEventPeek]);
+
+  useEffect(() => {
+    if (!isTimerFinished) return;
+    const dismiss = setTimeout(resetTimer, 6000);
+    return () => clearTimeout(dismiss);
+  }, [isTimerFinished]);
 
   const lastTrackRef = useRef<string | null>(null);
   const lastPlayingRef = useRef<boolean>(false);
@@ -1541,6 +1547,13 @@ function App() {
     return label === key ? condition : label;
   };
 
+  const handleVolumeWheel = (e: React.WheelEvent) => {
+    if (!settingsScrollVolume) return;
+    e.stopPropagation();
+    const change = e.deltaY < 0 ? 0.02 : -0.02;
+    handleVolumeChange(Math.min(1, Math.max(0, Math.round((displayVolume + change) * 100) / 100)));
+  };
+
   const tip = (text: string | undefined) =>
     settingsLegacyMode
       ? { "data-tooltip": text }
@@ -1941,7 +1954,7 @@ function App() {
                           </motion.button>
                         </div>
 
-                        <div className="volume-slider-container">
+                        <div className="volume-slider-container" onWheel={handleVolumeWheel}>
                           <VolumeLowIcon size={14} style={{ opacity: 0.65 }} />
                           <div className="slider-track-premium">
                             <input
@@ -2325,7 +2338,7 @@ function App() {
                     {/* Classic Sliders Area */}
                     <div className="cc-classic-sliders-area">
                       {/* Volume Slider */}
-                      <div className="cc-classic-slider-row">
+                      <div className="cc-classic-slider-row" onWheel={handleVolumeWheel}>
                         <div
                           className={`cc-classic-slider-label${settingsLegacyMode ? '' : ' clickable'}`}
                           title={settingsLegacyMode ? undefined : t('cc.outputDevice')}
@@ -2335,16 +2348,7 @@ function App() {
                           <span>{t("cc.volume")}</span>
                           {!settingsLegacyMode && <span className="cc-label-more">›</span>}
                         </div>
-                        <div
-                          className="cc-classic-slider-track"
-                          onWheel={(e) => {
-                            if (!settingsScrollVolume) return;
-                            e.stopPropagation();
-                            const change = e.deltaY < 0 ? 0.02 : -0.02;
-                            const newVol = Math.min(1, Math.max(0, Math.round((volume + change) * 100) / 100));
-                            handleVolumeChange(newVol);
-                          }}
-                        >
+                        <div className="cc-classic-slider-track">
                           <input
                             type="range"
                             min="0"
@@ -2452,21 +2456,15 @@ function App() {
         </AnimatePresence>
 
         {showTimerProgressBar && (
-          <div
-            className={`notch-timer-progress-track ${isTimerRunning ? 'active' : 'paused'} ${isTimerFinished ? 'finished' : ''} ${isBreakTimer ? 'is-break' : 'is-focus'}`}
-            style={{
-              borderBottomLeftRadius: isCalendarMode ? 28 : 18,
-              borderBottomRightRadius: isCalendarMode ? 28 : 18,
-            }}
+          <NotchProgressBorder
+            progress={timerProgressPercent}
+            topRadius={isImpacted ? 0 : 18}
+            flare={isImpacted ? 13 : 0}
+            bottomRadius={isCalendarMode ? 28 : 18}
+            paused={!isTimerRunning}
+            finished={isTimerFinished}
             title={`${formatTimerTime(timerSeconds)} (${Math.round(timerProgressRatio * 100)}%)`}
-          >
-            <div
-              className="notch-timer-progress-fill"
-              style={{
-                width: `${timerProgressPercent}%`
-              }}
-            />
-          </div>
+          />
         )}
 
       </motion.div>

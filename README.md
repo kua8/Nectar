@@ -22,6 +22,10 @@
 
 <br />
 
+> **Heads up:** Due to recent traction, updates may be slow. I wasn't expecting this many issues and pull requests, so please bear with me!
+
+<br />
+
 <img src="docs/screenshots/desktop.webp" width="820" alt="Nectar's notch and dock on a Windows desktop" />
 
 </div>

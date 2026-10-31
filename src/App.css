@@ -324,22 +324,13 @@ img {
 }
 
 .timer-finished {
-    color: #ff4757 !important;
-    animation: timer-blink 0.6s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
+    color: #32d74b !important;
+    animation: timer-pulse 1.2s ease-in-out 3;
 }
 
-@keyframes timer-blink {
-    0% {
-        color: #fff;
-        opacity: 1;
-        transform: scale(1);
-    }
-
-    100% {
-        color: #ff4757;
-        opacity: 1;
-        transform: scale(1.05);
-    }
+@keyframes timer-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.45; }
 }
 
 /* Side content containers */
@@ -2351,49 +2342,46 @@ img {
 .cc-classic-slider-label.clickable:hover { background: rgba(255, 255, 255, 0.08); }
 .cc-label-more { opacity: 0.55; margin-left: 2px; font-size: 12px; line-height: 1; }
 
-/* Notch Timer / Pomodoro Progress Bar */
-.notch-timer-progress-track {
+.notch-progress {
     position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: rgba(255, 255, 255, 0.08);
-    overflow: hidden;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
     pointer-events: none;
     z-index: 10;
-    transition: opacity 0.3s ease;
 }
 
-.notch-timer-progress-fill {
-    height: 100%;
-    border-radius: 2px;
-    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+.notch-progress path {
+    fill: none;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
-.notch-timer-progress-track.is-focus .notch-timer-progress-fill {
-    background: linear-gradient(90deg, #ff453a 0%, #ff9f0a 100%);
-    box-shadow: 0 0 8px rgba(255, 69, 58, 0.6);
+.notch-progress-track {
+    stroke: rgba(255, 255, 255, 0.1);
 }
 
-.notch-timer-progress-track.is-break .notch-timer-progress-fill {
-    background: linear-gradient(90deg, #30d158 0%, #0a84ff 100%);
-    box-shadow: 0 0 8px rgba(48, 209, 88, 0.6);
+.notch-progress-fill {
+    stroke: var(--nectar-text, white);
+    opacity: 0.7;
+    transition: stroke-dasharray 1s linear, opacity 0.3s ease;
 }
 
-.notch-timer-progress-track.paused .notch-timer-progress-fill {
-    opacity: 0.55;
-    box-shadow: none;
-    filter: saturate(0.7);
+.notch-progress.paused .notch-progress-fill {
+    opacity: 0.3;
 }
 
-.notch-timer-progress-track.finished .notch-timer-progress-fill {
-    background: #32d74b !important;
-    box-shadow: 0 0 12px rgba(50, 215, 75, 0.8) !important;
-    animation: timer-progress-blink 0.6s infinite alternate cubic-bezier(0.4, 0, 0.2, 1);
+.notch-progress.finished .notch-progress-fill {
+    stroke: #32d74b;
+    transition: none;
+    animation: timer-progress-done 3.6s ease-in-out forwards;
 }
 
-@keyframes timer-progress-blink {
-    from { opacity: 1; }
-    to { opacity: 0.3; }
+@keyframes timer-progress-done {
+    0% { opacity: 0.7; }
+    17%, 50%, 83% { opacity: 1; }
+    33%, 67% { opacity: 0.35; }
+    100% { opacity: 0; }
 }

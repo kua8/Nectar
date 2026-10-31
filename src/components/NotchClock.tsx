@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import type { Stopwatch } from "../hooks/useStopwatch";
 import { formatStopwatch, parseDuration } from "../clockFormat";
 import { useT } from "../i18n";
@@ -66,6 +67,10 @@ export function NotchClock({
   const [savedTab, setSavedTab] = useState<Tab>(readTab);
   const [custom, setCustom] = useState("");
   const [invalid, setInvalid] = useState(false);
+  const customRef = useRef<HTMLInputElement>(null);
+
+  const setKeyboardFocus = (enabled: boolean) => invoke("set_window_keyboard_focus", { enabled }).catch(() => {});
+  useEffect(() => () => void setKeyboardFocus(false), []);
 
   const tab: Tab = savedTab === "stopwatch" && stopwatchEnabled ? "stopwatch" : timerEnabled ? "timer" : "stopwatch";
 
@@ -136,11 +141,15 @@ export function NotchClock({
 
             <form className={`timer-custom${invalid ? " invalid" : ""}`} onSubmit={submitCustom}>
               <input
+                ref={customRef}
+                onMouseDown={() => setKeyboardFocus(true).finally(() => customRef.current?.focus())}
+                onBlur={() => setKeyboardFocus(false)}
                 value={custom}
                 onChange={(e) => {
-                  setCustom(e.target.value);
+                  setCustom(e.target.value.replace(/[^\d:]/g, ""));
                   setInvalid(false);
                 }}
+                inputMode="numeric"
                 placeholder={t("clock.custom.placeholder")}
                 spellCheck={false}
                 aria-label={t("clock.custom.label")}

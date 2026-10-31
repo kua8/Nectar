@@ -120,6 +120,13 @@ export function CompactMediaPlayer({
   onOpenCalendar,
 }: CompactMediaPlayerProps) {
   const t = useT();
+
+  const scrollVolume = (e: React.WheelEvent) => {
+    if (localStorage.getItem("nectar-notch-scroll-volume") !== "true") return;
+    e.stopPropagation();
+    const change = e.deltaY < 0 ? 0.02 : -0.02;
+    onVolumeChange(Math.min(1, Math.max(0, Math.round((volume + change) * 100) / 100)));
+  };
   const seekRef = useRef<HTMLInputElement>(null);
 
   const positionMs = mediaInfo.position_ms ?? 0;
@@ -258,6 +265,7 @@ export function CompactMediaPlayer({
         <motion.button
           className="cmp-btn cmp-btn-side"
           onClick={(e) => { e.stopPropagation(); onVolumeExpandedChange(!volumeExpanded); }}
+          onWheel={scrollVolume}
           whileTap={{ scale: 0.9 }}
           data-tooltip={t("cc.volume")}
         >
@@ -318,17 +326,9 @@ export function CompactMediaPlayer({
             exit={{ height: 0, opacity: 0 }}
             transition={{ type: "spring", stiffness: 500, damping: 30 }}
           >
-            <div className="cmp-volume-row">
+            <div className="cmp-volume-row" onWheel={scrollVolume}>
               <VolumeLowIcon size={14} style={{ opacity: 0.65, flexShrink: 0 }} />
-              <div
-                className="cmp-volume-track"
-                onWheel={(e) => {
-                  if (localStorage.getItem("nectar-notch-scroll-volume") !== "true") return;
-                  e.stopPropagation();
-                  const change = e.deltaY < 0 ? 0.02 : -0.02;
-                  onVolumeChange(Math.min(1, Math.max(0, Math.round((volume + change) * 100) / 100)));
-                }}
-              >
+              <div className="cmp-volume-track">
                 <div className="cmp-volume-fill" style={{ width: `${volume * 100}%` }} />
                 <input
                   type="range"
