@@ -197,11 +197,13 @@ pub fn set_taskbar_visibility(visible: bool, always_on_top: bool) {
         }
 
         let state_val = if visible {
-            if always_on_top {
+            let orig = ORIGINAL_TASKBAR_STATE.load(std::sync::atomic::Ordering::Relaxed);
+            if orig != -1 {
+                orig as isize
+            } else if always_on_top {
                 2
             } else {
-                let orig = ORIGINAL_TASKBAR_STATE.load(std::sync::atomic::Ordering::Relaxed);
-                if orig != -1 { orig as isize } else { 1 }
+                1
             }
         } else {
             1
