@@ -11,7 +11,7 @@ use windows::Win32::UI::Accessibility::{
 use windows::Win32::UI::WindowsAndMessaging::{
     FindWindowA, GetClassNameA, GetCursorPos, GetForegroundWindow, GetWindowLongA, GetWindowRect, IsWindowVisible, SetForegroundWindow,
     SetLayeredWindowAttributes, SetWindowLongA, SetWindowPos, ShowWindow, GWL_EXSTYLE, HWND_TOPMOST, LWA_ALPHA,
-    SWP_NOSIZE, SWP_SHOWWINDOW, SW_HIDE, SW_SHOWNA, WS_EX_LAYERED, WS_EX_TRANSPARENT,
+    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SW_HIDE, SW_SHOWNA, WS_EX_LAYERED, WS_EX_TRANSPARENT,
 };
 use windows::core::Interface;
 
@@ -249,7 +249,12 @@ pub fn open_native_tray(anchor: Option<(i32, i32)>) {
         crate::diagnostics::log("tray: flyout opened and placed");
         std::thread::sleep(std::time::Duration::from_millis(200));
         for _ in 0..2400 {
-            if find_overflow_window().is_none_or(|w| !unsafe { IsWindowVisible(w) }.as_bool()) { break; }
+            match find_overflow_window().filter(|&w| unsafe { IsWindowVisible(w) }.as_bool()) {
+                Some(flyout) => unsafe {
+                    let _ = SetWindowPos(flyout, Some(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                },
+                None => break,
+            }
             std::thread::sleep(std::time::Duration::from_millis(150));
         }
         FLYOUT_OPEN.store(false, Ordering::SeqCst);
