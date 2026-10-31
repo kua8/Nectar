@@ -27,6 +27,8 @@ pub struct MediaInfo {
     pub seek_enabled: bool,
     #[serde(default)]
     pub position_updated_at: u64,
+    #[serde(default)]
+    pub source_id: String,
 }
 
 pub enum SystemCommand {

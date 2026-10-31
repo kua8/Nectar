@@ -113,6 +113,7 @@ fn main() {
             hide_overlay,
             set_splash_fullscreen,
             sync_overlay_position,
+            select_media_session,
             media_play_pause,
             media_next,
             media_previous,

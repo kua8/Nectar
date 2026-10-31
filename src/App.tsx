@@ -1329,6 +1329,12 @@ function App() {
     return () => { unlisten.then(fn => fn()); };
   }, []);
 
+  const [mediaSessions, setMediaSessions] = useState<{ id: string; name: string; title: string; is_playing: boolean; active: boolean }[]>([]);
+  useEffect(() => {
+    const unlisten = listen<typeof mediaSessions>("media-sessions", (event) => setMediaSessions(event.payload ?? []));
+    return () => { unlisten.then(fn => fn()); };
+  }, []);
+
   // Native Windows Media Controls - Listen for updates from background worker
   useEffect(() => {
     const unlisten = listen<MediaInfo>("media-update", (event) => {
@@ -1723,7 +1729,7 @@ function App() {
       if (mediaLayout === 'compact') {
         if (compactVolumeExpanded) h += 36;
       }
-      return h;
+      return h + (mediaSessions.length > 1 ? 26 : 0);
     }
     return 36;
   };
@@ -1819,6 +1825,22 @@ function App() {
         }}
       >
         {widgetTip && isHovered && <div className="widget-tip">{widgetTip}</div>}
+
+        {isMusicMode && isHovered && mediaSessions.length > 1 && (
+          <div className="media-session-strip" onClick={(e) => e.stopPropagation()}>
+            {mediaSessions.map((s) => (
+              <button
+                key={s.id}
+                className={`media-session-chip${s.active ? ' active' : ''}`}
+                title={s.title}
+                onClick={() => invoke('select_media_session', { id: s.id }).catch(() => { })}
+              >
+                {s.is_playing && <span className="media-session-dot" />}
+                {s.name}
+              </button>
+            ))}
+          </div>
+        )}
 
 
         <AnimatePresence>

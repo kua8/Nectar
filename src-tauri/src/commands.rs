@@ -2100,6 +2100,14 @@ pub fn open_notification_center() {
 }
 
 #[tauri::command]
+pub fn select_media_session(id: Option<String>) {
+    if let Ok(mut selected) = crate::services::SELECTED_MEDIA_SOURCE.lock() {
+        *selected = id.filter(|s| !s.is_empty());
+    }
+    crate::services::MEDIA_REFRESH.store(true, Ordering::Relaxed);
+}
+
+#[tauri::command]
 pub fn media_play_pause() { if let Some(sender) = COMMAND_SENDER.get() { let _ = sender.send(crate::types::SystemCommand::MediaPlayPause); } }
 
 #[tauri::command]

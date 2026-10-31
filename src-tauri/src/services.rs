@@ -221,6 +221,38 @@ pub fn setup_taskbar_hook() {
 
 static WINDOW_CHANGE_APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 static LAST_WINDOW_CHANGE_MS: AtomicI64 = AtomicI64::new(0);
+pub static SELECTED_MEDIA_SOURCE: Mutex<Option<String>> = Mutex::new(None);
+static ACTIVE_MEDIA_SOURCE: Mutex<String> = Mutex::new(String::new());
+pub static MEDIA_REFRESH: AtomicBool = AtomicBool::new(false);
+
+fn media_app_name(source_id: &str) -> String {
+    let id = source_id.rsplit('!').next().unwrap_or(source_id);
+    let id = id.trim_end_matches(".exe").trim_end_matches(".EXE");
+    let name = id.rsplit('.').next().unwrap_or(id);
+    let mut chars = name.chars();
+    match chars.next() {
+        Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+        None => String::new(),
+    }
+}
+
+fn media_control_session(
+    mgr: &windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager,
+) -> windows::core::Result<windows::Media::Control::GlobalSystemMediaTransportControlsSession> {
+    let active = ACTIVE_MEDIA_SOURCE.lock().map(|g| g.clone()).unwrap_or_default();
+    if !active.is_empty() {
+        if let Ok(sessions) = mgr.GetSessions() {
+            for i in 0..sessions.Size().unwrap_or(0) {
+                if let Ok(session) = sessions.GetAt(i) {
+                    if session.SourceAppUserModelId().map(|s| s.to_string()).unwrap_or_default() == active {
+                        return Ok(session);
+                    }
+                }
+            }
+        }
+    }
+    mgr.GetCurrentSession()
+}
 
 pub fn setup_window_change_hook(app_handle: AppHandle) {
     unsafe {
@@ -806,6 +838,7 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
             #[allow(clippy::type_complexity)]
             let mut last_emitted_info: Option<(String, String, bool, bool, Option<String>, i64, i64)> = None;
             let mut last_volume: f32 = -1.0;
+            let mut last_sessions_json = String::new();
             let mut last_muted: bool = false;
 
             // Only hide the native flyout when our overlay replaces it.
@@ -860,12 +893,12 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                                     hide_osd("nectar-volume-overlay-enabled");
                                 }
                             }
-                            SystemCommand::MediaPlayPause => { if let Some(ref mgr) = manager { if let Ok(session) = mgr.GetCurrentSession() { let _ = session.TryTogglePlayPauseAsync(); } } }
-                            SystemCommand::MediaNext => { if let Some(ref mgr) = manager { if let Ok(session) = mgr.GetCurrentSession() { let _ = session.TrySkipNextAsync(); } } }
-                            SystemCommand::MediaPrevious => { if let Some(ref mgr) = manager { if let Ok(session) = mgr.GetCurrentSession() { let _ = session.TrySkipPreviousAsync(); } } }
+                            SystemCommand::MediaPlayPause => { if let Some(ref mgr) = manager { if let Ok(session) = media_control_session(mgr) { let _ = session.TryTogglePlayPauseAsync(); } } }
+                            SystemCommand::MediaNext => { if let Some(ref mgr) = manager { if let Ok(session) = media_control_session(mgr) { let _ = session.TrySkipNextAsync(); } } }
+                            SystemCommand::MediaPrevious => { if let Some(ref mgr) = manager { if let Ok(session) = media_control_session(mgr) { let _ = session.TrySkipPreviousAsync(); } } }
                             SystemCommand::MediaSeek(position_ms) => {
                                 if let Some(ref mgr) = manager {
-                                    if let Ok(session) = mgr.GetCurrentSession() {
+                                    if let Ok(session) = media_control_session(mgr) {
                                         let ticks = position_ms * 10_000;
                                         let _ = session.TryChangePlaybackPositionAsync(ticks);
                                     }
@@ -906,12 +939,44 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                         }
                     }
                 }
-                if last_processed_media.elapsed().as_millis() >= 2000 {
+                if last_processed_media.elapsed().as_millis() >= 2000 || MEDIA_REFRESH.swap(false, Ordering::Relaxed) {
                     last_processed_media = std::time::Instant::now();
                     let mut best_info: Option<MediaInfo> = None;
                     if let Some(ref mgr) = manager {
                         if let Ok(sessions) = mgr.GetSessions() {
+                            let mut entries: Vec<(u32, String, String, bool)> = Vec::new();
                             for i in 0..sessions.Size().unwrap_or(0) {
+                                if let Ok(session) = sessions.GetAt(i) {
+                                    let title = session
+                                        .TryGetMediaPropertiesAsync()
+                                        .and_then(|op| op.get())
+                                        .and_then(|p| p.Title())
+                                        .map(|t| t.to_string())
+                                        .unwrap_or_default();
+                                    if title.is_empty() { continue; }
+                                    let id = session.SourceAppUserModelId().map(|s| s.to_string()).unwrap_or_default();
+                                    let playing = session.GetPlaybackInfo().ok().and_then(|p| p.PlaybackStatus().ok()) == Some(GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing);
+                                    entries.push((i, id, title, playing));
+                                }
+                            }
+                            let selected = SELECTED_MEDIA_SOURCE.lock().ok().and_then(|g| g.clone());
+                            let chosen_i = selected
+                                .and_then(|id| entries.iter().find(|e| e.1 == id).map(|e| e.0))
+                                .or_else(|| entries.iter().find(|e| e.3).map(|e| e.0))
+                                .or_else(|| entries.first().map(|e| e.0));
+                            let active_id = entries.iter().find(|e| Some(e.0) == chosen_i).map(|e| e.1.clone()).unwrap_or_default();
+                            if let Ok(mut g) = ACTIVE_MEDIA_SOURCE.lock() { *g = active_id.clone(); }
+                            let list: Vec<serde_json::Value> = entries
+                                .iter()
+                                .map(|e| serde_json::json!({ "id": e.1, "name": media_app_name(&e.1), "title": e.2, "is_playing": e.3, "active": e.1 == active_id }))
+                                .collect();
+                            let list_json = serde_json::to_string(&list).unwrap_or_default();
+                            if list_json != last_sessions_json {
+                                let _ = handle_system.emit("media-sessions", list);
+                                last_sessions_json = list_json;
+                            }
+                            for i in 0..sessions.Size().unwrap_or(0) {
+                                if Some(i) != chosen_i { continue; }
                                 if let Ok(session) = sessions.GetAt(i) {
                                     let is_playing = session.GetPlaybackInfo().ok().and_then(|p| p.PlaybackStatus().ok()) == Some(GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing);
                                     if let Ok(props) = session.TryGetMediaPropertiesAsync().and_then(|op| op.get()) {
@@ -973,7 +1038,7 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                                                 .duration_since(std::time::UNIX_EPOCH)
                                                 .map(|d| d.as_millis() as u64)
                                                 .unwrap_or(0);
-                                            let info = MediaInfo { title, artist, is_playing, has_media: true, artwork, position_ms, duration_ms, seek_enabled, position_updated_at: now_ms };
+                                            let info = MediaInfo { title, artist, is_playing, has_media: true, artwork, position_ms, duration_ms, seek_enabled, position_updated_at: now_ms, source_id: active_id.clone() };
                                             if is_playing { best_info = Some(info); break; } else if best_info.is_none() { best_info = Some(info); }
                                         }
                                     }
@@ -981,7 +1046,7 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                             }
                         }
                     }
-                    let current = best_info.unwrap_or(MediaInfo { title: "".into(), artist: "".into(), is_playing: false, has_media: false, artwork: None, position_ms: 0, duration_ms: 0, seek_enabled: false, position_updated_at: 0 });
+                    let current = best_info.unwrap_or(MediaInfo { title: "".into(), artist: "".into(), is_playing: false, has_media: false, artwork: None, position_ms: 0, duration_ms: 0, seek_enabled: false, position_updated_at: 0, source_id: String::new() });
                     let art_str = current.artwork.as_ref().and_then(|a| a.first()).cloned();
                     if last_emitted_info.as_ref().is_none_or(|(t, a, p, h, art, pos, _dur)| {
                         t != &current.title || a != &current.artist || p != &current.is_playing || h != &current.has_media || art != &art_str ||

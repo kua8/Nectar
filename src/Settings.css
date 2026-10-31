@@ -473,10 +473,8 @@ input:checked + .slider:before {
 }
 
 .city-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
+  position: static;
+  margin: 4px 0 6px;
   background: var(--nectar-group-bg, rgba(30, 30, 30, 0.95));
   border: 1px solid var(--nectar-border, rgba(255, 255, 255, 0.08));
   border-radius: 8px;

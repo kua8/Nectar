@@ -2498,3 +2498,44 @@ img {
 .shelf-clear:hover {
     color: rgba(255, 255, 255, 0.85);
 }
+
+.media-session-strip {
+    position: absolute;
+    left: 10px;
+    right: 10px;
+    bottom: 6px;
+    z-index: 5;
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+}
+
+.media-session-strip::-webkit-scrollbar {
+    display: none;
+}
+
+.media-session-chip {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 9px;
+    border: none;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.media-session-chip.active {
+    background: rgba(255, 255, 255, 0.9);
+    color: #000;
+}
+
+.media-session-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+}
