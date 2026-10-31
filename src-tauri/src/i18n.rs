@@ -4,7 +4,10 @@ use tauri::menu::MenuItem;
 use tauri::{AppHandle, Wry};
 
 // Keep in step with LANGUAGES in src/i18n.ts: one entry per file in src/locales.
-const LOCALES: &[(&str, &str)] = &[("en", include_str!("../../src/locales/en.json"))];
+const LOCALES: &[(&str, &str)] = &[
+    ("en", include_str!("../../src/locales/en.json")),
+    ("tr", include_str!("../../src/locales/tr.json")),
+];
 
 type Messages = HashMap<String, String>;
 

@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import en from "./locales/en.json";
+import tr from "./locales/tr.json";
 
 type Messages = Record<string, string>;
 
@@ -9,6 +10,7 @@ type Messages = Record<string, string>;
 // Missing keys fall back to English, so a partial translation never breaks the UI.
 export const LANGUAGES: Record<string, { name: string; messages: Messages }> = {
   en: { name: "English", messages: en },
+  tr: { name: "Türkçe", messages: tr },
 };
 
 const STORAGE_KEY = "nectar-language";
