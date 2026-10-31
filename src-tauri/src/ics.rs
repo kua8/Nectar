@@ -163,7 +163,6 @@ async fn download(url: &Url) -> Result<String, String> {
         .await
         .map_err(|e| {
             let detail = error_chain(&e);
-            eprintln!("[ics] request to {} failed: {}", host, detail);
             if e.is_timeout() {
                 "The server took too long to respond.".to_string()
             } else {
@@ -171,7 +170,6 @@ async fn download(url: &Url) -> Result<String, String> {
             }
         })?;
     let status = resp.status();
-    eprintln!("[ics] {} -> {}", host, status);
     match status.as_u16() {
         200..=299 => {}
         401 | 403 => return Err("The link was rejected. It may have been turned off or regenerated.".to_string()),
@@ -448,8 +446,7 @@ fn occurrences(raw: &Raw, start: &Prop, start_ms: i64, all_day: bool, duration: 
 
     let set = match RRuleSet::from_str(&lines.join("\n")) {
         Ok(set) => set,
-        Err(e) => {
-            eprintln!("[ics] couldn't read a repeat rule ({}), showing the first occurrence only", e);
+        Err(_) => {
             return single();
         }
     };

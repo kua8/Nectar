@@ -73,7 +73,6 @@ async fn dav(
     depth: &str,
     body: String,
 ) -> Result<String, String> {
-    let method_name = method.to_string();
     let method = reqwest::Method::from_bytes(method.as_bytes()).map_err(|e| e.to_string())?;
     let resp = client
         .request(method, url.clone())
@@ -85,7 +84,6 @@ async fn dav(
         .await
         .map_err(|e| {
             let detail = error_chain(&e);
-            eprintln!("[caldav] {} {} failed: {}", method_name, url, detail);
             if e.is_timeout() {
                 "The server took too long to respond.".to_string()
             } else if e.is_connect() {
@@ -95,7 +93,6 @@ async fn dav(
             }
         })?;
     let status = resp.status();
-    eprintln!("[caldav] {} {} -> {}", method_name, url, status);
     if status == reqwest::StatusCode::UNAUTHORIZED {
         return Err(AUTH_ERROR.to_string());
     }
