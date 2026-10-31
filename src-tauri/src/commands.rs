@@ -2533,6 +2533,7 @@ pub fn restore_taskbar_and_exit(handle: &AppHandle) {
         }
     }
     set_taskbar_visibility(true, true);
+    crate::tray_icons::unstyle_flyout();
     NATIVE_TASKBAR_HIDDEN.store(false, Ordering::Relaxed);
     // Destroy all webview windows before exiting so Chromium's UnregisterClass for
     // Chrome_WidgetWin_0 finds no open windows (avoids the harmless Error=1412 log).

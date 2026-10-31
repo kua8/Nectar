@@ -194,6 +194,12 @@ fn place_flyout(flyout: HWND, anchor: Option<(i32, i32)>) {
     }
 }
 
+pub fn unstyle_flyout() {
+    if let Some(flyout) = find_overflow_window() {
+        reset_flyout_style(flyout);
+    }
+}
+
 pub fn warm_up() {
     unsafe {
         let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
