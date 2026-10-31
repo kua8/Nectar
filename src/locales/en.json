@@ -490,5 +490,20 @@
   "notch.section.panels": "Panels",
   "notch.section.controls": "Controls and shelf",
   "dock.section.shortcuts": "Buttons and previews",
-  "dock.section.style": "Style"
+  "dock.section.style": "Style",
+  "notch.section.cc": "Control Center layout",
+  "notch.ccTiles": "Tiles",
+  "notch.ccTiles.desc": "Order of the four tiles at the top",
+  "notch.ccButtons": "Buttons",
+  "notch.ccButtons.desc": "Order of the round buttons",
+  "cc.layout.network": "Network",
+  "cc.layout.dock-mode": "Dock Mode",
+  "cc.layout.bluetooth": "Bluetooth",
+  "cc.layout.notch-mode": "Notch Mode",
+  "cc.layout.dnd": "Do Not Disturb",
+  "cc.layout.battery-saver": "Battery Saver",
+  "cc.layout.tray": "Tray",
+  "cc.layout.notifications": "Notifications",
+  "cc.layout.settings": "Settings",
+  "cc.layout.restart": "Restart"
 }

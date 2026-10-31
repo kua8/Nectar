@@ -19,7 +19,7 @@ import { NotchTour } from "./components/NotchTour";
 import { useStopwatch } from "./hooks/useStopwatch";
 import { t as translate, useT } from "./i18n";
 import { NotchShelf, useShelf } from "./components/NotchShelf";
-import { parsePanelOrder } from "./panelOrder";
+import { CC_BUTTONS, CC_TILES, parseCcLayout, parsePanelOrder } from "./panelOrder";
 import { NotchProgressBorder } from "./components/NotchProgressBorder";
 import type { WidgetConfig } from "./components/StatusWidgetConfig";
 import {
@@ -685,6 +685,12 @@ function App() {
   const [panelControlCenter, setPanelControlCenter] = useState(() => localStorage.getItem("nectar-panel-control-center-enabled") !== "false");
   const [panelShelf, setPanelShelf] = useState(() => localStorage.getItem("nectar-panel-shelf-enabled") !== "false");
   const [panelOrder, setPanelOrder] = useState(() => parsePanelOrder(localStorage.getItem("nectar-panel-order")));
+  const [ccLayout, setCcLayout] = useState(() => parseCcLayout(localStorage.getItem("nectar-cc-layout")));
+  const ccOrder = (kind: "tiles" | "buttons", id: string) => {
+    const list: readonly string[] = ccLayout[kind] ?? (kind === "tiles" ? CC_TILES : CC_BUTTONS);
+    const index = list.indexOf(id);
+    return index < 0 ? 99 : index;
+  };
   const rememberedModeRef = useRef<"command-center" | "calendar" | null>(null);
   const [settingsVisualizerEnabled, setSettingsVisualizerEnabled] = useState(() => localStorage.getItem("nectar-visualizer-enabled") !== "false");
   const [settingsAlbumArtEnabled, setSettingsAlbumArtEnabled] = useState(() => localStorage.getItem("nectar-media-album-art-enabled") !== "false");
@@ -871,6 +877,7 @@ function App() {
       "nectar-panel-control-center-enabled": (v) => setPanelControlCenter(v !== false && v !== "false"),
       "nectar-panel-shelf-enabled": (v) => setPanelShelf(v !== false && v !== "false"),
       "nectar-panel-order": (v) => setPanelOrder(parsePanelOrder(v === null ? null : String(v))),
+      "nectar-cc-layout": (v) => setCcLayout(parseCcLayout(v === null ? null : String(v))),
       "nectar-media-visualizer-enabled": setSettingsVisualizerEnabled,
       "nectar-visualizer-enabled": setSettingsVisualizerEnabled,
       "nectar-media-album-art-enabled": setSettingsAlbumArtEnabled,
@@ -1697,7 +1704,7 @@ function App() {
     if (isCalendarMode) return Math.max(settingsCalendarEnabled && showClockColumn ? 480 : settingsCalendarEnabled ? 310 : 270, 140 + dualClockExtra);
     if (nectarMode === 'command-center' && isHovered) {
       const totalWidgets = statusWidgets.left.length + statusWidgets.right.length;
-      return Math.max(350, Math.min(200 + totalWidgets * 65, 460)) + dualClockExtra;
+      return Math.max(390, Math.min(200 + totalWidgets * 65, 480)) + dualClockExtra;
     }
     if (nectarMode === 'status' && isHovered) {
       const totalWidgets = statusWidgets.left.length + statusWidgets.right.length;
@@ -1726,7 +1733,7 @@ function App() {
     if (nectarMode === 'tour') return 210;
     if (nectarMode === 'shelf') return shelf.items.length === 0 ? 96 : 130;
     if (nectarMode === 'calendar') return settingsCalendarEnabled ? (caldav.connected ? 350 : 310) : 262;
-    if (nectarMode === 'command-center') return isHovered ? 230 : 36;
+    if (nectarMode === 'command-center') return isHovered ? 268 : 36;
     if (nectarMode === 'status') return 36;
     if (isMusicMode && isHovered) {
       const hasProgressBar = (mediaInfo.duration_ms ?? 0) > 0;
@@ -2308,6 +2315,7 @@ function App() {
                       {/* Wi-Fi Pill */}
                       <div
                         className={`cc-pill-tile ${showLan || wifiEnabled ? 'active' : ''}`}
+                        style={{ order: ccOrder("tiles", "network") }}
                         onClick={(e) => { e.stopPropagation(); if (showLan) invoke('open_ethernet_settings'); else toggleWifi(); }}
                         onContextMenu={handleWifiRightClick}
                       >
@@ -2326,6 +2334,7 @@ function App() {
                       {/* Dock Mode Pill */}
                       <div
                         className={`cc-pill-tile ${dockMode === 'fixed' ? 'active' : ''}`}
+                        style={{ order: ccOrder("tiles", "dock-mode") }}
                         onClick={toggleDockModeSetting}
                       >
                         <div className="cc-pill-icon-wrapper">
@@ -2340,6 +2349,7 @@ function App() {
                       {/* Bluetooth Pill */}
                       <div
                         className={`cc-pill-tile ${bluetoothEnabled ? 'active' : ''}`}
+                        style={{ order: ccOrder("tiles", "bluetooth") }}
                         onClick={(e) => { e.stopPropagation(); toggleBluetooth(); }}
                         onContextMenu={handleBluetoothRightClick}
                       >
@@ -2358,6 +2368,7 @@ function App() {
                       {/* Notch Mode Pill */}
                       <div
                         className={`cc-pill-tile ${notchMode === 'fixed' ? 'active' : ''}`}
+                        style={{ order: ccOrder("tiles", "notch-mode") }}
                         onClick={toggleNotchModeSetting}
                       >
                         <div className="cc-pill-icon-wrapper">
@@ -2374,6 +2385,7 @@ function App() {
                     <div className="cc-circular-actions-row">
                       <button
                         className={`cc-circular-btn ${dndActive ? 'active' : ''}`}
+                        style={{ order: ccOrder("buttons", "dnd") }}
                         {...tip(t("cc.dnd"))}
                         onClick={(e) => { e.stopPropagation(); setDndActive(prev => !prev); }}
                       >
@@ -2381,6 +2393,7 @@ function App() {
                       </button>
                       <button
                         className={`cc-circular-btn ${batterySaverEnabled ? 'active' : ''}`}
+                        style={{ order: ccOrder("buttons", "battery-saver") }}
                         {...tip(t("cc.batterySaver"))}
                         onClick={(e) => { e.stopPropagation(); openBatterySaverSettings(); }}
                       >
@@ -2388,6 +2401,7 @@ function App() {
                       </button>
                       <button
                         className="cc-circular-btn"
+                        style={{ order: ccOrder("buttons", "tray") }}
                         {...tip(t("cc.tray"))}
                         onClick={(e) => { e.stopPropagation(); invoke("open_tray_window"); }}
                       >
@@ -2395,6 +2409,7 @@ function App() {
                       </button>
                       <button
                         className="cc-circular-btn"
+                        style={{ order: ccOrder("buttons", "notifications") }}
                         {...tip(t("cc.notifications"))}
                         onClick={(e) => { e.stopPropagation(); invoke("open_notification_center"); }}
                       >
@@ -2402,6 +2417,7 @@ function App() {
                       </button>
                       <button
                         className="cc-circular-btn"
+                        style={{ order: ccOrder("buttons", "settings") }}
                         {...tip(t("cc.settings"))}
                         onClick={(e) => { e.stopPropagation(); openSettingsWindow(); }}
                       >
@@ -2409,6 +2425,7 @@ function App() {
                       </button>
                       <button
                         className="cc-circular-btn"
+                        style={{ order: ccOrder("buttons", "restart") }}
                         {...tip(t("general.restart"))}
                         onClick={(e) => { e.stopPropagation(); invoke("restart_nectar"); }}
                       >

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { DEFAULT_PANEL_ORDER, parsePanelOrder, type PanelId } from "../panelOrder";
+import { CC_BUTTONS, CC_TILES, DEFAULT_PANEL_ORDER, parseCcLayout, parsePanelOrder, type CcLayout, type PanelId } from "../panelOrder";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, emit } from "@tauri-apps/api/event";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
@@ -111,6 +111,9 @@ export function useSettings() {
   );
   const [panelOrder, setPanelOrder] = useState<PanelId[] | null>(
     () => parsePanelOrder(localStorage.getItem("nectar-panel-order"))
+  );
+  const [ccLayout, setCcLayout] = useState<CcLayout>(
+    () => parseCcLayout(localStorage.getItem("nectar-cc-layout"))
   );
   const [panelShelf, setPanelShelf] = useState(
     () => localStorage.getItem("nectar-panel-shelf-enabled") !== "false"
@@ -243,6 +246,7 @@ export function useSettings() {
       apply(getVal("nectar-panel-control-center-enabled"), setPanelControlCenter, (v) => v !== "false");
       apply(getVal("nectar-panel-shelf-enabled"), setPanelShelf, (v) => v !== "false");
       apply(getVal("nectar-panel-order"), setPanelOrder, (v) => parsePanelOrder(v));
+      apply(getVal("nectar-cc-layout"), setCcLayout, (v) => parseCcLayout(v));
       apply(getVal("nectar-dock-recycle-enabled"), setDockRecycle, readBool);
       apply(getVal("nectar-dock-drives"), setDockDrives, parseDrives);
       apply(getVal("nectar-dock-icon-only"), setDockIconOnly, readBool);
@@ -346,6 +350,7 @@ export function useSettings() {
     "nectar-panel-control-center-enabled": (v) => setPanelControlCenter(v !== false && v !== "false"),
     "nectar-panel-shelf-enabled": (v) => setPanelShelf(v !== false && v !== "false"),
     "nectar-panel-order": (v) => setPanelOrder(parsePanelOrder(v === null ? null : String(v))),
+    "nectar-cc-layout": (v) => setCcLayout(parseCcLayout(v === null ? null : String(v))),
     "nectar-dock-recycle-enabled": setDockRecycle,
     "nectar-dock-drives": (v) => setDockDrives(parseDrives(v)),
     "nectar-dock-icon-only": setDockIconOnly,
@@ -707,6 +712,24 @@ export function useSettings() {
     [order[from], order[to]] = [order[to], order[from]];
     setPanelOrder(order);
     saveSetting("nectar-panel-order", JSON.stringify(order));
+  };
+
+  const moveCcItem = (kind: "tiles" | "buttons", id: string, direction: -1 | 1) => {
+    const order = [...(ccLayout[kind] ?? (kind === "tiles" ? CC_TILES : CC_BUTTONS))];
+    const from = order.indexOf(id);
+    const to = from + direction;
+    if (from < 0 || to < 0 || to >= order.length) return;
+    [order[from], order[to]] = [order[to], order[from]];
+    const next = { ...ccLayout, [kind]: order };
+    setCcLayout(next);
+    saveSetting("nectar-cc-layout", JSON.stringify(next));
+  };
+
+  const resetCcItems = (kind: "tiles" | "buttons") => {
+    const next = { ...ccLayout };
+    delete next[kind];
+    setCcLayout(next);
+    saveSetting("nectar-cc-layout", JSON.stringify(next));
   };
 
   const resetPanelOrder = () => {
@@ -1120,6 +1143,9 @@ export function useSettings() {
     panelOrder,
     movePanel,
     resetPanelOrder,
+    ccLayout,
+    moveCcItem,
+    resetCcItems,
     dockRecycle,
     toggleDockRecycle,
     dockDrives,

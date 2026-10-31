@@ -18,7 +18,8 @@ import {
   Globe,
   Volume2,
 } from "lucide-react";
-import { DEFAULT_PANEL_ORDER, type PanelId } from "../panelOrder";
+import { CC_BUTTONS, CC_TILES, DEFAULT_PANEL_ORDER, type CcLayout, type PanelId } from "../panelOrder";
+import { OrderList } from "./OrderList";
 import { SettingRow } from "./SettingRow";
 import { SettingSection } from "./SettingSection";
 import { Dropdown } from "./Dropdown";
@@ -80,6 +81,9 @@ interface NotchTabProps {
   panelOrder: PanelId[] | null;
   movePanel: (id: PanelId, direction: -1 | 1) => void;
   resetPanelOrder: () => void;
+  ccLayout: CcLayout;
+  moveCcItem: (kind: "tiles" | "buttons", id: string, direction: -1 | 1) => void;
+  resetCcItems: (kind: "tiles" | "buttons") => void;
   weatherEnabled: boolean;
   toggleWeather: () => void;
   tempUnitFahrenheit: boolean;
@@ -148,6 +152,9 @@ export function NotchTab({
   panelOrder,
   movePanel,
   resetPanelOrder,
+  ccLayout,
+  moveCcItem,
+  resetCcItems,
   weatherEnabled,
   toggleWeather,
   tempUnitFahrenheit,
@@ -382,18 +389,37 @@ export function NotchTab({
               </label>
             </SettingRow>
 
-        <SettingRow icon={Circle} label={t("notch.panelOrder")} desc={t("notch.panelOrder.desc")} stacked>
-              <div className="panel-order-row">
-                {(panelOrder ?? DEFAULT_PANEL_ORDER).map((id, index, all) => (
-                  <div key={id} className="panel-order-item">
-                    <button className="panel-order-arrow" disabled={index === 0} onClick={() => movePanel(id, -1)}>‹</button>
-                    <span>{t(`panel.${id}`)}</span>
-                    <button className="panel-order-arrow" disabled={index === all.length - 1} onClick={() => movePanel(id, 1)}>›</button>
-                  </div>
-                ))}
-                {panelOrder && <button className="panel-order-reset" onClick={resetPanelOrder}>{t("notch.panelOrder.reset")}</button>}
-              </div>
-            </SettingRow>
+        <SettingRow icon={Circle} label={t("notch.panelOrder")} desc={t("notch.panelOrder.desc")} divider={false} stacked>
+          <OrderList
+            ids={panelOrder ?? DEFAULT_PANEL_ORDER}
+            label={(id) => t(`panel.${id}`)}
+            onMove={(id, direction) => movePanel(id as PanelId, direction)}
+            onReset={panelOrder ? resetPanelOrder : undefined}
+            resetLabel={t("notch.panelOrder.reset")}
+          />
+        </SettingRow>
+      </SettingSection>
+
+      <SettingSection id="notch-cc" title={t("notch.section.cc")}>
+        <SettingRow icon={Circle} label={t("notch.ccTiles")} desc={t("notch.ccTiles.desc")} stacked>
+          <OrderList
+            ids={ccLayout.tiles ?? CC_TILES}
+            label={(id) => t(`cc.layout.${id}`)}
+            onMove={(id, direction) => moveCcItem("tiles", id, direction)}
+            onReset={ccLayout.tiles ? () => resetCcItems("tiles") : undefined}
+            resetLabel={t("notch.panelOrder.reset")}
+          />
+        </SettingRow>
+
+        <SettingRow icon={Circle} label={t("notch.ccButtons")} desc={t("notch.ccButtons.desc")} divider={false} stacked>
+          <OrderList
+            ids={ccLayout.buttons ?? CC_BUTTONS}
+            label={(id) => t(`cc.layout.${id}`)}
+            onMove={(id, direction) => moveCcItem("buttons", id, direction)}
+            onReset={ccLayout.buttons ? () => resetCcItems("buttons") : undefined}
+            resetLabel={t("notch.panelOrder.reset")}
+          />
+        </SettingRow>
       </SettingSection>
 
       <SettingSection id="notch-controls" title={t("notch.section.controls")}>

@@ -490,5 +490,20 @@
   "notch.section.panels": "Paneller",
   "notch.section.controls": "Denetimler ve raf",
   "dock.section.shortcuts": "Düğmeler ve önizlemeler",
-  "dock.section.style": "Stil"
+  "dock.section.style": "Stil",
+  "notch.section.cc": "Denetim Merkezi düzeni",
+  "notch.ccTiles": "Kutucuklar",
+  "notch.ccTiles.desc": "Üstteki dört kutucuğun sırası",
+  "notch.ccButtons": "Düğmeler",
+  "notch.ccButtons.desc": "Yuvarlak düğmelerin sırası",
+  "cc.layout.network": "Ağ",
+  "cc.layout.dock-mode": "Dock Modu",
+  "cc.layout.bluetooth": "Bluetooth",
+  "cc.layout.notch-mode": "Çentik Modu",
+  "cc.layout.dnd": "Rahatsız Etmeyin",
+  "cc.layout.battery-saver": "Pil Tasarrufu",
+  "cc.layout.tray": "Tepsi",
+  "cc.layout.notifications": "Bildirimler",
+  "cc.layout.settings": "Ayarlar",
+  "cc.layout.restart": "Yeniden Başlat"
 }

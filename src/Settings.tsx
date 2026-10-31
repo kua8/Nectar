@@ -182,6 +182,9 @@ function SettingsApp() {
               panelOrder={settings.panelOrder}
               movePanel={settings.movePanel}
               resetPanelOrder={settings.resetPanelOrder}
+              ccLayout={settings.ccLayout}
+              moveCcItem={settings.moveCcItem}
+              resetCcItems={settings.resetCcItems}
               weatherEnabled={settings.weatherEnabled}
               toggleWeather={settings.toggleWeather}
               tempUnitFahrenheit={settings.tempUnitFahrenheit}
