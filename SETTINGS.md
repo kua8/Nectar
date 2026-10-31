@@ -170,7 +170,6 @@ Example:
 | `nectar-low-battery-threshold` | integer string | `"20"` | Battery percentage that triggers the low-battery alert pulse (5 to 50, step 5). |
 | `nectar-auto-update` | `"true"` / `"false"` | `"false"` | Check for and download updates automatically on startup. |
 | `nectar-show-update-indicator` | `"true"` / `"false"` | `"true"` | Show a green dot on the notch when an update is available. |
-| `nectar-hide-in-fullscreen` | `"true"` / `"false"` | `"true"` | Hide the dock, and disable its hover reveal, while a fullscreen app (game or video) is in front. The notch is not affected. |
 | `nectar-time-format-24h` | `"true"` / `"false"` | `"false"` | Use 24-hour clock format in the notch. When `"false"`, displays 12-hour format with AM/PM. |
 | `nectar-language` | `"system"` / language code, e.g. `"en"` | `"system"` | UI language. `"system"` follows the Windows display language and falls back to English when that language has no translation. Missing keys in a translation fall back to English. Translations live in `src/locales/<code>.json` and are registered in `src/i18n.ts` and `src-tauri/src/i18n.rs` (tray menu). Calendar dates and times follow this language too. |
 | `nectar-tour-seen` | `"1"` | unset | Set once the first-run tour has been finished or skipped. Delete it to see the tour again, or use Settings > About > Replay Tour. |
