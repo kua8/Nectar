@@ -1565,6 +1565,12 @@ function App() {
     handleVolumeChange(Math.min(1, Math.max(0, Math.round((displayVolume + change) * 100) / 100)));
   };
 
+  const handleBrightnessWheel = (e: React.WheelEvent) => {
+    if (!settingsScrollVolume) return;
+    e.stopPropagation();
+    handleBrightnessChange(Math.min(100, Math.max(0, Math.round(currentBrightness + (e.deltaY < 0 ? 2 : -2)))));
+  };
+
   const tip = (text: string | undefined) =>
     settingsLegacyMode
       ? { "data-tooltip": text }
@@ -2401,7 +2407,7 @@ function App() {
                       </div>
 
                       {/* Brightness Slider */}
-                      <div className="cc-classic-slider-row">
+                      <div className="cc-classic-slider-row" onWheel={handleBrightnessWheel}>
                         <div className="cc-classic-slider-label">
                           <BrightnessLowIcon />
                           <span>{t("cc.brightness")}</span>
