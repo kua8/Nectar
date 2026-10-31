@@ -583,6 +583,29 @@ pub async fn open_app(app: AppHandle, app_name: String, args: Option<String>) {
         return;
     }
 
+    if app_name == "taskmgr" {
+        tauri::async_runtime::spawn_blocking(|| {
+            let root = std::env::var("SystemRoot").unwrap_or_else(|_| "C:\\Windows".to_string());
+            let exe = format!("{root}\\System32\\Taskmgr.exe");
+            let wide_exe: Vec<u16> = exe.encode_utf16().chain(std::iter::once(0)).collect();
+            let wide_open: Vec<u16> = "open".encode_utf16().chain(std::iter::once(0)).collect();
+            let res = unsafe {
+                windows::Win32::UI::Shell::ShellExecuteW(
+                    None,
+                    windows::core::PCWSTR(wide_open.as_ptr()),
+                    windows::core::PCWSTR(wide_exe.as_ptr()),
+                    None,
+                    None,
+                    windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL,
+                )
+            };
+            if res.0 as usize <= 32 {
+                crate::diagnostics::log(&format!("task manager failed to start: error {}", res.0 as usize));
+            }
+        });
+        return;
+    }
+
     if app_name == "nectar-settings" {
         open_settings_window(app);
         return;

@@ -113,7 +113,7 @@ async function fetchWeatherForCoords(
 
   const data = await response.json();
 
-  if (!data?.current?.temperature_2m) {
+  if (typeof data?.current?.temperature_2m !== "number") {
     throw new Error("Invalid weather API response shape");
   }
 
