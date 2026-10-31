@@ -22,7 +22,7 @@
 
 <br />
 
-> **Heads up:** Due to recent traction, updates may be slow. I wasn't expecting this many issues and pull requests, so please bear with me!
+> **Disclaimer:** I'm a solo dev and I really DID NOT expect this sudden traction for Nectar. I really appreciate the recent support, and I'm trying my best to release fixes as quickly as possible to keep you all happy. But fixing one issue often causes another one. So moving forward I'll do weekly releases with stable builds, plus a pre-release for smaller fixes, and a toggle to decide which version of Nectar you run. This gives me time to search through all the bugs, find the most critical ones, and also have a private life. Thank you for understanding.
 
 <br />
 
