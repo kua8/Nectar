@@ -13,8 +13,8 @@
 
 <br />
 
-[![Latest release](https://shieldcn.dev/badge/release-v1.6.1.svg?logo=lu:Tag)](https://github.com/kua8/Nectar/releases/latest)
-[![Downloads](https://shieldcn.dev/github/downloads/kua8/Nectar.svg?logo=lu:Download&v=1.6.1)](https://github.com/kua8/Nectar/releases)
+[![Latest release](https://shieldcn.dev/badge/release-v1.6.2.svg?logo=lu:Tag)](https://github.com/kua8/Nectar/releases/latest)
+[![Downloads](https://shieldcn.dev/github/downloads/kua8/Nectar.svg?logo=lu:Download&v=1.6.2)](https://github.com/kua8/Nectar/releases)
 [![License](https://shieldcn.dev/github/license/kua8/Nectar.svg?logo=lu:Scale)](LICENSE)
 ![Platform](https://shieldcn.dev/badge/platform-Windows.svg?logo=ri:FaWindows)
 
