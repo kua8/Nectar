@@ -1801,14 +1801,6 @@ function App() {
       >
         {widgetTip && isHovered && <div className="widget-tip">{widgetTip}</div>}
 
-        {isHovered && isExpanded && !isHidden && nectarMode !== 'tour' && (() => {
-          const modes = availableNotchModes();
-          return modes.length > 1 ? (
-            <div className="mode-dots">
-              {modes.map((m) => <span key={m} className={m === nectarMode ? 'active' : ''} />)}
-            </div>
-          ) : null;
-        })()}
 
         <AnimatePresence>
           {isMusicMode && settingsAmbienceEnabled && albumArtUrl && isHovered && !isCalendarMode && (
