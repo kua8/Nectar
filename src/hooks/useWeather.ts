@@ -384,8 +384,9 @@ export function useWeather(enabled: boolean) {
     };
   }, [enabled, doFetch]);
 
-  // Listen for city name changes from Settings
+  // Listen for city changes from Settings. The saved coordinates are read again on every refresh.
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const unlisten = listen<{ key: string; value: any }>(
       "settings-changed",
       (event) => {
@@ -393,12 +394,17 @@ export function useWeather(enabled: boolean) {
         if (key === "nectar-weather-city") {
           setCityName(String(value || ""));
         }
+        if (key === "nectar-weather-city" || key === "nectar-weather-lat" || key === "nectar-weather-lon") {
+          clearTimeout(timer);
+          timer = setTimeout(() => doFetch(false), 250);
+        }
       },
     );
     return () => {
+      clearTimeout(timer);
       unlisten.then((fn) => fn());
     };
-  }, []);
+  }, [doFetch]);
 
   // Initial fetch + 30-min interval
   useEffect(() => {

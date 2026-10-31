@@ -157,7 +157,7 @@ body,
 }
 
 .volume-notch-flares::before {
-  top: -13px;
+  top: -12px;
   -webkit-mask-image: radial-gradient(circle at 13px 0px, transparent 12px, black 13px);
   mask-image: radial-gradient(circle at 13px 0px, transparent 12px, black 13px);
   background:
@@ -172,7 +172,7 @@ body,
 }
 
 .volume-notch-flares::after {
-  bottom: -13px;
+  bottom: -12px;
   -webkit-mask-image: radial-gradient(circle at 13px 13px, transparent 12px, black 13px);
   mask-image: radial-gradient(circle at 13px 13px, transparent 12px, black 13px);
   background:
