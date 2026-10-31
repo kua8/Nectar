@@ -7,6 +7,7 @@ import './Dock.css';
 import { initTheme } from './theme';
 import { useSettingsSync } from './hooks/useSettingsSync';
 import { useT } from './i18n';
+import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon } from './icons';
 
 interface AppInfo {
   name: string;
@@ -170,6 +171,21 @@ function DriveIcon({ letter }: { letter: string }) {
 }
 
 // One dot per open window, capped at three.
+interface AppMediaSession {
+  app_id: string;
+  title: string;
+  artist: string;
+  is_playing: boolean;
+}
+
+// Media sessions are keyed by app id: an exe name for desktop apps (Spotify.exe),
+// a package id for packaged ones (SpotifyAB.SpotifyMusic_...!Spotify).
+function sessionForApp(app: AppInfo, sessions: AppMediaSession[]): AppMediaSession | undefined {
+  const exe = (app.executable || app.path.split(/[\\/]/).pop() || "").toLowerCase().replace(/\.exe$/, "");
+  if (!exe) return undefined;
+  return sessions.find((s) => s.app_id.toLowerCase().replace(/\.exe$/, "").includes(exe));
+}
+
 function WindowDots({ count }: { count: number }) {
   return (
     <div className="window-dots">
@@ -260,6 +276,7 @@ const Dock = memo(function Dock() {
   
   const previewTimerRef = useRef<any>(null);
   const isPreviewHoveredRef = useRef(false);
+  const [mediaSessions, setMediaSessions] = useState<AppMediaSession[]>([]);
   const hoveredAppRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -964,6 +981,48 @@ const Dock = memo(function Dock() {
     tap: { scale: 0.95 }
   };
 
+  const previewAppId = dockPreviewEnabled ? previewData?.id : undefined;
+  useEffect(() => {
+    if (!previewAppId) {
+      setMediaSessions([]);
+      return;
+    }
+    const refresh = () => invoke<AppMediaSession[]>('get_app_media_sessions').then(setMediaSessions).catch(() => {});
+    refresh();
+    const timer = setInterval(refresh, 2000);
+    return () => clearInterval(timer);
+  }, [previewAppId]);
+
+  const controlMedia = (e: React.MouseEvent, session: AppMediaSession, action: 'previous' | 'play_pause' | 'next') => {
+    e.stopPropagation();
+    invoke('app_media_control', { appId: session.app_id, action })
+      .then(() => setTimeout(() => invoke<AppMediaSession[]>('get_app_media_sessions').then(setMediaSessions).catch(() => {}), 300))
+      .catch(() => {});
+  };
+
+  const renderPreviewMedia = (app: AppInfo) => {
+    const session = sessionForApp(app, mediaSessions);
+    if (!session || !session.title) return null;
+    return (
+      <div className="preview-media" onClick={(e) => e.stopPropagation()}>
+        <div className="preview-media-info">
+          <span className="preview-media-title">{session.title}</span>
+          {session.artist && <span className="preview-media-artist">{session.artist}</span>}
+        </div>
+        <div className="preview-media-controls">
+          <button aria-label={t("media.previous")} onClick={(e) => controlMedia(e, session, 'previous')}><SkipBackIcon size={14} /></button>
+          <button
+            aria-label={session.is_playing ? t("media.pause") : t("media.play")}
+            onClick={(e) => controlMedia(e, session, 'play_pause')}
+          >
+            {session.is_playing ? <PauseIcon size={16} /> : <PlayIcon size={16} />}
+          </button>
+          <button aria-label={t("media.next")} onClick={(e) => controlMedia(e, session, 'next')}><SkipForwardIcon size={14} /></button>
+        </div>
+      </div>
+    );
+  };
+
   const renderShortcut = (id: string, label: string, delay: number, onClick: () => void, icon: React.ReactNode) => (
     <motion.div
       key={id}
@@ -1210,6 +1269,7 @@ const Dock = memo(function Dock() {
                           </div>
                         ))}
                       </div>
+                      {renderPreviewMedia(app)}
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -1319,6 +1379,7 @@ const Dock = memo(function Dock() {
                                 </div>
                               ))}
                             </div>
+                            {renderPreviewMedia(app)}
                           </motion.div>
                         )}
                       </AnimatePresence>
@@ -1416,6 +1477,7 @@ const Dock = memo(function Dock() {
                                 </div>
                               ))}
                             </div>
+                            {renderPreviewMedia(app)}
                           </motion.div>
                         )}
                       </AnimatePresence>

@@ -1969,7 +1969,11 @@ pub fn open_calendar_window(app: AppHandle) {
 
 #[tauri::command]
 pub fn open_tray_at_cursor() {
-    std::thread::spawn(|| crate::tray_icons::open_native_tray(None));
+    use windows::Win32::Foundation::POINT;
+    use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
+    let mut cursor = POINT::default();
+    let anchor = unsafe { GetCursorPos(&mut cursor) }.ok().map(|_| (cursor.x, cursor.y - 4));
+    std::thread::spawn(move || crate::tray_icons::open_native_tray(anchor));
 }
 
 #[tauri::command]
@@ -2074,6 +2078,62 @@ pub fn media_previous() { if let Some(sender) = COMMAND_SENDER.get() { let _ = s
 
 #[tauri::command]
 pub fn media_seek(position_ms: f64) { if let Some(sender) = COMMAND_SENDER.get() { let _ = sender.send(crate::types::SystemCommand::MediaSeek(position_ms as i64)); } }
+
+#[derive(serde::Serialize)]
+pub struct AppMediaSession {
+    pub app_id: String,
+    pub title: String,
+    pub artist: String,
+    pub is_playing: bool,
+}
+
+#[tauri::command]
+pub fn get_app_media_sessions() -> Vec<AppMediaSession> {
+    use windows::Media::Control::{GlobalSystemMediaTransportControlsSessionManager, GlobalSystemMediaTransportControlsSessionPlaybackStatus};
+
+    let Ok(mgr) = GlobalSystemMediaTransportControlsSessionManager::RequestAsync().and_then(|op| op.get()) else { return Vec::new() };
+    let Ok(sessions) = mgr.GetSessions() else { return Vec::new() };
+
+    sessions
+        .into_iter()
+        .filter_map(|session| {
+            let app_id = session.SourceAppUserModelId().ok()?.to_string();
+            let props = session.TryGetMediaPropertiesAsync().ok()?.get().ok()?;
+            let is_playing = session.GetPlaybackInfo().ok().and_then(|p| p.PlaybackStatus().ok())
+                == Some(GlobalSystemMediaTransportControlsSessionPlaybackStatus::Playing);
+            Some(AppMediaSession {
+                app_id,
+                title: props.Title().ok()?.to_string(),
+                artist: props.Artist().map(|a| a.to_string()).unwrap_or_default(),
+                is_playing,
+            })
+        })
+        .collect()
+}
+
+#[tauri::command]
+pub fn app_media_control(app_id: String, action: String) -> Result<(), String> {
+    use windows::Media::Control::GlobalSystemMediaTransportControlsSessionManager;
+
+    let mgr = GlobalSystemMediaTransportControlsSessionManager::RequestAsync()
+        .and_then(|op| op.get())
+        .map_err(|e| e.to_string())?;
+    let session = mgr
+        .GetSessions()
+        .map_err(|e| e.to_string())?
+        .into_iter()
+        .find(|s| s.SourceAppUserModelId().map(|id| id.to_string() == app_id).unwrap_or(false))
+        .ok_or("No media session for that app")?;
+
+    match action.as_str() {
+        "play_pause" => session.TryTogglePlayPauseAsync(),
+        "next" => session.TrySkipNextAsync(),
+        "previous" => session.TrySkipPreviousAsync(),
+        _ => return Err("Unknown media action".into()),
+    }
+    .map(|_| ())
+    .map_err(|e| e.to_string())
+}
 
 #[tauri::command]
 pub fn open_media_source_app() {

@@ -170,7 +170,7 @@ pub fn open_native_tray(anchor: Option<(i32, i32)>) {
             let _ = SetLayeredWindowAttributes(tray, windows::Win32::Foundation::COLORREF(0), 0, LWA_ALPHA);
             let _ = ShowWindow(tray, SW_SHOWNA);
         }
-        std::thread::sleep(std::time::Duration::from_millis(250));
+        std::thread::sleep(std::time::Duration::from_millis(100));
     }
 
     let mut opened = false;
@@ -195,8 +195,8 @@ pub fn open_native_tray(anchor: Option<(i32, i32)>) {
     if opened {
         FLYOUT_OPEN.store(true, Ordering::SeqCst);
         let mut placed = false;
-        for _ in 0..40 {
-            std::thread::sleep(std::time::Duration::from_millis(50));
+        for _ in 0..130 {
+            std::thread::sleep(std::time::Duration::from_millis(15));
             if let Some(flyout) = find_overflow_window() {
                 place_flyout(flyout, anchor);
                 placed = true;

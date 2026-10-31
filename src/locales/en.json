@@ -451,5 +451,9 @@
   "dualClock.sameTime": "Same time as here",
   "dualClock.ahead": "{amount} ahead",
   "dualClock.behind": "{amount} behind",
-  "battery.updateAvailable": "Update Available"
+  "battery.updateAvailable": "Update Available",
+  "media.previous": "Previous",
+  "media.next": "Next",
+  "media.play": "Play",
+  "media.pause": "Pause"
 }

@@ -107,6 +107,8 @@ fn main() {
             media_next,
             media_previous,
             media_seek,
+            get_app_media_sessions,
+            app_media_control,
             open_media_source_app,
 
             init_dock,
