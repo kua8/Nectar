@@ -76,7 +76,8 @@ interface NotchTabProps {
   tempUnitFahrenheit: boolean;
   toggleTempUnit: () => void;
   cityName: string;
-  setCityName: (name: string) => void;
+  cityQuery: string;
+  setCityQuery: (query: string) => void;
   citySearchResults: Array<{ name: string; country: string; latitude: number; longitude: number }>;
   showCityDropdown: boolean;
   setShowCityDropdown: (show: boolean) => void;
@@ -136,7 +137,8 @@ export function NotchTab({
   tempUnitFahrenheit,
   toggleTempUnit,
   cityName,
-  setCityName,
+  cityQuery,
+  setCityQuery,
   citySearchResults,
   showCityDropdown,
   setShowCityDropdown,
@@ -379,8 +381,8 @@ export function NotchTab({
               <input
                 type="text"
                 placeholder={t("notch.weather.search")}
-                value={cityName}
-                onChange={(e) => setCityName(e.target.value)}
+                value={cityQuery}
+                onChange={(e) => setCityQuery(e.target.value)}
                 onFocus={() => citySearchResults.length > 0 && setShowCityDropdown(true)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && citySearchResults.length > 0) {
@@ -391,9 +393,12 @@ export function NotchTab({
                     setShowCityDropdown(false);
                   }
                 }}
-                onBlur={() => setTimeout(() => setShowCityDropdown(false), 150)}
+                onBlur={() => setTimeout(() => {
+                  setShowCityDropdown(false);
+                  if (cityQuery !== cityName && citySearchResults.length > 0) selectCity(citySearchResults[0]);
+                }, 150)}
               />
-              {cityName && (
+              {(cityName || cityQuery) && (
                 <button
                   className="city-clear-btn"
                   onMouseDown={(e) => {

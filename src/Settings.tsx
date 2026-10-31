@@ -180,7 +180,8 @@ function SettingsApp() {
               tempUnitFahrenheit={settings.tempUnitFahrenheit}
               toggleTempUnit={settings.toggleTempUnit}
               cityName={settings.cityName}
-              setCityName={settings.setCityName}
+              cityQuery={settings.cityQuery}
+              setCityQuery={settings.setCityQuery}
               citySearchResults={settings.citySearchResults}
               showCityDropdown={settings.showCityDropdown}
               setShowCityDropdown={settings.setShowCityDropdown}

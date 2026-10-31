@@ -86,6 +86,7 @@ export function useSettings() {
   );
   const [tempUnitFahrenheit, setTempUnitFahrenheit] = useState(false);
   const [cityName, setCityName] = useState("");
+  const [cityQuery, setCityQuery] = useState("");
   const [citySearchResults, setCitySearchResults] = useState<
     Array<{ name: string; country: string; latitude: number; longitude: number }>
   >([]);
@@ -255,7 +256,10 @@ export function useSettings() {
       }
 
       const savedCity = getVal("nectar-weather-city");
-      if (savedCity) setCityName(savedCity);
+      if (savedCity) {
+        setCityName(savedCity);
+        setCityQuery(savedCity);
+      }
 
       apply(getVal("nectar-theme-mode"), setThemeMode, (v) => v);
       apply(getVal("nectar-theme-color"), setThemeColor, (v) => v);
@@ -365,7 +369,10 @@ export function useSettings() {
     "nectar-theme-opacity": setThemeOpacity,
     "nectar-theme-saturation": setThemeSaturation,
     "nectar-theme-brightness": setThemeBrightness,
-    "nectar-weather-city": (v) => setCityName(v || ""),
+    "nectar-weather-city": (v) => {
+      setCityName(v || "");
+      setCityQuery(v || "");
+    },
   });
 
   // ── Listen for system accent changes (adaptive theme) ──
@@ -389,7 +396,7 @@ export function useSettings() {
 
   // ── City search debounce ──
   useEffect(() => {
-    if (cityName.trim().length < 2) {
+    if (cityQuery.trim().length < 2 || cityQuery === cityName) {
       setCitySearchResults([]);
       setShowCityDropdown(false);
       return;
@@ -398,7 +405,7 @@ export function useSettings() {
     const timeout = setTimeout(async () => {
       try {
         const res = await fetch(
-          `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityName)}&count=5&language=en&format=json`
+          `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(cityQuery)}&count=5&language=en&format=json`
         );
         const data = await res.json();
         if (data.results && data.results.length > 0) {
@@ -420,7 +427,7 @@ export function useSettings() {
     }, 300);
 
     return () => clearTimeout(timeout);
-  }, [cityName]);
+  }, [cityQuery, cityName]);
 
   // ── Update checker ──
   const checkForUpdates = async (manual = true) => {
@@ -849,6 +856,7 @@ export function useSettings() {
     longitude: number;
   }) => {
     setCityName(city.name);
+    setCityQuery(city.name);
     setShowCityDropdown(false);
     setCitySearchResults([]);
     localStorage.setItem("nectar-weather-city", city.name);
@@ -862,6 +870,7 @@ export function useSettings() {
 
   const handleCityClear = async () => {
     setCityName("");
+    setCityQuery("");
     setShowCityDropdown(false);
     setCitySearchResults([]);
     localStorage.removeItem("nectar-weather-city");
@@ -1019,7 +1028,8 @@ export function useSettings() {
     tempUnitFahrenheit,
     toggleTempUnit,
     cityName,
-    setCityName,
+    cityQuery,
+    setCityQuery,
     citySearchResults,
     showCityDropdown,
     setShowCityDropdown,
