@@ -123,6 +123,12 @@ Every setting lives in one plain `settings.json` that Nectar watches and applies
 2. Choose **Just me** or **All users**. An all-users install asks for administrator permission once.
 3. Nectar starts with a short splash animation, then the notch and dock appear together.
 
+Only download Nectar from the [releases page](https://github.com/kua8/Nectar/releases) of this repository. Each release includes a `SHA256SUMS.txt` file. To check your download, run this in PowerShell and compare the result with the matching line in that file:
+
+```powershell
+Get-FileHash .\Nectar-Setup-<version>.exe -Algorithm SHA256
+```
+
 Nectar updates itself: a green dot on the notch means an update is ready, and you can turn on **Auto Update** in **Settings › About**. **Launch at Login** is in **Settings › General**.
 
 **Uninstall** from Windows Settings › Apps, or from **Settings › About** inside Nectar. Both remove the app and put your native taskbar back.
