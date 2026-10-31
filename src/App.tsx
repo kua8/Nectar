@@ -29,6 +29,7 @@ import {
   zoneOffsetLabel,
 } from "./dualClock";
 import {
+  CalendarDays,
   Cpu,
   MemoryStick,
   HardDrive,
@@ -1775,6 +1776,11 @@ function App() {
                     exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.1 } }}
                     transition={{ type: "spring", stiffness: 500, damping: 30 }}
                   >
+                    {productivityEnabled && (
+                      <button className="music-calendar-btn" onClick={toggleCalendarMode} title={t("music.openCalendar")} aria-label={t("music.openCalendar")}>
+                        <CalendarDays size={13} strokeWidth={2} />
+                      </button>
+                    )}
                     {mediaLayout === 'compact' ? (
                       <CompactMediaPlayer
                         mediaInfo={mediaInfo}

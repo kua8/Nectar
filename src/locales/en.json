@@ -455,5 +455,6 @@
   "media.previous": "Previous",
   "media.next": "Next",
   "media.play": "Play",
-  "media.pause": "Pause"
+  "media.pause": "Pause",
+  "music.openCalendar": "Open calendar and timer"
 }
