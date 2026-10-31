@@ -510,8 +510,10 @@ function App() {
   const dockModeInitial = useRef(true);
   const notchModeInitial = useRef(true);
 
+  const [nectarMode, setNectarMode] = useState<'music' | 'calendar' | 'command-center' | 'status' | 'tour'>('status');
+
   const isAnyInteraction = isHovered || isNotchHovered || isEdgeHovered;
-  const isHidden = !startupAnimating && (
+  const isHidden = !startupAnimating && nectarMode !== 'tour' && (
     (notchMode === 'smart' && isOverlapped && interactionState === 'none') ||
     (notchMode === 'peek' && interactionState === 'none' && !eventPeek)
   );
@@ -906,7 +908,6 @@ function App() {
     invoke("change_notch_mode", { mode: notchMode });
   }, [notchMode, windowLabel]);
 
-  const [nectarMode, setNectarMode] = useState<'music' | 'calendar' | 'command-center' | 'status' | 'tour'>('status');
   const [tourStep, setTourStep] = useState(0);
   const tourAutoStartedRef = useRef(false);
 
@@ -1589,6 +1590,7 @@ function App() {
 
   // Calculate width dynamically based on enabled features
   const getDynamicWidth = () => {
+    if (nectarMode === 'tour') return 380;
     if (isCalendarMode) return Math.max(settingsCalendarEnabled && showClockColumn ? 480 : settingsCalendarEnabled ? 310 : 270, 140 + dualClockExtra);
     if (nectarMode === 'command-center' && isHovered) {
       const totalWidgets = statusWidgets.left.length + statusWidgets.right.length;
@@ -1618,7 +1620,7 @@ function App() {
     if (!isExpanded || isHidden) {
       return isImpacted ? 28.9 : 44.2;
     }
-    if (nectarMode === 'tour') return 178;
+    if (nectarMode === 'tour') return 210;
     if (nectarMode === 'calendar') return settingsCalendarEnabled ? (caldav.connected ? 350 : 310) : 262;
     if (nectarMode === 'command-center') return isHovered ? 230 : 36;
     if (nectarMode === 'status') return 36;
