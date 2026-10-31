@@ -9,7 +9,7 @@ use windows::Win32::UI::Accessibility::{
     UIA_InvokePatternId,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    FindWindowA, GetCursorPos, GetWindowLongA, GetWindowRect, IsWindowVisible, SetForegroundWindow,
+    FindWindowA, GetClassNameA, GetCursorPos, GetForegroundWindow, GetWindowLongA, GetWindowRect, IsWindowVisible, SetForegroundWindow,
     SetLayeredWindowAttributes, SetWindowLongA, SetWindowPos, ShowWindow, GWL_EXSTYLE, HWND_TOPMOST, LWA_ALPHA,
     SWP_NOSIZE, SWP_SHOWWINDOW, SW_HIDE, SW_SHOWNA, WS_EX_LAYERED, WS_EX_TRANSPARENT,
 };
@@ -74,24 +74,37 @@ fn send_keys(keys: &[(windows::Win32::UI::Input::KeyboardAndMouse::VIRTUAL_KEY, 
     unsafe { SendInput(&inputs, std::mem::size_of::<INPUT>() as i32) };
 }
 
+fn class_name(hwnd: HWND) -> String {
+    let mut buf = [0u8; 64];
+    let len = unsafe { GetClassNameA(hwnd, &mut buf) }.max(0) as usize;
+    String::from_utf8_lossy(&buf[..len]).into_owned()
+}
+
+fn taskbar_has_focus() -> bool {
+    let fg = unsafe { GetForegroundWindow() };
+    !fg.0.is_null() && matches!(class_name(fg).as_str(), "Shell_TrayWnd" | "Shell_SecondaryTrayWnd")
+}
+
 fn open_with_shortcut(anchor: Option<(i32, i32)>) -> bool {
     use windows::Win32::UI::Input::KeyboardAndMouse::{VK_B, VK_LWIN, VK_RETURN};
     send_keys(&[(VK_LWIN, false), (VK_B, false), (VK_B, true), (VK_LWIN, true)]);
-    std::thread::sleep(std::time::Duration::from_millis(250));
-    send_keys(&[(VK_RETURN, false), (VK_RETURN, true)]);
 
-    for _ in 0..40 {
+    let mut focused = false;
+    for _ in 0..60 {
         std::thread::sleep(std::time::Duration::from_millis(10));
-        if let Some(flyout) = find_overflow_window() {
-            if unsafe { IsWindowVisible(flyout) }.as_bool() {
-                place_flyout(flyout, anchor);
-                return true;
-            }
+        if taskbar_has_focus() {
+            focused = true;
+            break;
         }
     }
+    if !focused {
+        crate::diagnostics::log("tray: taskbar never took focus, not sending Return");
+        return false;
+    }
     send_keys(&[(VK_RETURN, false), (VK_RETURN, true)]);
-    for _ in 0..30 {
-        std::thread::sleep(std::time::Duration::from_millis(15));
+
+    for _ in 0..60 {
+        std::thread::sleep(std::time::Duration::from_millis(10));
         if let Some(flyout) = find_overflow_window() {
             if unsafe { IsWindowVisible(flyout) }.as_bool() {
                 place_flyout(flyout, anchor);
@@ -128,19 +141,22 @@ fn nectar_theme_is_light() -> bool {
 }
 
 fn style_flyout(flyout: HWND) {
+    set_flyout_style(flyout, !nectar_theme_is_light(), 2, 3);
+}
+
+fn reset_flyout_style(flyout: HWND) {
+    set_flyout_style(flyout, false, 0, 0);
+}
+
+fn set_flyout_style(flyout: HWND, dark: bool, corner: u32, backdrop: u32) {
     use windows::Win32::Graphics::Dwm::{
-        DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_SYSTEMBACKDROP_TYPE,
-        DWMWA_USE_IMMERSIVE_DARK_MODE, DWMWA_WINDOW_CORNER_PREFERENCE,
+        DwmSetWindowAttribute, DWMWA_SYSTEMBACKDROP_TYPE, DWMWA_USE_IMMERSIVE_DARK_MODE, DWMWA_WINDOW_CORNER_PREFERENCE,
     };
-    let dark = windows::core::BOOL(if nectar_theme_is_light() { 0 } else { 1 });
-    let corner_pref: u32 = 2;
-    let backdrop_type: u32 = 3;
-    let border_color: u32 = if nectar_theme_is_light() { 0x00D0D0D0 } else { 0x00333333 };
+    let dark = windows::core::BOOL(dark as i32);
     unsafe {
         let _ = DwmSetWindowAttribute(flyout, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark as *const _ as _, std::mem::size_of::<windows::core::BOOL>() as u32);
-        let _ = DwmSetWindowAttribute(flyout, DWMWA_WINDOW_CORNER_PREFERENCE, &corner_pref as *const _ as _, 4);
-        let _ = DwmSetWindowAttribute(flyout, DWMWA_SYSTEMBACKDROP_TYPE, &backdrop_type as *const _ as _, 4);
-        let _ = DwmSetWindowAttribute(flyout, DWMWA_BORDER_COLOR, &border_color as *const _ as _, 4);
+        let _ = DwmSetWindowAttribute(flyout, DWMWA_WINDOW_CORNER_PREFERENCE, &corner as *const _ as _, 4);
+        let _ = DwmSetWindowAttribute(flyout, DWMWA_SYSTEMBACKDROP_TYPE, &backdrop as *const _ as _, 4);
     }
 }
 
@@ -172,9 +188,9 @@ fn place_flyout(flyout: HWND, anchor: Option<(i32, i32)>) {
         let x = (ax - w / 2).clamp(work.left + 8, (work.right - w - 8).max(work.left + 8));
         let below = ay + 10;
         let y = if below + h <= work.bottom - 8 { below } else { (ay - h - 10).max(work.top + 8) };
-        style_flyout(flyout);
         let _ = SetWindowPos(flyout, Some(HWND_TOPMOST), x, y, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW);
         let _ = SetForegroundWindow(flyout);
+        style_flyout(flyout);
     }
 }
 
@@ -196,7 +212,12 @@ pub fn open_native_tray(anchor: Option<(i32, i32)>) {
 
     crate::diagnostics::log(&format!("tray: open requested, anchor={anchor:?}, flyout_open={}", FLYOUT_OPEN.load(Ordering::SeqCst)));
     if let Some(flyout) = find_overflow_window().filter(|&w| unsafe { IsWindowVisible(w) }.as_bool()) {
-        unsafe { let _ = ShowWindow(flyout, SW_HIDE); }
+        if unsafe { GetForegroundWindow() } == flyout {
+            use windows::Win32::UI::Input::KeyboardAndMouse::VK_ESCAPE;
+            send_keys(&[(VK_ESCAPE, false), (VK_ESCAPE, true)]);
+        } else {
+            unsafe { let _ = ShowWindow(flyout, SW_HIDE); }
+        }
         FLYOUT_OPEN.store(false, Ordering::SeqCst);
         return;
     }
@@ -259,6 +280,9 @@ pub fn open_native_tray(anchor: Option<(i32, i32)>) {
         for _ in 0..2400 {
             if find_overflow_window().is_none_or(|w| !unsafe { IsWindowVisible(w) }.as_bool()) { break; }
             std::thread::sleep(std::time::Duration::from_millis(150));
+        }
+        if let Some(flyout) = find_overflow_window() {
+            reset_flyout_style(flyout);
         }
         FLYOUT_OPEN.store(false, Ordering::SeqCst);
     }
