@@ -105,6 +105,7 @@ function SettingsApp() {
               showUpdateIndicator={settings.showUpdateIndicator}
               toggleUpdateIndicator={settings.toggleUpdateIndicator}
               lowBatteryThreshold={settings.lowBatteryThreshold}
+              hasBattery={settings.hasBattery}
               handleThresholdChange={settings.handleThresholdChange}
               restartNectar={settings.restartNectar}
               quitNectar={settings.quitNectar}

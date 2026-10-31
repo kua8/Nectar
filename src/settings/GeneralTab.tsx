@@ -13,6 +13,7 @@ interface GeneralTabProps {
   showUpdateIndicator: boolean;
   toggleUpdateIndicator: () => void;
   lowBatteryThreshold: number;
+  hasBattery: boolean;
   handleThresholdChange: (val: number) => void;
   restartNectar: () => void;
   quitNectar: () => void;
@@ -28,6 +29,7 @@ export function GeneralTab({
   showUpdateIndicator,
   toggleUpdateIndicator,
   lowBatteryThreshold,
+  hasBattery,
   handleThresholdChange,
   restartNectar,
   quitNectar,
@@ -70,6 +72,7 @@ export function GeneralTab({
           icon={History}
           label={t("general.legacyMode")}
           desc={t("general.legacyMode.desc")}
+          divider={hasBattery}
         >
           <label className="toggle-switch">
             <input type="checkbox" checked={legacyMode} onChange={toggleLegacyMode} />
@@ -77,22 +80,24 @@ export function GeneralTab({
           </label>
         </SettingRow>
 
-        <SettingRow
-          icon={BatteryWarning}
-          label={t("general.lowBattery")}
-          desc={t("general.lowBattery.desc", { percent: lowBatteryThreshold })}
-          divider={false}
-        >
-          <input
-            type="range"
-            min="5"
-            max="50"
-            step="5"
-            value={lowBatteryThreshold}
-            onChange={(e) => handleThresholdChange(parseInt(e.target.value))}
-            className="settings-slider"
-          />
-        </SettingRow>
+        {hasBattery && (
+          <SettingRow
+            icon={BatteryWarning}
+            label={t("general.lowBattery")}
+            desc={t("general.lowBattery.desc", { percent: lowBatteryThreshold })}
+            divider={false}
+          >
+            <input
+              type="range"
+              min="5"
+              max="50"
+              step="5"
+              value={lowBatteryThreshold}
+              onChange={(e) => handleThresholdChange(parseInt(e.target.value))}
+              className="settings-slider"
+            />
+          </SettingRow>
+        )}
       </div>
 
       <div className="setting-group-label">{t("general.app")}</div>

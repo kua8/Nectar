@@ -144,7 +144,7 @@ export function useSettings() {
   const [notchModeByMonitor, setNotchModeByMonitor] = useState<Record<string, string>>({});
   const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
   const [lowBatteryThreshold, setLowBatteryThreshold] = useState(20);
-  const [hasBattery, setHasBattery] = useState(true);
+  const [hasBattery, setHasBattery] = useState(() => localStorage.getItem("nectar-has-battery") !== "false");
   const [updateStatus, setUpdateStatus] = useState<
     "idle" | "checking" | "available" | "uptodate" | "error" | "downloading" | "installing"
   >("idle");
@@ -289,7 +289,10 @@ export function useSettings() {
       .then((ver) => setAppVersion(ver))
       .catch(() => setAppVersion(""));
 
-    invoke<boolean>("has_battery").then(setHasBattery).catch(() => {});
+    invoke<boolean>("has_battery").then((present) => {
+      setHasBattery(present);
+      localStorage.setItem("nectar-has-battery", String(present));
+    }).catch(() => {});
 
     checkForUpdates(false);
   }, []);

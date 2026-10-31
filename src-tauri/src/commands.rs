@@ -3207,11 +3207,19 @@ pub async fn has_battery() -> Result<bool, String> {
         }
         use windows::System::Power::{BatteryStatus, PowerManager};
         use windows::Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
-        let mut status = SYSTEM_POWER_STATUS::default();
-        if unsafe { GetSystemPowerStatus(&mut status) }.is_ok() && status.BatteryFlag == 128 {
+        let mut power = SYSTEM_POWER_STATUS::default();
+        let power_ok = unsafe { GetSystemPowerStatus(&mut power) }.is_ok();
+        let manager = PowerManager::BatteryStatus();
+        crate::diagnostics::log(&format!(
+            "battery: power_ok={power_ok} flag={} percent={} manager={:?}",
+            power.BatteryFlag,
+            power.BatteryLifePercent,
+            manager.as_ref().map(|s| s.0)
+        ));
+        if power_ok && (power.BatteryFlag == 128 || (power.BatteryFlag == 255 && power.BatteryLifePercent == 255)) {
             return Ok(false);
         }
-        match PowerManager::BatteryStatus() {
+        match manager {
             Ok(status) => Ok(status != BatteryStatus::NotPresent),
             Err(_) => Ok(true),
         }
