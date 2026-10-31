@@ -473,7 +473,7 @@ const Dock = memo(function Dock() {
       "nectar-dock-search-enabled": setDockSearchEnabled,
       "nectar-dock-calendar-enabled": setDockCalendarEnabled,
       "nectar-legacy-mode": setLegacyMode,
-      "nectar-dock-tray-enabled": (v) => setDockTray(v !== "false"),
+      "nectar-dock-tray-enabled": (v) => setDockTray(v !== false && v !== "false"),
       "nectar-dock-taskview-enabled": setDockTaskView,
       "nectar-dock-recycle-enabled": setDockRecycle,
       "nectar-dock-drives": (v) => setDockDrives(parseDrives(v)),

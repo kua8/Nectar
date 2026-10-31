@@ -45,6 +45,7 @@ Edit `settings.json` with any text editor while Nectar is running. Changes are a
 | `nectar-notch-timer-progress` | `"true"` / `"false"` | `"true"` | Show an edge progress bar along the bottom of the notch while a timer or Pomodoro session is active. |
 | `nectar-notch-scroll-volume` | `"true"` / `"false"` | `"false"` | Scroll with mouse wheel over the volume, brightness and mixer sliders to adjust them. |
 | `nectar-shelf-persist` | `"true"` / `"false"` | `"false"` | Keep the notch shelf's items after Nectar restarts. The shelf holds files (as links, not copies) and text dropped on the notch; at most 10, newest first. Off clears them when Nectar closes. Files that no longer exist are dropped on start. |
+| `nectar-notch-remember-mode` | `"true"` / `"false"` | `"false"` | When the cursor leaves the notch and comes back, reopen the Control Center or Calendar panel you were on instead of resetting to the default (status or music). |
 
 ### Monitors
 

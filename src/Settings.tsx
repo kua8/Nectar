@@ -172,6 +172,8 @@ function SettingsApp() {
               toggleNotchScrollVolume={settings.toggleNotchScrollVolume}
               shelfPersist={settings.shelfPersist}
               toggleShelfPersist={settings.toggleShelfPersist}
+              rememberMode={settings.rememberMode}
+              toggleRememberMode={settings.toggleRememberMode}
               weatherEnabled={settings.weatherEnabled}
               toggleWeather={settings.toggleWeather}
               tempUnitFahrenheit={settings.tempUnitFahrenheit}

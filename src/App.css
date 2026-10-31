@@ -2498,3 +2498,35 @@ img {
 .shelf-clear:hover {
     color: rgba(255, 255, 255, 0.85);
 }
+
+.mode-dots {
+    position: absolute;
+    bottom: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 4px;
+    z-index: 3;
+    pointer-events: none;
+}
+
+.mode-dots span {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.28);
+    transition: background 0.15s, transform 0.15s;
+}
+
+.mode-dots span.active {
+    background: rgba(255, 255, 255, 0.9);
+    transform: scale(1.25);
+}
+
+.light-mode .mode-dots span {
+    background: rgba(0, 0, 0, 0.25);
+}
+
+.light-mode .mode-dots span.active {
+    background: rgba(0, 0, 0, 0.8);
+}

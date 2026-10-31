@@ -130,11 +130,13 @@ export function NotchShelf({ items, onRemove, onClear, onDragOutEnd }: Props) {
   }, []);
 
   const beginDrag = async (item: ShelfItem) => {
-    if (item.kind !== "file" || !item.path) return;
     const icon = item.thumb ?? dragIcon.current;
     if (!icon) return;
+    // Text is dragged out as a .txt file, since a native drag carries files.
+    const path = item.kind === "file" ? item.path : await invoke<string | null>("shelf_text_file", { text: item.text ?? "" });
+    if (!path) return;
     try {
-      await startDrag({ item: [item.path], icon, mode: "copy" });
+      await startDrag({ item: [path], icon, mode: "copy" });
     } catch { /* drag was cancelled or refused */ }
     onDragOutEnd();
   };

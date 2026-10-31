@@ -51,6 +51,9 @@ export function useSettings() {
   const [notchScrollVolume, setNotchScrollVolume] = useState(
     () => localStorage.getItem("nectar-notch-scroll-volume") === "true"
   );
+  const [rememberMode, setRememberMode] = useState(
+    () => localStorage.getItem("nectar-notch-remember-mode") === "true"
+  );
   const [shelfPersist, setShelfPersist] = useState(
     () => localStorage.getItem("nectar-shelf-persist") === "true"
   );
@@ -204,6 +207,7 @@ export function useSettings() {
       apply(getVal("nectar-music-compact-notch"), setMusicCompactNotch, readBool);
       apply(getVal("nectar-notch-scroll-volume"), setNotchScrollVolume, (v) => v === "true");
       apply(getVal("nectar-shelf-persist"), setShelfPersist, (v) => v === "true");
+      apply(getVal("nectar-notch-remember-mode"), setRememberMode, (v) => v === "true");
       apply(getVal("nectar-volume-overlay-enabled"), setVolumeOverlayEnabled, readBool);
       apply(getVal("nectar-brightness-overlay-enabled"), setBrightnessOverlayEnabled, readBool);
       apply(getVal("nectar-media-ambience-enabled"), setMediaAmbienceEnabled, readBool);
@@ -312,7 +316,7 @@ export function useSettings() {
     "nectar-dock-mode-by-monitor": (v) => { try { setDockModeByMonitor(JSON.parse(v)); } catch {} },
     "nectar-notch-mode-by-monitor": (v) => { try { setNotchModeByMonitor(JSON.parse(v)); } catch {} },
     "nectar-dock-enabled": setDockEnabled,
-    "nectar-dock-tray-enabled": (v) => setDockTray(v !== "false"),
+    "nectar-dock-tray-enabled": (v) => setDockTray(v !== false && v !== "false"),
     "nectar-dock-taskview-enabled": setDockTaskView,
     "nectar-dock-recycle-enabled": setDockRecycle,
     "nectar-dock-drives": (v) => setDockDrives(parseDrives(v)),
@@ -337,6 +341,7 @@ export function useSettings() {
     "nectar-music-compact-notch": setMusicCompactNotch,
     "nectar-notch-scroll-volume": setNotchScrollVolume,
     "nectar-shelf-persist": setShelfPersist,
+    "nectar-notch-remember-mode": setRememberMode,
     "nectar-media-ambience-enabled": setMediaAmbienceEnabled,
     "nectar-media-compact-glow-enabled": setMediaCompactGlowEnabled,
     "nectar-media-layout": setMediaLayout,
@@ -542,6 +547,12 @@ export function useSettings() {
     const next = !notchScrollVolume;
     setNotchScrollVolume(next);
     saveSetting("nectar-notch-scroll-volume", String(next));
+  };
+
+  const toggleRememberMode = () => {
+    const next = !rememberMode;
+    setRememberMode(next);
+    saveSetting("nectar-notch-remember-mode", String(next));
   };
 
   const toggleShelfPersist = () => {
@@ -990,6 +1001,8 @@ export function useSettings() {
     toggleNotchScrollVolume,
     shelfPersist,
     toggleShelfPersist,
+    rememberMode,
+    toggleRememberMode,
     mediaLayout,
     toggleMediaLayout,
     mediaAmbienceEnabled,

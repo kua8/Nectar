@@ -69,6 +69,8 @@ interface NotchTabProps {
   toggleNotchScrollVolume: () => void;
   shelfPersist: boolean;
   toggleShelfPersist: () => void;
+  rememberMode: boolean;
+  toggleRememberMode: () => void;
   weatherEnabled: boolean;
   toggleWeather: () => void;
   tempUnitFahrenheit: boolean;
@@ -127,6 +129,8 @@ export function NotchTab({
   toggleNotchScrollVolume,
   shelfPersist,
   toggleShelfPersist,
+  rememberMode,
+  toggleRememberMode,
   weatherEnabled,
   toggleWeather,
   tempUnitFahrenheit,
@@ -337,9 +341,16 @@ export function NotchTab({
               </label>
             </SettingRow>
 
-            <SettingRow icon={Circle} label={t("notch.shelfPersist")} desc={t("notch.shelfPersist.desc")} divider={false}>
+            <SettingRow icon={Circle} label={t("notch.shelfPersist")} desc={t("notch.shelfPersist.desc")}>
               <label className="toggle-switch">
                 <input type="checkbox" checked={shelfPersist} onChange={toggleShelfPersist} />
+                <span className="slider"></span>
+              </label>
+            </SettingRow>
+
+            <SettingRow icon={Circle} label={t("notch.rememberMode")} desc={t("notch.rememberMode.desc")} divider={false}>
+              <label className="toggle-switch">
+                <input type="checkbox" checked={rememberMode} onChange={toggleRememberMode} />
                 <span className="slider"></span>
               </label>
             </SettingRow>

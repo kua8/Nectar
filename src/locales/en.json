@@ -466,5 +466,7 @@
   "shelf.copied": "Copied",
   "shelf.remove": "Remove",
   "notch.shelfPersist": "Keep Shelf Items",
-  "notch.shelfPersist.desc": "Keep files and text on the notch shelf after Nectar restarts. Files are kept as links, not copies. Up to 10 items"
+  "notch.shelfPersist.desc": "Keep files and text on the notch shelf after Nectar restarts. Files are kept as links, not copies. Up to 10 items",
+  "notch.rememberMode": "Remember Last Panel",
+  "notch.rememberMode.desc": "When the cursor leaves and comes back, reopen the Control Center or Calendar instead of the default panel"
 }

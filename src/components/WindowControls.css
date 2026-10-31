@@ -6,13 +6,24 @@
 }
 
 .wc-btn {
+  position: relative;
   width: 12px;
   height: 12px;
   padding: 0;
   border: none;
   border-radius: 50%;
-  cursor: default;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
   transition: background-color 0.15s ease, filter 0.15s ease;
+}
+
+/* Wider invisible hit box so a slightly off or moving click isn't taken as a window drag. */
+.wc-btn::before {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  -webkit-app-region: no-drag;
 }
 
 .wc-btn.close {

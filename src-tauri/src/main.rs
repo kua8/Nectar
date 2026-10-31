@@ -97,6 +97,8 @@ fn main() {
             shelf_open,
             shelf_prune,
             shelf_drag_icon,
+            shelf_text_file,
+            pointer_over_notch,
             open_settings_window,
             open_calendar_window,
             open_tray_window,

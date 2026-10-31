@@ -680,6 +680,8 @@ function App() {
   const [settingsMusicCompactNotch, setSettingsMusicCompactNotch] = useState(() => localStorage.getItem("nectar-music-compact-notch") !== "false");
   const [settingsScrollVolume, setSettingsScrollVolume] = useState(() => localStorage.getItem("nectar-notch-scroll-volume") === "true");
   const [settingsShelfPersist, setSettingsShelfPersist] = useState(() => localStorage.getItem("nectar-shelf-persist") === "true");
+  const [settingsRememberMode, setSettingsRememberMode] = useState(() => localStorage.getItem("nectar-notch-remember-mode") === "true");
+  const rememberedModeRef = useRef<"command-center" | "calendar" | null>(null);
   const [settingsVisualizerEnabled, setSettingsVisualizerEnabled] = useState(() => localStorage.getItem("nectar-visualizer-enabled") !== "false");
   const [settingsAlbumArtEnabled, setSettingsAlbumArtEnabled] = useState(() => localStorage.getItem("nectar-media-album-art-enabled") !== "false");
   const [settingsAmbienceEnabled, setSettingsAmbienceEnabled] = useState(() => localStorage.getItem("nectar-media-ambience-enabled") !== "false");
@@ -861,6 +863,7 @@ function App() {
       "nectar-music-compact-notch": setSettingsMusicCompactNotch,
       "nectar-notch-scroll-volume": setSettingsScrollVolume,
       "nectar-shelf-persist": setSettingsShelfPersist,
+      "nectar-notch-remember-mode": setSettingsRememberMode,
       "nectar-media-visualizer-enabled": setSettingsVisualizerEnabled,
       "nectar-visualizer-enabled": setSettingsVisualizerEnabled,
       "nectar-media-album-art-enabled": setSettingsAlbumArtEnabled,
@@ -961,6 +964,22 @@ function App() {
   const WHEEL_STEP_THRESHOLD = 60;
   const WHEEL_IDLE_RESET_MS = 180;
 
+  // Music shifts position based on playing state:
+  // Playing: command-center → music → status → calendar (active, near command-center)
+  // Paused:  command-center → status → music → calendar (secondary, after status)
+  const availableNotchModes = () => {
+    const musicBeforeStatus = isPlaying && mediaInfo.has_media && settingsMusicModeEnabled;
+    const modes: ('command-center' | 'status' | 'music' | 'calendar' | 'shelf')[] = musicBeforeStatus
+      ? ['command-center', 'music', 'status', 'calendar', 'shelf']
+      : ['command-center', 'status', 'music', 'calendar', 'shelf'];
+    return modes.filter(m => {
+      if (m === 'music' && (!settingsMusicModeEnabled || !mediaInfo.has_media)) return false;
+      if (m === 'calendar' && !productivityEnabled) return false;
+      if (m === 'shelf' && (!isNotchWindow || settingsLegacyMode)) return false;
+      return true;
+    });
+  };
+
   const handleWheel = (e: React.WheelEvent) => {
     const target = e.target as HTMLElement;
     if (target.closest('.calendar-grid') || target.closest('.timer-column') || target.closest('.cal-scroll')) {
@@ -981,19 +1000,7 @@ function App() {
     const direction = wheelAccumRef.current > 0 ? 1 : -1;
     wheelAccumRef.current = 0;
 
-    // Music shifts position based on playing state:
-    // Playing: command-center → music → status → calendar (active, near command-center)
-    // Paused:  command-center → status → music → calendar (secondary, after status)
-    const musicBeforeStatus = isPlaying && mediaInfo.has_media && settingsMusicModeEnabled;
-    const modes: ('command-center' | 'status' | 'music' | 'calendar' | 'shelf')[] = musicBeforeStatus
-      ? ['command-center', 'music', 'status', 'calendar', 'shelf']
-      : ['command-center', 'status', 'music', 'calendar', 'shelf'];
-    const availableModes = modes.filter(m => {
-      if (m === 'music' && (!settingsMusicModeEnabled || !mediaInfo.has_media)) return false;
-      if (m === 'calendar' && !productivityEnabled) return false;
-      if (m === 'shelf' && (!isNotchWindow || settingsLegacyMode)) return false;
-      return true;
-    });
+    const availableModes = availableNotchModes();
 
     if (nectarMode === 'tour') return;
     const currentIndex = availableModes.indexOf(nectarMode);
@@ -1763,10 +1770,15 @@ function App() {
         }}
         onHoverStart={() => {
           setIsHovered(true);
-          if (nectarMode !== 'tour' && nectarMode !== 'shelf') setNectarMode(mediaInfo.has_media && isPlaying ? 'music' : 'status');
+          if (nectarMode !== 'tour' && nectarMode !== 'shelf') {
+            const remembered = settingsRememberMode ? rememberedModeRef.current : null;
+            if (remembered && availableNotchModes().includes(remembered)) setNectarMode(remembered);
+            else setNectarMode(mediaInfo.has_media && isPlaying ? 'music' : 'status');
+          }
         }}
         onHoverEnd={() => {
           setIsHovered(false);
+          if (nectarMode === 'command-center' || nectarMode === 'calendar') rememberedModeRef.current = nectarMode;
           const targetMode = mediaInfo.has_media && isPlaying && settingsMusicCompactNotch ? 'music' : 'status';
           if (nectarMode === 'music') {
             setNectarMode(targetMode);
@@ -1788,6 +1800,15 @@ function App() {
         }}
       >
         {widgetTip && isHovered && <div className="widget-tip">{widgetTip}</div>}
+
+        {isHovered && isExpanded && !isHidden && nectarMode !== 'tour' && (() => {
+          const modes = availableNotchModes();
+          return modes.length > 1 ? (
+            <div className="mode-dots">
+              {modes.map((m) => <span key={m} className={m === nectarMode ? 'active' : ''} />)}
+            </div>
+          ) : null;
+        })()}
 
         <AnimatePresence>
           {isMusicMode && settingsAmbienceEnabled && albumArtUrl && isHovered && !isCalendarMode && (
@@ -2315,42 +2336,42 @@ function App() {
                     <div className="cc-circular-actions-row">
                       <button
                         className={`cc-circular-btn ${dndActive ? 'active' : ''}`}
-                        title={t("cc.dnd")}
+                        {...tip(t("cc.dnd"))}
                         onClick={(e) => { e.stopPropagation(); setDndActive(prev => !prev); }}
                       >
                         <MoonIcon />
                       </button>
                       <button
                         className={`cc-circular-btn ${batterySaverEnabled ? 'active' : ''}`}
-                        title={t("cc.batterySaver")}
+                        {...tip(t("cc.batterySaver"))}
                         onClick={(e) => { e.stopPropagation(); openBatterySaverSettings(); }}
                       >
                         <BatterySaverIcon />
                       </button>
                       <button
                         className="cc-circular-btn"
-                        title={t("cc.tray")}
+                        {...tip(t("cc.tray"))}
                         onClick={(e) => { e.stopPropagation(); invoke("open_tray_window"); }}
                       >
                         <TrayIcon />
                       </button>
                       <button
                         className="cc-circular-btn"
-                        title={t("cc.notifications")}
+                        {...tip(t("cc.notifications"))}
                         onClick={(e) => { e.stopPropagation(); invoke("open_notification_center"); }}
                       >
                         <BellIcon />
                       </button>
                       <button
                         className="cc-circular-btn"
-                        title={t("cc.settings")}
+                        {...tip(t("cc.settings"))}
                         onClick={(e) => { e.stopPropagation(); openSettingsWindow(); }}
                       >
                         <SettingsIcon />
                       </button>
                       <button
                         className="cc-circular-btn"
-                        title={t("general.restart")}
+                        {...tip(t("general.restart"))}
                         onClick={(e) => { e.stopPropagation(); invoke("restart_nectar"); }}
                       >
                         <ReloadIcon />
@@ -2428,7 +2449,10 @@ function App() {
                       items={shelf.items}
                       onRemove={shelf.remove}
                       onClear={shelf.clear}
-                      onDragOutEnd={collapseAfterShelfDrag}
+                      onDragOutEnd={async () => {
+                        const stillOver = await invoke<boolean>('pointer_over_notch').catch(() => false);
+                        if (!stillOver) collapseAfterShelfDrag();
+                      }}
                     />
                   </motion.div>
                 )}

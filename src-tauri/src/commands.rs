@@ -3847,12 +3847,40 @@ pub fn setup_shelf_drop(app: AppHandle) {
     });
 }
 
-/// Small PNG preview for image files on the shelf, as a data URI. None for anything else.
+/// Preview for a shelf item as a PNG data URI: the image itself, or Explorer's thumbnail for
+/// other files and folders (PDFs, Office files, videos). None when Windows has no thumbnail.
 #[tauri::command]
 pub async fn shelf_thumbnail(path: String) -> Option<String> {
+    tauri::async_runtime::spawn_blocking(move || shelf_image_thumbnail(&path).or_else(|| shelf_shell_thumbnail(&path)))
+        .await
+        .ok()
+        .flatten()
+}
+
+/// Explorer's thumbnail only, so a file Windows can't preview returns nothing instead of its generic icon.
+fn shelf_shell_thumbnail(path: &str) -> Option<String> {
+    use windows::Win32::Foundation::SIZE;
+    use windows::Win32::UI::Shell::{IShellItemImageFactory, SHCreateItemFromParsingName, SIIGBF, SIIGBF_BIGGERSIZEOK, SIIGBF_THUMBNAILONLY};
+
+    unsafe {
+        let _ = windows::Win32::System::Com::CoInitializeEx(None, windows::Win32::System::Com::COINIT_MULTITHREADED);
+        let factory: IShellItemImageFactory = SHCreateItemFromParsingName(&windows::core::HSTRING::from(path), None).ok()?;
+        let hbitmap = factory
+            .GetImage(SIZE { cx: 256, cy: 256 }, SIIGBF(SIIGBF_THUMBNAILONLY.0 | SIIGBF_BIGGERSIZEOK.0))
+            .ok()?;
+        if hbitmap.0.is_null() {
+            return None;
+        }
+        let result = hbitmap_to_base64(hbitmap);
+        let _ = windows::Win32::Graphics::Gdi::DeleteObject(hbitmap.into());
+        result
+    }
+}
+
+fn shelf_image_thumbnail(path: &str) -> Option<String> {
     use base64::Engine;
 
-    let p = std::path::Path::new(&path);
+    let p = std::path::Path::new(path);
     let ext = p.extension()?.to_str()?.to_ascii_lowercase();
     if !matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "gif" | "webp" | "bmp" | "ico" | "tif" | "tiff") {
         return None;
@@ -3910,4 +3938,40 @@ pub fn shelf_drag_icon() -> Option<String> {
     let mut png_bytes: Vec<u8> = Vec::new();
     img.write_to(&mut std::io::Cursor::new(&mut png_bytes), image::ImageFormat::Png).ok()?;
     Some(format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(&png_bytes)))
+}
+
+/// Writes shelf text to a temp .txt so it can be dragged out as a file. Returns the path.
+#[tauri::command]
+pub fn shelf_text_file(text: String) -> Option<String> {
+    let name: String = text
+        .trim()
+        .chars()
+        .take(24)
+        .map(|c| if c.is_alphanumeric() || c == ' ' || c == '-' || c == '_' { c } else { '_' })
+        .collect();
+    let name = if name.trim().is_empty() { "note".to_string() } else { name.trim().to_string() };
+    let dir = std::env::temp_dir().join("nectar-shelf");
+    std::fs::create_dir_all(&dir).ok()?;
+    let path = dir.join(format!("{name}.txt"));
+    std::fs::write(&path, text).ok()?;
+    Some(path.to_string_lossy().into_owned())
+}
+
+/// True when the cursor is over this notch window's visible box. A native drag leaves the webview
+/// without a pointer event, so the frontend asks after a drag-out instead.
+#[tauri::command]
+pub fn pointer_over_notch(window: Window) -> bool {
+    let label = window.label().to_string();
+    let mut pt = windows::Win32::Foundation::POINT::default();
+    if unsafe { windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut pt) }.is_err() {
+        return false;
+    }
+    let Some((win_pos, _)) = main_window_rects().lock().ok().and_then(|m| m.get(&label).copied()) else { return false };
+    let Some(r) = notch_rects().lock().ok().and_then(|m| m.get(&label).copied()) else { return false };
+    let scale = window.scale_factor().unwrap_or(1.0);
+    let left = win_pos.x + (r.x as f64 * scale) as i32;
+    let right = left + (r.width as f64 * scale) as i32;
+    let top = win_pos.y;
+    let bottom = win_pos.y + (r.height as f64 * scale) as i32;
+    pt.x >= left && pt.x <= right && pt.y >= top && pt.y <= bottom
 }
