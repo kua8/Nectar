@@ -1977,6 +1977,15 @@ pub fn open_tray_at_cursor() {
 }
 
 #[tauri::command]
+pub fn open_tray_from_button(dx: f64, dy: f64) {
+    use windows::Win32::Foundation::POINT;
+    use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
+    let mut cursor = POINT::default();
+    let anchor = unsafe { GetCursorPos(&mut cursor) }.ok().map(|_| (cursor.x + dx.round() as i32, cursor.y + dy.round() as i32 - 8));
+    std::thread::spawn(move || crate::tray_icons::open_native_tray(anchor));
+}
+
+#[tauri::command]
 pub fn open_tray_window(app: AppHandle) {
     let anchor = notch_anchor(&app);
     std::thread::spawn(move || crate::tray_icons::open_native_tray(anchor));

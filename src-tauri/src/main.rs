@@ -103,6 +103,7 @@ fn main() {
             open_calendar_window,
             open_tray_window,
             open_tray_at_cursor,
+            open_tray_from_button,
             open_wifi_settings,
             open_sound_settings,
             open_notification_center,

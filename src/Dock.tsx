@@ -1054,7 +1054,7 @@ const Dock = memo(function Dock() {
     );
   };
 
-  const renderShortcut = (id: string, label: string, delay: number, onClick: () => void, icon: React.ReactNode) => (
+  const renderShortcut = (id: string, label: string, delay: number, onClick: (rect: DOMRect, e: React.MouseEvent) => void, icon: React.ReactNode) => (
     <motion.div
       key={id}
       initial={{ opacity: 0, scale: 0 }}
@@ -1072,7 +1072,7 @@ const Dock = memo(function Dock() {
         onPointerDown={() => setPressedApp(id)}
         onPointerUp={() => setPressedApp(null)}
         onPointerCancel={() => setPressedApp(null)}
-        onClick={(e) => { e.stopPropagation(); onClick(); }}
+        onClick={(e) => { e.stopPropagation(); onClick(e.currentTarget.getBoundingClientRect(), e); }}
       >
         {icon}
       </motion.div>
@@ -1215,7 +1215,10 @@ const Dock = memo(function Dock() {
 
               {!legacyMode && dockTray && renderShortcut(
                 'tray', t('dockmenu.hiddenIcons'), 0.21,
-                () => invoke('open_tray_at_cursor').catch((err) => console.error('Failed to open tray:', err)),
+                (rect, e) => invoke('open_tray_from_button', {
+                  dx: (rect.left + rect.width / 2 - e.clientX) * window.devicePixelRatio,
+                  dy: (rect.top - e.clientY) * window.devicePixelRatio,
+                }).catch((err) => console.error('Failed to open tray:', err)),
                 <ChevronUpIcon />
               )}
 
