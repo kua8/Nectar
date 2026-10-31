@@ -248,6 +248,7 @@ const Dock = memo(function Dock() {
   const [legacyMode, setLegacyMode] = useState(() => localStorage.getItem("nectar-legacy-mode") === "true");
   const [dockTray, setDockTray] = useState(() => localStorage.getItem("nectar-dock-tray-enabled") !== "false");
   const [dockTaskView, setDockTaskView] = useState(() => localStorage.getItem("nectar-dock-taskview-enabled") === "true");
+  const [dockShowDesktop, setDockShowDesktop] = useState(() => localStorage.getItem("nectar-dock-show-desktop-corner") === "true");
   const [dockRecycle, setDockRecycle] = useState(() => localStorage.getItem("nectar-dock-recycle-enabled") === "true");
   const [dockDrives, setDockDrives] = useState<string[]>(() => parseDrives(localStorage.getItem("nectar-dock-drives")));
   const [dockIconOnly, setDockIconOnly] = useState(() => localStorage.getItem("nectar-dock-icon-only") === "true");
@@ -438,6 +439,7 @@ const Dock = memo(function Dock() {
       setLegacyMode(getVal("nectar-legacy-mode", "false") === "true");
       setDockTray(getVal("nectar-dock-tray-enabled", "true") !== "false");
       setDockTaskView(getVal("nectar-dock-taskview-enabled", "false") === "true");
+      setDockShowDesktop(getVal("nectar-dock-show-desktop-corner", "false") === "true");
       setDockRecycle(getVal("nectar-dock-recycle-enabled", "false") === "true");
       setDockDrives(parseDrives(getVal("nectar-dock-drives", "[]")));
 
@@ -508,6 +510,7 @@ const Dock = memo(function Dock() {
       "nectar-legacy-mode": setLegacyMode,
       "nectar-dock-tray-enabled": (v) => setDockTray(v !== false && v !== "false"),
       "nectar-dock-taskview-enabled": setDockTaskView,
+      "nectar-dock-show-desktop-corner": setDockShowDesktop,
       "nectar-dock-recycle-enabled": setDockRecycle,
       "nectar-dock-drives": (v) => setDockDrives(parseDrives(v)),
       "nectar-dock-icon-only": setDockIconOnly,
@@ -1542,6 +1545,14 @@ const Dock = memo(function Dock() {
                   </Reorder.Item>
                 ))}
               </Reorder.Group>
+              )}
+
+              {dockShowDesktop && (
+                <div
+                  className="dock-show-desktop"
+                  title={t('dockmenu.showDesktop')}
+                  onClick={(e) => { e.stopPropagation(); invoke('show_desktop').catch(() => { }); }}
+                />
               )}
             </motion.div>
           )}

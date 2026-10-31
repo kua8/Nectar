@@ -79,10 +79,10 @@ interface NotchTabProps {
   panelShelf: boolean;
   togglePanelShelf: () => void;
   panelOrder: PanelId[] | null;
-  movePanel: (id: PanelId, direction: -1 | 1) => void;
+  reorderPanels: (order: PanelId[]) => void;
   resetPanelOrder: () => void;
   ccLayout: CcLayout;
-  moveCcItem: (kind: "tiles" | "buttons", id: string, direction: -1 | 1) => void;
+  reorderCc: (kind: "tiles" | "buttons", order: string[]) => void;
   resetCcItems: (kind: "tiles" | "buttons") => void;
   weatherEnabled: boolean;
   toggleWeather: () => void;
@@ -150,10 +150,10 @@ export function NotchTab({
   panelShelf,
   togglePanelShelf,
   panelOrder,
-  movePanel,
+  reorderPanels,
   resetPanelOrder,
   ccLayout,
-  moveCcItem,
+  reorderCc,
   resetCcItems,
   weatherEnabled,
   toggleWeather,
@@ -393,7 +393,7 @@ export function NotchTab({
           <OrderList
             ids={panelOrder ?? DEFAULT_PANEL_ORDER}
             label={(id) => t(`panel.${id}`)}
-            onMove={(id, direction) => movePanel(id as PanelId, direction)}
+            onReorder={(order) => reorderPanels(order as PanelId[])}
             onReset={panelOrder ? resetPanelOrder : undefined}
             resetLabel={t("notch.panelOrder.reset")}
           />
@@ -405,7 +405,7 @@ export function NotchTab({
           <OrderList
             ids={ccLayout.tiles ?? CC_TILES}
             label={(id) => t(`cc.layout.${id}`)}
-            onMove={(id, direction) => moveCcItem("tiles", id, direction)}
+            onReorder={(order) => reorderCc("tiles", order)}
             onReset={ccLayout.tiles ? () => resetCcItems("tiles") : undefined}
             resetLabel={t("notch.panelOrder.reset")}
           />
@@ -415,7 +415,7 @@ export function NotchTab({
           <OrderList
             ids={ccLayout.buttons ?? CC_BUTTONS}
             label={(id) => t(`cc.layout.${id}`)}
-            onMove={(id, direction) => moveCcItem("buttons", id, direction)}
+            onReorder={(order) => reorderCc("buttons", order)}
             onReset={ccLayout.buttons ? () => resetCcItems("buttons") : undefined}
             resetLabel={t("notch.panelOrder.reset")}
           />

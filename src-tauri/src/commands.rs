@@ -2000,6 +2000,11 @@ pub fn open_tray_at_cursor() {
 }
 
 #[tauri::command]
+pub fn show_desktop() {
+    std::thread::spawn(|| send_win_chord(windows::Win32::UI::Input::KeyboardAndMouse::VK_D));
+}
+
+#[tauri::command]
 pub fn open_tray_from_button(dx: f64, dy: f64) {
     use windows::Win32::Foundation::POINT;
     use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;

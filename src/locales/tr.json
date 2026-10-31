@@ -470,8 +470,8 @@
   "notch.rememberMode": "Son Paneli Hatırla",
   "notch.rememberMode.desc": "İmleç çıkıp geri geldiğinde varsayılan panel yerine Denetim Merkezi'ni veya Takvim'i yeniden aç",
   "dockmenu.taskManager": "Görev Yöneticisi",
-  "dock.showDesktop": "Masaüstü Köşesi",
-  "dock.showDesktop.desc": "Masaüstünü göstermek için ekranın en sağ alt köşesine tıklayın (Win+D)",
+  "dock.showDesktop": "Masaüstü Çubuğu",
+  "dock.showDesktop.desc": "Dock'un sağ ucundaki ince çubuğa veya ekranın sağ alt köşesine tıklayınca masaüstünü gösterir (Win+D)",
   "notch.panelControlCenter": "Denetim Merkezi Paneli",
   "notch.panelControlCenter.desc": "Çentik panelleri arasında gezinirken Denetim Merkezi'ni dahil et",
   "notch.panelShelf": "Raf Paneli",
@@ -505,5 +505,6 @@
   "cc.layout.tray": "Tepsi",
   "cc.layout.notifications": "Bildirimler",
   "cc.layout.settings": "Ayarlar",
-  "cc.layout.restart": "Yeniden Başlat"
+  "cc.layout.restart": "Yeniden Başlat",
+  "dockmenu.showDesktop": "Masaüstünü göster"
 }

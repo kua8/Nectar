@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { CC_BUTTONS, CC_TILES, DEFAULT_PANEL_ORDER, parseCcLayout, parsePanelOrder, type CcLayout, type PanelId } from "../panelOrder";
+import { parseCcLayout, parsePanelOrder, type CcLayout, type PanelId } from "../panelOrder";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, emit } from "@tauri-apps/api/event";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
@@ -704,22 +704,12 @@ export function useSettings() {
     saveSetting("nectar-panel-control-center-enabled", String(next));
   };
 
-  const movePanel = (id: PanelId, direction: -1 | 1) => {
-    const order = [...(panelOrder ?? DEFAULT_PANEL_ORDER)];
-    const from = order.indexOf(id);
-    const to = from + direction;
-    if (from < 0 || to < 0 || to >= order.length) return;
-    [order[from], order[to]] = [order[to], order[from]];
+  const reorderPanels = (order: PanelId[]) => {
     setPanelOrder(order);
     saveSetting("nectar-panel-order", JSON.stringify(order));
   };
 
-  const moveCcItem = (kind: "tiles" | "buttons", id: string, direction: -1 | 1) => {
-    const order = [...(ccLayout[kind] ?? (kind === "tiles" ? CC_TILES : CC_BUTTONS))];
-    const from = order.indexOf(id);
-    const to = from + direction;
-    if (from < 0 || to < 0 || to >= order.length) return;
-    [order[from], order[to]] = [order[to], order[from]];
+  const reorderCc = (kind: "tiles" | "buttons", order: string[]) => {
     const next = { ...ccLayout, [kind]: order };
     setCcLayout(next);
     saveSetting("nectar-cc-layout", JSON.stringify(next));
@@ -1141,10 +1131,10 @@ export function useSettings() {
     panelShelf,
     togglePanelShelf,
     panelOrder,
-    movePanel,
+    reorderPanels,
     resetPanelOrder,
     ccLayout,
-    moveCcItem,
+    reorderCc,
     resetCcItems,
     dockRecycle,
     toggleDockRecycle,

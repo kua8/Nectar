@@ -104,6 +104,7 @@ fn main() {
             open_tray_window,
             open_tray_at_cursor,
             open_tray_from_button,
+            show_desktop,
             open_wifi_settings,
             open_sound_settings,
             open_notification_center,

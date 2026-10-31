@@ -470,8 +470,8 @@
   "notch.rememberMode": "Remember Last Panel",
   "notch.rememberMode.desc": "When the cursor leaves and comes back, reopen the Control Center or Calendar instead of the default panel",
   "dockmenu.taskManager": "Task Manager",
-  "dock.showDesktop": "Show Desktop Corner",
-  "dock.showDesktop.desc": "Click the very bottom-right corner of the screen to show the desktop (Win+D)",
+  "dock.showDesktop": "Show Desktop Bar",
+  "dock.showDesktop.desc": "A thin bar at the right end of the dock, and the bottom-right corner of the screen, show the desktop when clicked (Win+D)",
   "notch.panelControlCenter": "Control Center Panel",
   "notch.panelControlCenter.desc": "Include the Control Center when scrolling through the notch panels",
   "notch.panelShelf": "Shelf Panel",
@@ -505,5 +505,6 @@
   "cc.layout.tray": "Tray",
   "cc.layout.notifications": "Notifications",
   "cc.layout.settings": "Settings",
-  "cc.layout.restart": "Restart"
+  "cc.layout.restart": "Restart",
+  "dockmenu.showDesktop": "Show desktop"
 }

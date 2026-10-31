@@ -180,10 +180,10 @@ function SettingsApp() {
               panelShelf={settings.panelShelf}
               togglePanelShelf={settings.togglePanelShelf}
               panelOrder={settings.panelOrder}
-              movePanel={settings.movePanel}
+              reorderPanels={settings.reorderPanels}
               resetPanelOrder={settings.resetPanelOrder}
               ccLayout={settings.ccLayout}
-              moveCcItem={settings.moveCcItem}
+              reorderCc={settings.reorderCc}
               resetCcItems={settings.resetCcItems}
               weatherEnabled={settings.weatherEnabled}
               toggleWeather={settings.toggleWeather}
