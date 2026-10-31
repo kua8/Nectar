@@ -99,6 +99,13 @@ function MixerTile({
         className="volume-mixer-bar"
         onMouseDown={handleMouseDown}
         onTouchStart={(e) => volumeFromY(e.touches[0].clientY)}
+        onWheel={(e) => {
+          if (localStorage.getItem("nectar-notch-scroll-volume") !== "true") return;
+          e.stopPropagation();
+          const change = e.deltaY < 0 ? 0.02 : -0.02;
+          const newVol = Math.max(0, Math.min(1, Math.round((session.volume + change) * 100) / 100));
+          onVolumeChange(session.pid, newVol);
+        }}
         title={`${session.name} — ${percentage}%`}
         style={{ cursor: "pointer" }}
       >
