@@ -444,14 +444,32 @@ button {
   opacity: 0.45;
 }
 
-.cw-cell.selected::before {
-  background: color-mix(in srgb, var(--cw-text) 16%, transparent);
-  box-shadow: inset 0 0 0 2px var(--cw-text);
+.cw-cell.today::before {
+  background: var(--cw-text);
 }
 
-.cw-cell.selected .cw-daynum:not(.today) {
-  background: color-mix(in srgb, var(--cw-text) 30%, transparent);
-  color: var(--cw-text);
+.cw-cell.today .cw-daynum.today {
+  background: transparent;
+  color: var(--cw-inverse);
+}
+
+.cw-cell.today .cw-chip {
+  background: color-mix(in srgb, var(--cw-inverse) 16%, transparent);
+  color: var(--cw-inverse);
+}
+
+.cw-cell.today .cw-more {
+  color: color-mix(in srgb, var(--cw-inverse) 70%, transparent);
+}
+
+.cw-cell.selected.today::before {
+  background: var(--cw-text);
+  box-shadow: inset 0 0 0 2px var(--cw-inverse);
+}
+
+.cw-cell.selected::before {
+  background: color-mix(in srgb, var(--cw-text) 10%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cw-text) 45%, transparent);
 }
 
 .cw-daynum {
@@ -476,6 +494,7 @@ button {
 .cw-daynum.today {
   background: var(--cw-text);
   color: var(--cw-inverse);
+  font-weight: 700;
 }
 
 .cw-cell-events {
@@ -556,6 +575,19 @@ button {
 
 .cw-week-col.today {
   background: color-mix(in srgb, var(--cw-text) 6%, transparent);
+}
+
+.cw-week-col.today .cw-week-head {
+  background: var(--cw-text);
+  color: var(--cw-inverse);
+}
+
+.cw-week-col.today .cw-week-head * {
+  color: var(--cw-inverse);
+}
+
+.cw-week-col.today .cw-week-head .cw-daynum.today {
+  background: transparent;
 }
 
 .cw-week-head {
