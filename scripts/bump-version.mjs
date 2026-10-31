@@ -44,6 +44,13 @@ function updatePackageLockJson(relativePath) {
   writeFileSync(path, JSON.stringify(json, null, 2) + "\n");
 }
 
+function updateReadmeBadges() {
+  const path = resolve(root, "README.md");
+  const content = readFileSync(path, "utf8");
+  const pattern = /(shieldcn\.dev\/github\/(?:release|downloads)\/kua8\/Nectar\.svg\?logo=[^)&]*)(?:&v=[^)&]*)?/g;
+  writeFileSync(path, content.replace(pattern, `$1&v=${version}`));
+}
+
 updateJson("package.json");
 updateJson("src-tauri/tauri.conf.json");
 updateCargoToml();
@@ -55,5 +62,6 @@ updateJson("installer-app/src-tauri/tauri.conf.json");
 updateInstallerCargoToml();
 updateCargoLock("installer-app/src-tauri/Cargo.lock", "nectar-installer");
 updatePackageLockJson("installer-app/package-lock.json");
+updateReadmeBadges();
 
 console.log(`Bumped package.json, tauri.conf.json, Cargo.toml, Cargo.lock and package-lock.json (main app + installer-app) to ${version}`);
