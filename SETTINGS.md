@@ -50,7 +50,7 @@ Edit `settings.json` with any text editor while Nectar is running. Changes are a
 | `nectar-panel-control-center-enabled` | `"true"` / `"false"` | `"true"` | Include the Control Center when scrolling through the notch panels. |
 | `nectar-panel-shelf-enabled` | `"true"` / `"false"` | `"true"` | Include the Shelf panel and accept files and text dropped on the notch. |
 | `nectar-panel-order` | JSON string, e.g. `"[\"status\",\"music\"]"` | unset | Order of the notch panels when scrolling: `command-center`, `status`, `music`, `calendar`, `shelf`. Missing panels are added at the end. Unset keeps the default order, where Music moves in front of Status while something plays. Set in Settings > Notch > Panel Order. |
-| `nectar-cc-layout` | JSON string | unset | Order of the Control Center tiles and round buttons, for example `{"tiles":["bluetooth","network","notch-mode","dock-mode"]}`. Tiles: `network`, `dock-mode`, `bluetooth`, `notch-mode`. Buttons: `dnd`, `battery-saver`, `tray`, `notifications`, `settings`, `restart`. A missing list keeps the default order. Set in Settings > Notch > Control Center layout. |
+| `nectar-cc-layout` | JSON string | unset | Which Control Center items show, and their order: `{"tiles":[...],"buttons":[...],"sliders":[...]}`. Tiles: `network`, `dock-mode`, `bluetooth`, `notch-mode`. Buttons: `dnd`, `battery-saver`, `tray`, `notifications`, `settings`, `restart`. Sliders: `volume`, `brightness`. An item that is not listed is hidden. A missing list shows all its items in the default order. Set in Settings > Notch > Control Center layout, by dragging items in, out and around like the status widgets. |
 
 ### Monitors
 

@@ -17,21 +17,40 @@ export function parsePanelOrder(raw: string | null | undefined): PanelId[] | nul
 
 export const CC_TILES = ["network", "dock-mode", "bluetooth", "notch-mode"] as const;
 export const CC_BUTTONS = ["dnd", "battery-saver", "tray", "notifications", "settings", "restart"] as const;
+export const CC_SLIDERS = ["volume", "brightness"] as const;
 
-export type CcLayout = { tiles?: string[]; buttons?: string[] };
+export type CcKind = "tiles" | "buttons" | "sliders";
+export type CcLayout = Partial<Record<CcKind, string[]>>;
 
-function complete(saved: unknown, defaults: readonly string[]): string[] | undefined {
+export const CC_DEFAULTS: Record<CcKind, readonly string[]> = {
+  tiles: CC_TILES,
+  buttons: CC_BUTTONS,
+  sliders: CC_SLIDERS,
+};
+
+function valid(saved: unknown, defaults: readonly string[]): string[] | undefined {
   if (!Array.isArray(saved)) return undefined;
-  const known = Array.from(new Set(saved.filter((id): id is string => defaults.includes(id as string))));
-  return [...known, ...defaults.filter((id) => !known.includes(id))];
+  return Array.from(new Set(saved.filter((id): id is string => defaults.includes(id as string))));
 }
 
 export function parseCcLayout(raw: string | null | undefined): CcLayout {
   if (!raw) return {};
   try {
     const parsed = JSON.parse(raw);
-    return { tiles: complete(parsed?.tiles, CC_TILES), buttons: complete(parsed?.buttons, CC_BUTTONS) };
+    return {
+      tiles: valid(parsed?.tiles, CC_TILES),
+      buttons: valid(parsed?.buttons, CC_BUTTONS),
+      sliders: valid(parsed?.sliders, CC_SLIDERS),
+    };
   } catch {
     return {};
   }
+}
+
+export function resolveCcLayout(layout: CcLayout): Record<CcKind, string[]> {
+  return {
+    tiles: layout.tiles ?? [...CC_TILES],
+    buttons: layout.buttons ?? [...CC_BUTTONS],
+    sliders: layout.sliders ?? [...CC_SLIDERS],
+  };
 }

@@ -183,8 +183,8 @@ function SettingsApp() {
               reorderPanels={settings.reorderPanels}
               resetPanelOrder={settings.resetPanelOrder}
               ccLayout={settings.ccLayout}
-              reorderCc={settings.reorderCc}
-              resetCcItems={settings.resetCcItems}
+              changeCcLayout={settings.changeCcLayout}
+              resetCcLayout={settings.resetCcLayout}
               weatherEnabled={settings.weatherEnabled}
               toggleWeather={settings.toggleWeather}
               tempUnitFahrenheit={settings.tempUnitFahrenheit}

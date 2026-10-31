@@ -506,5 +506,8 @@
   "cc.layout.notifications": "Notifications",
   "cc.layout.settings": "Settings",
   "cc.layout.restart": "Restart",
-  "dockmenu.showDesktop": "Show desktop"
+  "dockmenu.showDesktop": "Show desktop",
+  "notch.ccSliders": "Sliders",
+  "cc.layout.volume": "Volume",
+  "cc.layout.brightness": "Brightness"
 }

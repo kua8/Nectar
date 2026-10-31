@@ -506,5 +506,8 @@
   "cc.layout.notifications": "Bildirimler",
   "cc.layout.settings": "Ayarlar",
   "cc.layout.restart": "Yeniden Başlat",
-  "dockmenu.showDesktop": "Masaüstünü göster"
+  "dockmenu.showDesktop": "Masaüstünü göster",
+  "notch.ccSliders": "Kaydırıcılar",
+  "cc.layout.volume": "Ses",
+  "cc.layout.brightness": "Parlaklık"
 }

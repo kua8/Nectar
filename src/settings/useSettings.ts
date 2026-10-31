@@ -709,17 +709,15 @@ export function useSettings() {
     saveSetting("nectar-panel-order", JSON.stringify(order));
   };
 
-  const reorderCc = (kind: "tiles" | "buttons", order: string[]) => {
-    const next = { ...ccLayout, [kind]: order };
+  const changeCcLayout = (next: CcLayout) => {
     setCcLayout(next);
     saveSetting("nectar-cc-layout", JSON.stringify(next));
   };
 
-  const resetCcItems = (kind: "tiles" | "buttons") => {
-    const next = { ...ccLayout };
-    delete next[kind];
-    setCcLayout(next);
-    saveSetting("nectar-cc-layout", JSON.stringify(next));
+  const resetCcLayout = () => {
+    setCcLayout({});
+    localStorage.removeItem("nectar-cc-layout");
+    invoke("save_setting", { key: "nectar-cc-layout", value: null }).catch(() => {});
   };
 
   const resetPanelOrder = () => {
@@ -1134,8 +1132,8 @@ export function useSettings() {
     reorderPanels,
     resetPanelOrder,
     ccLayout,
-    reorderCc,
-    resetCcItems,
+    changeCcLayout,
+    resetCcLayout,
     dockRecycle,
     toggleDockRecycle,
     dockDrives,

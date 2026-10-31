@@ -1580,7 +1580,6 @@ img {
     grid-template-columns: 1fr 1fr;
     gap: 10px;
     width: 100%;
-    height: 94px;
 }
 
 .cc-pill-tile {

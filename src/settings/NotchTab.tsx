@@ -18,7 +18,8 @@ import {
   Globe,
   Volume2,
 } from "lucide-react";
-import { CC_BUTTONS, CC_TILES, DEFAULT_PANEL_ORDER, type CcLayout, type PanelId } from "../panelOrder";
+import { DEFAULT_PANEL_ORDER, type CcLayout, type PanelId } from "../panelOrder";
+import { ControlCenterConfig } from "../components/ControlCenterConfig";
 import { OrderList } from "./OrderList";
 import { SettingRow } from "./SettingRow";
 import { SettingSection } from "./SettingSection";
@@ -82,8 +83,8 @@ interface NotchTabProps {
   reorderPanels: (order: PanelId[]) => void;
   resetPanelOrder: () => void;
   ccLayout: CcLayout;
-  reorderCc: (kind: "tiles" | "buttons", order: string[]) => void;
-  resetCcItems: (kind: "tiles" | "buttons") => void;
+  changeCcLayout: (layout: CcLayout) => void;
+  resetCcLayout: () => void;
   weatherEnabled: boolean;
   toggleWeather: () => void;
   tempUnitFahrenheit: boolean;
@@ -153,8 +154,8 @@ export function NotchTab({
   reorderPanels,
   resetPanelOrder,
   ccLayout,
-  reorderCc,
-  resetCcItems,
+  changeCcLayout,
+  resetCcLayout,
   weatherEnabled,
   toggleWeather,
   tempUnitFahrenheit,
@@ -401,25 +402,12 @@ export function NotchTab({
       </SettingSection>
 
       <SettingSection id="notch-cc" title={t("notch.section.cc")}>
-        <SettingRow icon={Circle} label={t("notch.ccTiles")} desc={t("notch.ccTiles.desc")} stacked>
-          <OrderList
-            ids={ccLayout.tiles ?? CC_TILES}
-            label={(id) => t(`cc.layout.${id}`)}
-            onReorder={(order) => reorderCc("tiles", order)}
-            onReset={ccLayout.tiles ? () => resetCcItems("tiles") : undefined}
-            resetLabel={t("notch.panelOrder.reset")}
-          />
-        </SettingRow>
-
-        <SettingRow icon={Circle} label={t("notch.ccButtons")} desc={t("notch.ccButtons.desc")} divider={false} stacked>
-          <OrderList
-            ids={ccLayout.buttons ?? CC_BUTTONS}
-            label={(id) => t(`cc.layout.${id}`)}
-            onReorder={(order) => reorderCc("buttons", order)}
-            onReset={ccLayout.buttons ? () => resetCcItems("buttons") : undefined}
-            resetLabel={t("notch.panelOrder.reset")}
-          />
-        </SettingRow>
+        <ControlCenterConfig
+          value={ccLayout}
+          onChange={changeCcLayout}
+          onReset={resetCcLayout}
+          customized={Boolean(ccLayout.tiles || ccLayout.buttons || ccLayout.sliders)}
+        />
       </SettingSection>
 
       <SettingSection id="notch-controls" title={t("notch.section.controls")}>
