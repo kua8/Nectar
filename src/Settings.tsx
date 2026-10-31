@@ -170,6 +170,8 @@ function SettingsApp() {
               toggleCompactGlow={settings.toggleCompactGlow}
               notchScrollVolume={settings.notchScrollVolume}
               toggleNotchScrollVolume={settings.toggleNotchScrollVolume}
+              shelfPersist={settings.shelfPersist}
+              toggleShelfPersist={settings.toggleShelfPersist}
               weatherEnabled={settings.weatherEnabled}
               toggleWeather={settings.toggleWeather}
               tempUnitFahrenheit={settings.tempUnitFahrenheit}

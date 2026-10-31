@@ -460,5 +460,11 @@
   "notch.timerProgress": "Timer Progress Bar",
   "notch.timerProgress.desc": "Show an edge progress bar on the notch while a timer is active",
   "notch.scrollVolume": "Scroll on Sliders",
-  "notch.scrollVolume.desc": "Scroll with mouse wheel over the volume and brightness sliders to adjust them"
+  "notch.scrollVolume.desc": "Scroll with mouse wheel over the volume and brightness sliders to adjust them",
+  "shelf.empty": "Drop files or text here",
+  "shelf.clear": "Clear",
+  "shelf.copied": "Copied",
+  "shelf.remove": "Remove",
+  "notch.shelfPersist": "Keep Shelf Items",
+  "notch.shelfPersist.desc": "Keep files and text on the notch shelf after Nectar restarts. Files are kept as links, not copies. Up to 10 items"
 }

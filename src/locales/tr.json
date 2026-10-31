@@ -460,5 +460,11 @@
   "notch.timerProgress": "Zamanlayıcı İlerleme Çubuğu",
   "notch.timerProgress.desc": "Zamanlayıcı etkinken çentik kenarında ilerleme çubuğu göster",
   "notch.scrollVolume": "Kaydırıcılarda Kaydırma",
-  "notch.scrollVolume.desc": "Ayarlamak için ses ve parlaklık kaydırıcıları üzerinde fare tekerleğini kaydırın"
+  "notch.scrollVolume.desc": "Ayarlamak için ses ve parlaklık kaydırıcıları üzerinde fare tekerleğini kaydırın",
+  "shelf.empty": "Dosya veya metni buraya bırakın",
+  "shelf.clear": "Temizle",
+  "shelf.copied": "Kopyalandı",
+  "shelf.remove": "Kaldır",
+  "notch.shelfPersist": "Raf Öğelerini Koru",
+  "notch.shelfPersist.desc": "Nectar yeniden başlatıldıktan sonra çentik rafındaki dosya ve metinleri koru. Dosyalar kopya değil bağlantı olarak tutulur. En fazla 10 öğe"
 }

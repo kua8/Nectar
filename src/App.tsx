@@ -18,6 +18,7 @@ import { ConnectionsView } from "./components/ConnectionsView";
 import { NotchTour } from "./components/NotchTour";
 import { useStopwatch } from "./hooks/useStopwatch";
 import { t as translate, useT } from "./i18n";
+import { NotchShelf, useShelf } from "./components/NotchShelf";
 import { NotchProgressBorder } from "./components/NotchProgressBorder";
 import type { WidgetConfig } from "./components/StatusWidgetConfig";
 import {
@@ -514,7 +515,7 @@ function App() {
   const dockModeInitial = useRef(true);
   const notchModeInitial = useRef(true);
 
-  const [nectarMode, setNectarMode] = useState<'music' | 'calendar' | 'command-center' | 'status' | 'tour'>('status');
+  const [nectarMode, setNectarMode] = useState<'music' | 'calendar' | 'command-center' | 'status' | 'shelf' | 'tour'>('status');
 
   const isAnyInteraction = isHovered || isNotchHovered || isEdgeHovered;
   const isHidden = !startupAnimating && nectarMode !== 'tour' && (
@@ -678,6 +679,7 @@ function App() {
   const [settingsMusicModeEnabled, setSettingsMusicModeEnabled] = useState(() => localStorage.getItem("nectar-music-mode-enabled") !== "false");
   const [settingsMusicCompactNotch, setSettingsMusicCompactNotch] = useState(() => localStorage.getItem("nectar-music-compact-notch") !== "false");
   const [settingsScrollVolume, setSettingsScrollVolume] = useState(() => localStorage.getItem("nectar-notch-scroll-volume") === "true");
+  const [settingsShelfPersist, setSettingsShelfPersist] = useState(() => localStorage.getItem("nectar-shelf-persist") === "true");
   const [settingsVisualizerEnabled, setSettingsVisualizerEnabled] = useState(() => localStorage.getItem("nectar-visualizer-enabled") !== "false");
   const [settingsAlbumArtEnabled, setSettingsAlbumArtEnabled] = useState(() => localStorage.getItem("nectar-media-album-art-enabled") !== "false");
   const [settingsAmbienceEnabled, setSettingsAmbienceEnabled] = useState(() => localStorage.getItem("nectar-media-ambience-enabled") !== "false");
@@ -858,6 +860,7 @@ function App() {
       "nectar-music-mode-enabled": setSettingsMusicModeEnabled,
       "nectar-music-compact-notch": setSettingsMusicCompactNotch,
       "nectar-notch-scroll-volume": setSettingsScrollVolume,
+      "nectar-shelf-persist": setSettingsShelfPersist,
       "nectar-media-visualizer-enabled": setSettingsVisualizerEnabled,
       "nectar-visualizer-enabled": setSettingsVisualizerEnabled,
       "nectar-media-album-art-enabled": setSettingsAlbumArtEnabled,
@@ -982,12 +985,13 @@ function App() {
     // Playing: command-center → music → status → calendar (active, near command-center)
     // Paused:  command-center → status → music → calendar (secondary, after status)
     const musicBeforeStatus = isPlaying && mediaInfo.has_media && settingsMusicModeEnabled;
-    const modes: ('command-center' | 'status' | 'music' | 'calendar')[] = musicBeforeStatus
-      ? ['command-center', 'music', 'status', 'calendar']
-      : ['command-center', 'status', 'music', 'calendar'];
+    const modes: ('command-center' | 'status' | 'music' | 'calendar' | 'shelf')[] = musicBeforeStatus
+      ? ['command-center', 'music', 'status', 'calendar', 'shelf']
+      : ['command-center', 'status', 'music', 'calendar', 'shelf'];
     const availableModes = modes.filter(m => {
       if (m === 'music' && (!settingsMusicModeEnabled || !mediaInfo.has_media)) return false;
       if (m === 'calendar' && !productivityEnabled) return false;
+      if (m === 'shelf' && (!isNotchWindow || settingsLegacyMode)) return false;
       return true;
     });
 
@@ -1617,6 +1621,22 @@ function App() {
     return `${(bytes / (1024 * 1024)).toFixed(1)}M`;
   };
 
+  // After a native drag the webview never sees the pointer leave, so close the notch back down by hand.
+  const collapseAfterShelfDrag = () => {
+    setIsHovered(false);
+    setIsNotchHovered(false);
+    setNectarMode(mediaInfo.has_media && isPlaying && settingsMusicCompactNotch ? 'music' : 'status');
+  };
+  const shelf = useShelf(windowLabel, isNotchWindow && !settingsLegacyMode, settingsShelfPersist, {
+    onDragEnter: () => {
+      setIsHovered(true);
+      setIsNotchHovered(true);
+      setNectarMode('shelf');
+    },
+    onDragLeave: collapseAfterShelfDrag,
+    onDrop: () => setNectarMode('shelf'),
+  });
+
   // Music mode shows any time we have media info (playing or paused) and music mode setting is enabled
   const isMusicMode = mediaInfo.has_media && nectarMode === 'music' && settingsMusicModeEnabled;
 
@@ -1636,6 +1656,7 @@ function App() {
   // Calculate width dynamically based on enabled features
   const getDynamicWidth = () => {
     if (nectarMode === 'tour') return 380;
+    if (nectarMode === 'shelf') return Math.max(300, Math.min(120 + shelf.items.length * 62, 460));
     if (isCalendarMode) return Math.max(settingsCalendarEnabled && showClockColumn ? 480 : settingsCalendarEnabled ? 310 : 270, 140 + dualClockExtra);
     if (nectarMode === 'command-center' && isHovered) {
       const totalWidgets = statusWidgets.left.length + statusWidgets.right.length;
@@ -1666,6 +1687,7 @@ function App() {
       return isImpacted ? 28.9 : 44.2;
     }
     if (nectarMode === 'tour') return 210;
+    if (nectarMode === 'shelf') return shelf.items.length === 0 ? 96 : 130;
     if (nectarMode === 'calendar') return settingsCalendarEnabled ? (caldav.connected ? 350 : 310) : 262;
     if (nectarMode === 'command-center') return isHovered ? 230 : 36;
     if (nectarMode === 'status') return 36;
@@ -1741,14 +1763,14 @@ function App() {
         }}
         onHoverStart={() => {
           setIsHovered(true);
-          if (nectarMode !== 'tour') setNectarMode(mediaInfo.has_media && isPlaying ? 'music' : 'status');
+          if (nectarMode !== 'tour' && nectarMode !== 'shelf') setNectarMode(mediaInfo.has_media && isPlaying ? 'music' : 'status');
         }}
         onHoverEnd={() => {
           setIsHovered(false);
           const targetMode = mediaInfo.has_media && isPlaying && settingsMusicCompactNotch ? 'music' : 'status';
           if (nectarMode === 'music') {
             setNectarMode(targetMode);
-          } else if (nectarMode === 'command-center' || nectarMode === 'calendar' || nectarMode === 'status') {
+          } else if (nectarMode === 'command-center' || nectarMode === 'calendar' || nectarMode === 'status' || nectarMode === 'shelf') {
             setNectarMode(targetMode);
           }
         }}
@@ -2389,6 +2411,25 @@ function App() {
                       </div>
                     </div>
                     </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <AnimatePresence>
+                {nectarMode === 'shelf' && (
+                  <motion.div
+                    key="shelf"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0, transition: { duration: 0.1 } }}
+                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                  >
+                    <NotchShelf
+                      items={shelf.items}
+                      onRemove={shelf.remove}
+                      onClear={shelf.clear}
+                      onDragOutEnd={collapseAfterShelfDrag}
+                    />
                   </motion.div>
                 )}
               </AnimatePresence>

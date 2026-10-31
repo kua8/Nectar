@@ -67,6 +67,8 @@ interface NotchTabProps {
   toggleCompactGlow: () => void;
   notchScrollVolume: boolean;
   toggleNotchScrollVolume: () => void;
+  shelfPersist: boolean;
+  toggleShelfPersist: () => void;
   weatherEnabled: boolean;
   toggleWeather: () => void;
   tempUnitFahrenheit: boolean;
@@ -123,6 +125,8 @@ export function NotchTab({
   toggleCompactGlow,
   notchScrollVolume,
   toggleNotchScrollVolume,
+  shelfPersist,
+  toggleShelfPersist,
   weatherEnabled,
   toggleWeather,
   tempUnitFahrenheit,
@@ -326,9 +330,16 @@ export function NotchTab({
               </label>
             </SettingRow>
 
-            <SettingRow icon={Volume2} label={t("notch.scrollVolume")} desc={t("notch.scrollVolume.desc")} divider={false}>
+            <SettingRow icon={Volume2} label={t("notch.scrollVolume")} desc={t("notch.scrollVolume.desc")}>
               <label className="toggle-switch">
                 <input type="checkbox" checked={notchScrollVolume} onChange={toggleNotchScrollVolume} />
+                <span className="slider"></span>
+              </label>
+            </SettingRow>
+
+            <SettingRow icon={Circle} label={t("notch.shelfPersist")} desc={t("notch.shelfPersist.desc")} divider={false}>
+              <label className="toggle-switch">
+                <input type="checkbox" checked={shelfPersist} onChange={toggleShelfPersist} />
                 <span className="slider"></span>
               </label>
             </SettingRow>

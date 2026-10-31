@@ -19,6 +19,7 @@ mod active_look;
 mod connections;
 mod audio_devices;
 mod i18n;
+mod shelf;
 
 use tauri::Manager;
 use windows::Win32::System::Console::SetConsoleCtrlHandler;
@@ -83,6 +84,7 @@ fn main() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_drag::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
@@ -90,6 +92,11 @@ fn main() {
         ))
         .invoke_handler(tauri::generate_handler![
             hide_native_osd,
+            setup_shelf_drop,
+            shelf_thumbnail,
+            shelf_open,
+            shelf_prune,
+            shelf_drag_icon,
             open_settings_window,
             open_calendar_window,
             open_tray_window,

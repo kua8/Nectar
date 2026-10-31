@@ -44,6 +44,7 @@ Edit `settings.json` with any text editor while Nectar is running. Changes are a
 | `nectar-notch-mode` | `"fixed"` / `"smart"` / `"peek"` | `"fixed"` | Notch (top bar) visibility behavior. **fixed** = always visible, never auto-hides (including over fullscreen apps — matches a real hardware notch, which doesn't disappear either). **smart** = hides when overlapped by another window/fullscreen app, reveals on hover. **peek** = hidden until cursor approaches the top edge, a media event, or a notification. Smart/peek reveal and are fully clickable on hover even over a fullscreen app (only a thin strip right at the screen edge stays click-through, so it never steals input meant for another app). Unlike the Dock, the notch never reserves desktop work-area space, so it never leaves a gap above maximized windows' content. |
 | `nectar-notch-timer-progress` | `"true"` / `"false"` | `"true"` | Show an edge progress bar along the bottom of the notch while a timer or Pomodoro session is active. |
 | `nectar-notch-scroll-volume` | `"true"` / `"false"` | `"false"` | Scroll with mouse wheel over the volume, brightness and mixer sliders to adjust them. |
+| `nectar-shelf-persist` | `"true"` / `"false"` | `"false"` | Keep the notch shelf's items after Nectar restarts. The shelf holds files (as links, not copies) and text dropped on the notch; at most 10, newest first. Off clears them when Nectar closes. Files that no longer exist are dropped on start. |
 
 ### Monitors
 

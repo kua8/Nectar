@@ -2029,6 +2029,14 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
                                         && cursor.x >= rx - edge_pad && cursor.x <= rx + rw + edge_pad {
                                         is_click_interactive = true;
                                     }
+
+                                    if left_button_held() {
+                                        let over_span = cursor.x >= rx - edge_pad && cursor.x <= rx + rw + edge_pad;
+                                        let over_box = cursor.x >= rx && cursor.x <= rx + rw && cursor.y >= ry_top && cursor.y <= ry_bottom;
+                                        if over_box || (in_top_band && over_span) {
+                                            is_click_interactive = true;
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -2306,6 +2314,26 @@ fn hit_test_extra_dock_windows(app_handle: &AppHandle, cursor: windows::Win32::F
     }
 }
 
+/// True once the left button has been held for a moment, which may be an OS file drag. OLE cannot
+/// hit-test a click-through window, so the notch has to be interactive while the drag is over it or
+/// the shelf can't receive the drop. The delay keeps ordinary clicks at the top edge going to the app below.
+fn left_button_held() -> bool {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
+    static DOWN_SINCE_MS: AtomicI64 = AtomicI64::new(0);
+    let down = unsafe { (GetAsyncKeyState(VK_LBUTTON.0 as i32) as u16 & 0x8000) != 0 };
+    if !down {
+        DOWN_SINCE_MS.store(0, Ordering::Relaxed);
+        return false;
+    }
+    let now = now_ms();
+    let since = DOWN_SINCE_MS.load(Ordering::Relaxed);
+    if since == 0 {
+        DOWN_SINCE_MS.store(now, Ordering::Relaxed);
+        return false;
+    }
+    now - since >= 200
+}
+
 fn hit_test_extra_notch_windows(app_handle: &AppHandle, cursor: windows::Win32::Foundation::POINT, now: i64, fg_fs: bool) {
     let windows: Vec<(String, tauri::WebviewWindow)> = app_handle.webview_windows().into_iter()
         .filter(|(l, _)| is_notch_label(l) && crate::state::monitor_suffix(l).is_some())
@@ -2359,6 +2387,14 @@ fn hit_test_extra_notch_windows(app_handle: &AppHandle, cursor: windows::Win32::
                 if !fg_fs && in_top_band && (!notch_hidden || hover_active)
                     && cursor.x >= rx - edge_pad && cursor.x <= rx + rw + edge_pad {
                     is_click_interactive = true;
+                }
+
+                if left_button_held() {
+                    let over_span = cursor.x >= rx - edge_pad && cursor.x <= rx + rw + edge_pad;
+                    let over_box = cursor.x >= rx && cursor.x <= rx + rw && cursor.y >= ry_top && cursor.y <= ry_bottom;
+                    if over_box || (in_top_band && over_span) {
+                        is_click_interactive = true;
+                    }
                 }
             }
         }
