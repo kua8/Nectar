@@ -6,7 +6,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type { UpdateCheckResult } from "./updater";
 import "./App.css";
 import { initTheme } from "./theme";
-import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, VolumeLowIcon, VolumeHighIcon, MusicNoteIcon, AudioOutputIcon } from "./icons";
+import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, VolumeLowIcon, VolumeHighIcon, MusicNoteIcon } from "./icons";
 import { CompactMediaPlayer } from "./CompactMediaPlayer";
 import { useWeather } from "./hooks/useWeather";
 import { useSettingsSync } from "./hooks/useSettingsSync";
@@ -1851,14 +1851,6 @@ function App() {
                             <div className="header-visualizer">
                               <Visualizer isPlaying={isPlaying} bars={5} height={18} />
                             </div>
-                            <motion.button
-                              className="classic-audio-output-btn"
-                              onClick={(e) => { e.stopPropagation(); invoke('open_sound_settings').catch(() => {}); }}
-                              whileTap={{ scale: 0.9 }}
-                              data-tooltip={t("media.audioOutput")}
-                            >
-                              <AudioOutputIcon size={20} style={{ opacity: 0.5 }} />
-                            </motion.button>
                           </div>
                         </div>
 
