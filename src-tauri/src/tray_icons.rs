@@ -1,5 +1,5 @@
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU64, Ordering};
 use std::sync::Mutex;
 use windows::Win32::Foundation::{HWND, POINT, RECT};
 use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MonitorFromPoint, MONITORINFO, MONITOR_DEFAULTTONEAREST};
@@ -9,7 +9,8 @@ use windows::Win32::UI::Accessibility::{
     UIA_InvokePatternId,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    FindWindowA, GetClassNameA, GetCursorPos, GetForegroundWindow, GetWindowLongA, GetWindowRect, IsWindowVisible, SetForegroundWindow,
+    FindWindowA, GetClassNameA, GetCursorPos, GetForegroundWindow, GetShellWindow, GetWindowLongA, GetWindowRect, GetWindowThreadProcessId,
+    IsWindow, IsWindowVisible, SetForegroundWindow,
     SetLayeredWindowAttributes, SetWindowLongA, SetWindowPos, ShowWindow, GWL_EXSTYLE, HWND_TOPMOST, LWA_ALPHA,
     SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SW_HIDE, SW_SHOWNA, WS_EX_LAYERED, WS_EX_TRANSPARENT,
 };
@@ -17,6 +18,9 @@ use windows::core::Interface;
 
 static AUTOMATION_LOCK: Mutex<()> = Mutex::new(());
 static FLYOUT_OPEN: AtomicBool = AtomicBool::new(false);
+static OPEN_COUNT: AtomicU64 = AtomicU64::new(0);
+static PREVIOUS_FOREGROUND: AtomicIsize = AtomicIsize::new(0);
+static OPENING: AtomicBool = AtomicBool::new(false);
 
 fn automation() -> windows::core::Result<IUIAutomation> {
     unsafe { CoCreateInstance(&CUIAutomation, None, CLSCTX_INPROC_SERVER) }
@@ -85,6 +89,50 @@ fn taskbar_has_focus() -> bool {
     !fg.0.is_null() && matches!(class_name(fg).as_str(), "Shell_TrayWnd" | "Shell_SecondaryTrayWnd")
 }
 
+fn restore_foreground(target: HWND) -> bool {
+    use windows::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+    unsafe {
+        if !IsWindow(Some(target)).as_bool() {
+            return false;
+        }
+        if SetForegroundWindow(target).as_bool() {
+            return true;
+        }
+        let ours = GetCurrentThreadId();
+        let theirs = GetWindowThreadProcessId(GetForegroundWindow(), None);
+        let attached = theirs != 0 && theirs != ours && AttachThreadInput(ours, theirs, true).as_bool();
+        let restored = SetForegroundWindow(target).as_bool();
+        if attached {
+            let _ = AttachThreadInput(ours, theirs, false);
+        }
+        restored
+    }
+}
+
+fn leave_taskbar_focus(flyout: HWND, open_count: u64) {
+    for _ in 0..30 {
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        if !unsafe { IsWindowVisible(flyout) }.as_bool() {
+            break;
+        }
+    }
+    for _ in 0..20 {
+        if OPEN_COUNT.load(Ordering::SeqCst) != open_count {
+            return;
+        }
+        if taskbar_has_focus() {
+            let mut previous = HWND(PREVIOUS_FOREGROUND.load(Ordering::SeqCst) as *mut _);
+            if previous.0.is_null() || !unsafe { IsWindow(Some(previous)) }.as_bool() {
+                previous = unsafe { GetShellWindow() };
+            }
+            let restored = restore_foreground(previous);
+            crate::diagnostics::log(&format!("tray: taskbar kept focus after closing, gave focus back to {}: {restored}", class_name(previous)));
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(10));
+    }
+}
+
 fn open_with_shortcut(anchor: Option<(i32, i32)>) -> bool {
     use windows::Win32::UI::Input::KeyboardAndMouse::{VK_B, VK_LWIN, VK_RETURN};
     send_keys(&[(VK_LWIN, false), (VK_B, false), (VK_B, true), (VK_LWIN, true)]);
@@ -113,6 +161,39 @@ fn open_with_shortcut(anchor: Option<(i32, i32)>) -> bool {
         }
     }
     false
+}
+
+struct HiddenUntilPlaced {
+    flyout: HWND,
+    original_ex: i32,
+}
+
+impl HiddenUntilPlaced {
+    fn new() -> Option<Self> {
+        let flyout = find_overflow_window()?;
+        if unsafe { IsWindowVisible(flyout) }.as_bool() {
+            return None;
+        }
+        let original_ex = unsafe { GetWindowLongA(flyout, GWL_EXSTYLE) };
+        if original_ex & WS_EX_LAYERED.0 as i32 != 0 {
+            crate::diagnostics::log("tray: flyout is already layered, opening it without hiding");
+            return None;
+        }
+        unsafe {
+            SetWindowLongA(flyout, GWL_EXSTYLE, original_ex | WS_EX_LAYERED.0 as i32);
+            let _ = SetLayeredWindowAttributes(flyout, windows::Win32::Foundation::COLORREF(0), 0, LWA_ALPHA);
+        }
+        Some(Self { flyout, original_ex })
+    }
+}
+
+impl Drop for HiddenUntilPlaced {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = SetLayeredWindowAttributes(self.flyout, windows::Win32::Foundation::COLORREF(0), 255, LWA_ALPHA);
+            SetWindowLongA(self.flyout, GWL_EXSTYLE, self.original_ex);
+        }
+    }
 }
 
 fn describe_elements(automation: &IUIAutomation, root: &IUIAutomationElement) -> String {
@@ -176,6 +257,14 @@ pub fn warm_up() {
     }
 }
 
+struct OpeningFlag;
+
+impl Drop for OpeningFlag {
+    fn drop(&mut self) {
+        OPENING.store(false, Ordering::SeqCst);
+    }
+}
+
 pub fn open_native_tray(anchor: Option<(i32, i32)>) {
     unsafe {
         let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
@@ -186,16 +275,37 @@ pub fn open_native_tray(anchor: Option<(i32, i32)>) {
         if unsafe { GetForegroundWindow() } == flyout {
             use windows::Win32::UI::Input::KeyboardAndMouse::VK_ESCAPE;
             send_keys(&[(VK_ESCAPE, false), (VK_ESCAPE, true)]);
+            leave_taskbar_focus(flyout, OPEN_COUNT.load(Ordering::SeqCst));
         } else {
             unsafe { let _ = ShowWindow(flyout, SW_HIDE); }
         }
         FLYOUT_OPEN.store(false, Ordering::SeqCst);
         return;
     }
-    let Ok(_guard) = AUTOMATION_LOCK.try_lock() else {
-        crate::diagnostics::log("tray: another tray action is still running");
+    if OPENING.swap(true, Ordering::SeqCst) {
+        crate::diagnostics::log("tray: another open is still running");
         return;
+    }
+    let _opening = OpeningFlag;
+    OPEN_COUNT.fetch_add(1, Ordering::SeqCst);
+    let previous = unsafe { GetForegroundWindow() };
+    let usable = !previous.0.is_null() && !taskbar_has_focus() && find_overflow_window() != Some(previous);
+    PREVIOUS_FOREGROUND.store(if usable { previous.0 as isize } else { 0 }, Ordering::SeqCst);
+
+    let waiting = std::time::Instant::now();
+    let _guard = loop {
+        if let Ok(guard) = AUTOMATION_LOCK.try_lock() {
+            break guard;
+        }
+        if waiting.elapsed().as_millis() > 2000 {
+            crate::diagnostics::log("tray: another tray action is still running");
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
     };
+    if waiting.elapsed().as_millis() >= 20 {
+        crate::diagnostics::log(&format!("tray: waited {}ms for another tray action to finish", waiting.elapsed().as_millis()));
+    }
 
     let Ok(tray) = find_window(c"Shell_TrayWnd") else {
         crate::diagnostics::log("tray: Shell_TrayWnd not found");
@@ -214,6 +324,7 @@ pub fn open_native_tray(anchor: Option<(i32, i32)>) {
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
 
+    let hidden_until_placed = HiddenUntilPlaced::new();
     let mut opened = false;
     if !hidden {
         if let Ok(auto) = automation() {
@@ -244,6 +355,7 @@ pub fn open_native_tray(anchor: Option<(i32, i32)>) {
         opened = open_with_shortcut(anchor);
         crate::diagnostics::log(&format!("tray: open_with_shortcut opened={opened}"));
     }
+    drop(hidden_until_placed);
     if opened {
         FLYOUT_OPEN.store(true, Ordering::SeqCst);
         crate::diagnostics::log("tray: flyout opened and placed");
