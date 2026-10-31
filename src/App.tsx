@@ -1634,7 +1634,6 @@ function App() {
     return `${(bytes / (1024 * 1024)).toFixed(1)}M`;
   };
 
-  // After a native drag the webview never sees the pointer leave, so close the notch back down by hand.
   const collapseAfterShelfDrag = () => {
     setIsHovered(false);
     setIsNotchHovered(false);

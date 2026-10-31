@@ -17,7 +17,6 @@
   transition: background-color 0.15s ease, filter 0.15s ease;
 }
 
-/* Wider invisible hit box so a slightly off or moving click isn't taken as a window drag. */
 .wc-btn::before {
   content: "";
   position: absolute;

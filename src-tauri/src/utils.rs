@@ -35,7 +35,6 @@ pub fn resolve_shortcut(path: &str) -> Option<(String, String)> {
 }
 
 pub static ORIGINAL_TRAY_RECT: std::sync::Mutex<Option<windows::Win32::Foundation::RECT>> = std::sync::Mutex::new(None);
-// One entry per secondary taskbar, keyed by HWND: three monitors means two of them.
 static ORIGINAL_SEC_TRAY_RECTS: std::sync::Mutex<Vec<(isize, windows::Win32::Foundation::RECT)>> = std::sync::Mutex::new(Vec::new());
 static ORIGINAL_TASKBAR_STATE: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(-1);
 
@@ -142,7 +141,6 @@ pub fn restore_taskbar_after_crash() {
     set_taskbar_visibility(true, true);
 }
 
-/// Every secondary taskbar; Windows creates one per extra monitor.
 pub fn secondary_taskbars() -> Vec<windows::Win32::Foundation::HWND> {
     use windows::Win32::UI::WindowsAndMessaging::FindWindowExA;
     let mut taskbars = Vec::new();
@@ -934,13 +932,11 @@ mod tests {
         let right = rect(1920, 3840, 0, 1080);
         let monitors = [(primary, true), (left, false), (right, false)];
 
-        // Same width as both secondaries, so only the position tells them apart.
         let on_right = rect(1920, 3840, 1032, 1080);
         assert_eq!(taskbar_monitor(&monitors, false, &on_right), Some(right));
         let on_left = rect(-1920, 0, 1032, 1080);
         assert_eq!(taskbar_monitor(&monitors, false, &on_left), Some(left));
 
-        // A taskbar stranded off-screen still lands on a same-width secondary.
         let stranded = rect(-10000, -8080, -10000, -9952);
         assert_eq!(taskbar_monitor(&monitors, false, &stranded), Some(left));
         assert_eq!(taskbar_monitor(&monitors, true, &on_right), Some(primary));

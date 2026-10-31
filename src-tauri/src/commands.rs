@@ -3839,7 +3839,6 @@ mod pwa_icon_tests {
 pub fn setup_shelf_drop(app: AppHandle) {
     let first = app.clone();
     let _ = app.run_on_main_thread(move || crate::shelf::setup(&first));
-    // WebView2 can create or recreate its render child after first paint, so register again once it has settled.
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(tokio::time::Duration::from_millis(1500)).await;
         let late = app.clone();
@@ -3847,8 +3846,6 @@ pub fn setup_shelf_drop(app: AppHandle) {
     });
 }
 
-/// Preview for a shelf item as a PNG data URI: the image itself, or Explorer's thumbnail for
-/// other files and folders (PDFs, Office files, videos). None when Windows has no thumbnail.
 #[tauri::command]
 pub async fn shelf_thumbnail(path: String) -> Option<String> {
     tauri::async_runtime::spawn_blocking(move || shelf_image_thumbnail(&path).or_else(|| shelf_shell_thumbnail(&path)))
@@ -3857,7 +3854,6 @@ pub async fn shelf_thumbnail(path: String) -> Option<String> {
         .flatten()
 }
 
-/// Explorer's thumbnail only, so a file Windows can't preview returns nothing instead of its generic icon.
 fn shelf_shell_thumbnail(path: &str) -> Option<String> {
     use windows::Win32::Foundation::SIZE;
     use windows::Win32::UI::Shell::{IShellItemImageFactory, SHCreateItemFromParsingName, SIIGBF, SIIGBF_BIGGERSIZEOK, SIIGBF_THUMBNAILONLY};
@@ -3890,7 +3886,6 @@ fn shelf_image_thumbnail(path: &str) -> Option<String> {
         return None;
     }
 
-    // A small, highly compressed file can still expand into a huge bitmap, so cap the decode.
     let mut limits = image::Limits::default();
     limits.max_image_width = Some(8192);
     limits.max_image_height = Some(8192);
@@ -3908,13 +3903,11 @@ pub async fn shelf_open(path: String) -> Result<(), String> {
     tauri_plugin_opener::open_path(&path, None::<&str>).map_err(|e| e.to_string())
 }
 
-/// Keeps only the shelf paths that still exist (moved, deleted, or on an unplugged drive).
 #[tauri::command]
 pub async fn shelf_prune(paths: Vec<String>) -> Vec<String> {
     paths.into_iter().filter(|p| std::path::Path::new(p).exists()).collect()
 }
 
-/// Generic document icon used as the drag preview for shelf files without a thumbnail.
 #[tauri::command]
 pub fn shelf_drag_icon() -> Option<String> {
     use base64::Engine;
@@ -3940,7 +3933,6 @@ pub fn shelf_drag_icon() -> Option<String> {
     Some(format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(&png_bytes)))
 }
 
-/// Writes shelf text to a temp .txt so it can be dragged out as a file. Returns the path.
 #[tauri::command]
 pub fn shelf_text_file(text: String) -> Option<String> {
     let name: String = text
@@ -3957,8 +3949,6 @@ pub fn shelf_text_file(text: String) -> Option<String> {
     Some(path.to_string_lossy().into_owned())
 }
 
-/// True when the cursor is over this notch window's visible box. A native drag leaves the webview
-/// without a pointer event, so the frontend asks after a drag-out instead.
 #[tauri::command]
 pub fn pointer_over_notch(window: Window) -> bool {
     let label = window.label().to_string();

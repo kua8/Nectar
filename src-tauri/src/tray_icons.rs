@@ -89,7 +89,6 @@ fn open_with_shortcut(anchor: Option<(i32, i32)>) -> bool {
             }
         }
     }
-    // Fallback: in case focus transition needed slightly longer, retry Return once
     send_keys(&[(VK_RETURN, false), (VK_RETURN, true)]);
     for _ in 0..30 {
         std::thread::sleep(std::time::Duration::from_millis(15));
@@ -128,15 +127,14 @@ fn nectar_theme_is_light() -> bool {
         .unwrap_or(false)
 }
 
-/// Rounded corners, an acrylic backdrop and a dark or light frame to match Nectar's theme.
 fn style_flyout(flyout: HWND) {
     use windows::Win32::Graphics::Dwm::{
         DwmSetWindowAttribute, DWMWA_BORDER_COLOR, DWMWA_SYSTEMBACKDROP_TYPE,
         DWMWA_USE_IMMERSIVE_DARK_MODE, DWMWA_WINDOW_CORNER_PREFERENCE,
     };
     let dark = windows::core::BOOL(if nectar_theme_is_light() { 0 } else { 1 });
-    let corner_pref: u32 = 2; // DWMWCP_ROUND
-    let backdrop_type: u32 = 3; // DWMSBT_TRANSIENTWINDOW (acrylic)
+    let corner_pref: u32 = 2;
+    let backdrop_type: u32 = 3;
     let border_color: u32 = if nectar_theme_is_light() { 0x00D0D0D0 } else { 0x00333333 };
     unsafe {
         let _ = DwmSetWindowAttribute(flyout, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark as *const _ as _, std::mem::size_of::<windows::core::BOOL>() as u32);
@@ -225,7 +223,6 @@ pub fn open_native_tray(anchor: Option<(i32, i32)>) {
     }
 
     let mut opened = false;
-    // Fast path: if taskbar was already visible, try UI Automation once without a sleep loop
     if !hidden {
         if let Ok(auto) = automation() {
             if let Ok(root) = unsafe { auto.ElementFromHandle(tray) } {

@@ -1,13 +1,5 @@
-//! OS drop target for the notch (files and selected text).
-//!
-//! Adapted from Bloom by Sehajveer Singh (GPLv3).
-//!
-//! Tauri/wry registers its own drop targets on the WebView2 child windows that
-//! exist when the webview is built. The notch window is created hidden and
-//! WebView2 creates/recreates its render child later, so those targets can be
-//! stale — and OLE does not fall back to ancestors, so a drag over the notch
-//! finds nothing. This module revokes any existing target and registers ours on
-//! the toplevel and every current descendant, after the webview has painted.
+//! OS drop target for the notch (files and text), adapted from Bloom by Sehajveer Singh (GPLv3).
+//! WebView2 recreates its render child after the window is built, so the target is registered again after first paint.
 
 use std::cell::UnsafeCell;
 use std::sync::Mutex;
@@ -28,19 +20,11 @@ use windows::Win32::System::Ole::{
 use windows::Win32::System::SystemServices::MODIFIERKEYS_FLAGS;
 use windows::Win32::UI::Shell::{DragFinish, DragQueryFileW, HDROP};
 use windows::Win32::UI::WindowsAndMessaging::EnumChildWindows;
-
-/// Upper bound on accepted text drops (~128k UTF-16 units). Anything larger is
-/// treated as unsupported rather than truncated.
 const MAX_TEXT_UNITS: usize = 1 << 17;
-
-/// Keeps every registered target alive for as long as OLE holds it. The COM
-/// pointers are only ever used by OLE, which marshals calls itself.
 struct TargetStore(#[allow(dead_code)] Vec<IDropTarget>);
 unsafe impl Send for TargetStore {}
 
 static SHELF_DROP_TARGETS: Mutex<Option<TargetStore>> = Mutex::new(None);
-
-/// What a drag carries that we accept.
 enum DragPayload {
     Files(Vec<String>, HDROP),
     Text(String),
@@ -56,16 +40,12 @@ struct ShelfDropTarget {
 }
 
 impl ShelfDropTarget {
-    /// Files first (CF_HDROP), then selected text (CF_UNICODETEXT). `None` when
-    /// the drag carries neither.
     unsafe fn extract(data: &IDataObject) -> Option<DragPayload> {
         if let Some((paths, hdrop)) = unsafe { Self::extract_files(data) } {
             return Some(DragPayload::Files(paths, hdrop));
         }
         unsafe { Self::extract_text(data) }.map(DragPayload::Text)
     }
-
-    /// Reads CF_HDROP from the drag data. `None` when the drag carries no files.
     unsafe fn extract_files(data: &IDataObject) -> Option<(Vec<String>, HDROP)> {
         let format = FORMATETC {
             cfFormat: CF_HDROP.0,
@@ -90,9 +70,6 @@ impl ShelfDropTarget {
         }
         Some((paths, hdrop))
     }
-
-    /// Reads CF_UNICODETEXT (selected text dragged from another app). `None`
-    /// when absent, empty, or unreasonably large.
     unsafe fn extract_text(data: &IDataObject) -> Option<String> {
         let format = FORMATETC {
             cfFormat: CF_UNICODETEXT.0,
@@ -107,9 +84,6 @@ impl ShelfDropTarget {
             ReleaseStgMedium(&mut medium);
             return None;
         }
-
-        // Bound the scan by the allocation: a malformed data object could
-        // offer a buffer without a terminator.
         let alloc_units = (GlobalSize(medium.u.hGlobal) / 2) as usize;
         let max_units = alloc_units.min(MAX_TEXT_UNITS);
         let mut len = 0usize;
@@ -233,9 +207,6 @@ impl IDropTarget_Impl for ShelfDropTarget_Impl {
         Ok(())
     }
 }
-
-/// (Re)registers the shelf drop target on every notch window and all its current
-/// descendants. Safe to call repeatedly; existing registrations are replaced.
 pub fn setup(app: &AppHandle) {
     struct Ctx {
         app: AppHandle,

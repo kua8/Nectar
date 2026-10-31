@@ -2314,9 +2314,7 @@ fn hit_test_extra_dock_windows(app_handle: &AppHandle, cursor: windows::Win32::F
     }
 }
 
-/// True once the left button has been held for a moment, which may be an OS file drag. OLE cannot
-/// hit-test a click-through window, so the notch has to be interactive while the drag is over it or
-/// the shelf can't receive the drop. The delay keeps ordinary clicks at the top edge going to the app below.
+/// Held long enough to be a drag rather than a click.
 fn left_button_held() -> bool {
     use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON};
     static DOWN_SINCE_MS: AtomicI64 = AtomicI64::new(0);

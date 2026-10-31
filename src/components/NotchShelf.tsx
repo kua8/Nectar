@@ -46,7 +46,6 @@ export function useShelf(windowLabel: string, enabled: boolean, persist: boolean
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(items.map(({ thumb, ...rest }) => rest))); } catch { /* storage unavailable */ }
   }, [items, persist]);
 
-  // Forget saved files that were moved or deleted since the last run.
   useEffect(() => {
     if (!persist) return;
     const files = items.filter((i) => i.kind === "file" && i.path).map((i) => i.path as string);
@@ -55,8 +54,6 @@ export function useShelf(windowLabel: string, enabled: boolean, persist: boolean
       const keep = new Set(alive);
       setItems((prev) => prev.filter((i) => i.kind !== "file" || keep.has(i.path as string)));
     }).catch(() => { });
-    // Only once at startup.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadThumb = useCallback((id: string, path: string) => {
@@ -132,7 +129,6 @@ export function NotchShelf({ items, onRemove, onClear, onDragOutEnd }: Props) {
   const beginDrag = async (item: ShelfItem) => {
     const icon = item.thumb ?? dragIcon.current;
     if (!icon) return;
-    // Text is dragged out as a .txt file, since a native drag carries files.
     const path = item.kind === "file" ? item.path : await invoke<string | null>("shelf_text_file", { text: item.text ?? "" });
     if (!path) return;
     try {
