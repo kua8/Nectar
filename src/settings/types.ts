@@ -26,6 +26,7 @@ export interface SettingRowProps {
   action?: boolean;
   danger?: boolean;
   divider?: boolean;
+  stacked?: boolean;
   onClick?: () => void;
   children?: React.ReactNode;
 }

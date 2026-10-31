@@ -7,6 +7,7 @@ export function SettingRow({
   action,
   danger,
   divider = true,
+  stacked,
   onClick,
   children,
 }: SettingRowProps) {
@@ -14,6 +15,7 @@ export function SettingRow({
     "setting-item",
     action ? "action" : "",
     danger ? "danger" : "",
+    stacked ? "stacked" : "",
   ]
     .filter(Boolean)
     .join(" ");

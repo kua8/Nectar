@@ -483,5 +483,12 @@
   "panel.status": "Durum",
   "panel.music": "Müzik",
   "panel.calendar": "Takvim",
-  "panel.shelf": "Raf"
+  "panel.shelf": "Raf",
+  "notch.section.display": "Görünüm",
+  "notch.section.calendar": "Takvim ve saat",
+  "notch.section.music": "Müzik",
+  "notch.section.panels": "Paneller",
+  "notch.section.controls": "Denetimler ve raf",
+  "dock.section.shortcuts": "Düğmeler ve önizlemeler",
+  "dock.section.style": "Stil"
 }

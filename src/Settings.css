@@ -1346,3 +1346,47 @@ input:checked + .slider:before {
     font-size: 11px;
     cursor: pointer;
 }
+
+.setting-section {
+    margin-bottom: 4px;
+}
+
+.setting-section-header {
+    font-family: inherit;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+}
+
+.setting-section-chevron {
+    transition: transform 0.15s ease;
+    opacity: 0.6;
+}
+
+.setting-section.collapsed .setting-section-chevron {
+    transform: rotate(-90deg);
+}
+
+.setting-item.stacked {
+    flex-wrap: wrap;
+}
+
+.setting-item.stacked .setting-info {
+    flex: 1 1 calc(100% - 40px);
+}
+
+.setting-item.stacked > :not(.setting-icon-bg):not(.setting-info) {
+    flex: 1 1 100%;
+    margin: 8px 0 0 40px;
+}
+
+.setting-item.stacked .panel-order-row {
+    justify-content: flex-start;
+    max-width: none;
+}

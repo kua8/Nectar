@@ -483,5 +483,12 @@
   "panel.status": "Status",
   "panel.music": "Music",
   "panel.calendar": "Calendar",
-  "panel.shelf": "Shelf"
+  "panel.shelf": "Shelf",
+  "notch.section.display": "Display",
+  "notch.section.calendar": "Calendar and clock",
+  "notch.section.music": "Music",
+  "notch.section.panels": "Panels",
+  "notch.section.controls": "Controls and shelf",
+  "dock.section.shortcuts": "Buttons and previews",
+  "dock.section.style": "Style"
 }

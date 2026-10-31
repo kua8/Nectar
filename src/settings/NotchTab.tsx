@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { DEFAULT_PANEL_ORDER, type PanelId } from "../panelOrder";
 import { SettingRow } from "./SettingRow";
+import { SettingSection } from "./SettingSection";
 import { Dropdown } from "./Dropdown";
 import { useCaldav } from "../hooks/useCaldav";
 import { StatusWidgetConfig } from "../components/StatusWidgetConfig";
@@ -172,8 +173,7 @@ export function NotchTab({
   const showPerMonitor = multiMonitor && perMonitor.enabled;
   return (
     <>
-      <div className="setting-group-label">{t("notch.group")}</div>
-      <div className="setting-group">
+      <SettingSection id="notch-display" title={t("notch.section.display")} defaultOpen>
         {!showPerMonitor && (
           <SettingRow icon={PanelTop} label={t("notch.behavior")} desc={t("notch.behavior.desc")}>
             <Dropdown
@@ -237,6 +237,9 @@ export function NotchTab({
           </SettingRow>
         ))}
 
+      </SettingSection>
+
+      <SettingSection id="notch-calendar" title={t("notch.section.calendar")}>
         <SettingRow icon={Calendar} label={t("notch.calendar")} desc={t("notch.calendar.desc")}>
           <label className="toggle-switch">
             <input type="checkbox" checked={calendarEnabled} onChange={toggleCalendar} />
@@ -310,6 +313,9 @@ export function NotchTab({
           </>
         )}
 
+      </SettingSection>
+
+      <SettingSection id="notch-music" title={t("notch.section.music")}>
         <SettingRow icon={Music} label={t("notch.musicMode")} desc={t("notch.musicMode.desc")}>
           <label className="toggle-switch">
             <input type="checkbox" checked={musicModeEnabled} onChange={toggleMusicMode} />
@@ -350,43 +356,33 @@ export function NotchTab({
                 <span className="slider"></span>
               </label>
             </SettingRow>
+          </>
+        )}
+      </SettingSection>
 
-            <SettingRow icon={Volume2} label={t("notch.scrollVolume")} desc={t("notch.scrollVolume.desc")}>
-              <label className="toggle-switch">
-                <input type="checkbox" checked={notchScrollVolume} onChange={toggleNotchScrollVolume} />
-                <span className="slider"></span>
-              </label>
-            </SettingRow>
-
-            <SettingRow icon={Circle} label={t("notch.shelfPersist")} desc={t("notch.shelfPersist.desc")}>
-              <label className="toggle-switch">
-                <input type="checkbox" checked={shelfPersist} onChange={toggleShelfPersist} />
-                <span className="slider"></span>
-              </label>
-            </SettingRow>
-
-            <SettingRow icon={Circle} label={t("notch.rememberMode")} desc={t("notch.rememberMode.desc")}>
-              <label className="toggle-switch">
-                <input type="checkbox" checked={rememberMode} onChange={toggleRememberMode} />
-                <span className="slider"></span>
-              </label>
-            </SettingRow>
-
-            <SettingRow icon={Circle} label={t("notch.panelControlCenter")} desc={t("notch.panelControlCenter.desc")}>
+      <SettingSection id="notch-panels" title={t("notch.section.panels")}>
+        <SettingRow icon={Circle} label={t("notch.panelControlCenter")} desc={t("notch.panelControlCenter.desc")}>
               <label className="toggle-switch">
                 <input type="checkbox" checked={panelControlCenter} onChange={togglePanelControlCenter} />
                 <span className="slider"></span>
               </label>
             </SettingRow>
 
-            <SettingRow icon={Circle} label={t("notch.panelShelf")} desc={t("notch.panelShelf.desc")}>
+        <SettingRow icon={Circle} label={t("notch.panelShelf")} desc={t("notch.panelShelf.desc")}>
               <label className="toggle-switch">
                 <input type="checkbox" checked={panelShelf} onChange={togglePanelShelf} />
                 <span className="slider"></span>
               </label>
             </SettingRow>
 
-            <SettingRow icon={Circle} label={t("notch.panelOrder")} desc={t("notch.panelOrder.desc")} divider={false}>
+        <SettingRow icon={Circle} label={t("notch.rememberMode")} desc={t("notch.rememberMode.desc")}>
+              <label className="toggle-switch">
+                <input type="checkbox" checked={rememberMode} onChange={toggleRememberMode} />
+                <span className="slider"></span>
+              </label>
+            </SettingRow>
+
+        <SettingRow icon={Circle} label={t("notch.panelOrder")} desc={t("notch.panelOrder.desc")} stacked>
               <div className="panel-order-row">
                 {(panelOrder ?? DEFAULT_PANEL_ORDER).map((id, index, all) => (
                   <div key={id} className="panel-order-item">
@@ -398,12 +394,25 @@ export function NotchTab({
                 {panelOrder && <button className="panel-order-reset" onClick={resetPanelOrder}>{t("notch.panelOrder.reset")}</button>}
               </div>
             </SettingRow>
-          </>
-        )}
-      </div>
+      </SettingSection>
 
-      <div className="setting-group-label">{t("notch.weather.group")}</div>
-      <div className="setting-group">
+      <SettingSection id="notch-controls" title={t("notch.section.controls")}>
+        <SettingRow icon={Volume2} label={t("notch.scrollVolume")} desc={t("notch.scrollVolume.desc")}>
+              <label className="toggle-switch">
+                <input type="checkbox" checked={notchScrollVolume} onChange={toggleNotchScrollVolume} />
+                <span className="slider"></span>
+              </label>
+            </SettingRow>
+
+        <SettingRow icon={Circle} label={t("notch.shelfPersist")} desc={t("notch.shelfPersist.desc")} divider={false}>
+              <label className="toggle-switch">
+                <input type="checkbox" checked={shelfPersist} onChange={toggleShelfPersist} />
+                <span className="slider"></span>
+              </label>
+            </SettingRow>
+      </SettingSection>
+
+      <SettingSection id="notch-weather" title={t("notch.weather.group")}>
         <SettingRow icon={CloudSun} label={t("notch.weather")} desc={cityName || t("notch.weather.auto")}>
           <div className="weather-controls">
             <div className="unit-toggle-minimal" onClick={toggleTempUnit}>
@@ -472,12 +481,11 @@ export function NotchTab({
             )}
           </div>
         )}
-      </div>
+      </SettingSection>
 
-      <div className="setting-group-label">{t("notch.widgets.group")}</div>
-      <div className="setting-group">
+      <SettingSection id="notch-widgets" title={t("notch.widgets.group")}>
         <StatusWidgetConfig value={statusWidgets} onChange={handleWidgetsChange} hasBattery={hasBattery} />
-      </div>
+      </SettingSection>
     </>
   );
 }

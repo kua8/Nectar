@@ -1,5 +1,6 @@
 import { Power, Download, Clock, History, BatteryWarning, RefreshCw, LogOut, Languages } from "lucide-react";
 import { SettingRow } from "./SettingRow";
+import { SettingSection } from "./SettingSection";
 import { Dropdown } from "./Dropdown";
 import { LANGUAGES, getLanguagePreference, setLanguagePreference, useT } from "../i18n";
 
@@ -41,8 +42,7 @@ export function GeneralTab({
   ];
   return (
     <>
-      <div className="setting-group-label">{t("general.system")}</div>
-      <div className="setting-group">
+      <SettingSection id="general-system" title={t("general.system")} defaultOpen>
         <SettingRow icon={Power} label={t("general.launchAtLogin")} desc={t("general.launchAtLogin.desc")}>
           <label className="toggle-switch">
             <input type="checkbox" checked={autostart} onChange={toggleAutostart} />
@@ -98,13 +98,12 @@ export function GeneralTab({
             />
           </SettingRow>
         )}
-      </div>
+      </SettingSection>
 
-      <div className="setting-group-label">{t("general.app")}</div>
-      <div className="setting-group">
+      <SettingSection id="general-app" title={t("general.app")}>
         <SettingRow icon={RefreshCw} label={t("general.restart")} desc={t("general.restart.desc")} action onClick={restartNectar} />
         <SettingRow icon={LogOut} label={t("general.quit")} desc={t("general.quit.desc")} action danger onClick={quitNectar} divider={false} />
-      </div>
+      </SettingSection>
     </>
   );
 }

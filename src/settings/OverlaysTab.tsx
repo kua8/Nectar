@@ -1,5 +1,6 @@
 import { Volume2, Sun, ArrowLeftToLine, ArrowRightToLine } from "lucide-react";
 import { SettingRow } from "./SettingRow";
+import { SettingSection } from "./SettingSection";
 import { useT } from "../i18n";
 
 interface OverlaysTabProps {
@@ -26,8 +27,7 @@ export function OverlaysTab({
   const t = useT();
   return (
     <>
-      <div className="setting-group-label">{t("overlays.group")}</div>
-      <div className="setting-group">
+      <SettingSection id="overlays-main" title={t("overlays.group")} defaultOpen>
         <SettingRow icon={Volume2} label={t("overlays.volume")} desc={t("overlays.volume.desc")}>
           <label className="toggle-switch">
             <input type="checkbox" checked={volumeOverlayEnabled} onChange={toggleVolumeOverlay} />
@@ -59,7 +59,7 @@ export function OverlaysTab({
             </label>
           </SettingRow>
         )}
-      </div>
+      </SettingSection>
     </>
   );
 }

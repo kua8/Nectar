@@ -1,5 +1,6 @@
 import { Palette, Droplet, Contrast, Droplets, Sun, Square, Maximize2 } from "lucide-react";
 import { SettingRow } from "./SettingRow";
+import { SettingSection } from "./SettingSection";
 import { Dropdown } from "./Dropdown";
 import { useT } from "../i18n";
 
@@ -42,8 +43,7 @@ export function AppearanceTab({
 
   return (
     <>
-      <div className="setting-group-label">{t("appearance.theme.group")}</div>
-      <div className="setting-group">
+      <SettingSection id="appearance-theme" title={t("appearance.theme.group")} defaultOpen>
         <SettingRow icon={Palette} label={t("appearance.mode")} desc={t("appearance.mode.desc")}>
           <Dropdown
             value={themeMode}
@@ -124,10 +124,9 @@ export function AppearanceTab({
             </SettingRow>
           </>
         )}
-      </div>
+      </SettingSection>
 
-      <div className="setting-group-label">{t("appearance.display.group")}</div>
-      <div className="setting-group">
+      <SettingSection id="appearance-display" title={t("appearance.display.group")}>
         <SettingRow icon={Square} label={t("appearance.corners")} desc={t("appearance.corners.desc")}>
           <label className="toggle-switch">
             <input type="checkbox" checked={cornersEnabled} onChange={toggleCorners} />
@@ -161,7 +160,7 @@ export function AppearanceTab({
             </button>
           </div>
         </SettingRow>
-      </div>
+      </SettingSection>
     </>
   );
 }

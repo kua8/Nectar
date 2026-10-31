@@ -3,6 +3,7 @@ import type { ChangeEvent, CSSProperties } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Monitor, Eye, EyeOff, Circle, Search, Shuffle, MonitorCheck, CalendarDays, Maximize2, Keyboard, Sparkles, RotateCcw, LayoutGrid, Trash2, HardDrive, ChevronUp } from "lucide-react";
 import { SettingRow } from "./SettingRow";
+import { SettingSection } from "./SettingSection";
 import { Dropdown } from "./Dropdown";
 import type { MonitorInfo, MonitorMode } from "./types";
 import { usePerMonitor } from "./usePerMonitor";
@@ -140,8 +141,7 @@ export function DockTab({
 
   return (
     <>
-      <div className="setting-group-label">{t("dock.group")}</div>
-      <div className="setting-group">
+      <SettingSection id="dock-main" title={t("dock.group")} defaultOpen>
         <SettingRow icon={Monitor} label={t("dock.enable")} desc={t("dock.enable.desc")}>
           <label className="toggle-switch">
             <input type="checkbox" checked={dockEnabled} onChange={toggleDock} />
@@ -214,6 +214,13 @@ export function DockTab({
               </SettingRow>
             ))}
 
+          </>
+        )}
+      </SettingSection>
+
+      {dockEnabled && (
+        <>
+          <SettingSection id="dock-shortcuts" title={t("dock.section.shortcuts")}>
             <SettingRow icon={Eye} label={t("dock.previews")} desc={t("dock.previews.desc")}>
               <label className="toggle-switch">
                 <input type="checkbox" checked={dockPreviewEnabled} onChange={toggleDockPreview} />
@@ -281,6 +288,9 @@ export function DockTab({
               </>
             )}
 
+          </SettingSection>
+
+          <SettingSection id="dock-style" title={t("dock.section.style")}>
             <SettingRow icon={Circle} label={t("dock.iconOnly")} desc={t("dock.iconOnly.desc")}>
               <label className="toggle-switch">
                 <input type="checkbox" checked={dockIconOnly} onChange={toggleDockIconOnly} />
@@ -366,9 +376,9 @@ export function DockTab({
                 onChange={handleStartIconUpload}
               />
             </div>
-          </>
-        )}
-      </div>
+          </SettingSection>
+        </>
+      )}
     </>
   );
 }
