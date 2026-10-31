@@ -18,6 +18,7 @@ import {
   Globe,
   Volume2,
 } from "lucide-react";
+import { DEFAULT_PANEL_ORDER, type PanelId } from "../panelOrder";
 import { SettingRow } from "./SettingRow";
 import { Dropdown } from "./Dropdown";
 import { useCaldav } from "../hooks/useCaldav";
@@ -75,6 +76,9 @@ interface NotchTabProps {
   togglePanelControlCenter: () => void;
   panelShelf: boolean;
   togglePanelShelf: () => void;
+  panelOrder: PanelId[] | null;
+  movePanel: (id: PanelId, direction: -1 | 1) => void;
+  resetPanelOrder: () => void;
   weatherEnabled: boolean;
   toggleWeather: () => void;
   tempUnitFahrenheit: boolean;
@@ -140,6 +144,9 @@ export function NotchTab({
   togglePanelControlCenter,
   panelShelf,
   togglePanelShelf,
+  panelOrder,
+  movePanel,
+  resetPanelOrder,
   weatherEnabled,
   toggleWeather,
   tempUnitFahrenheit,
@@ -372,11 +379,24 @@ export function NotchTab({
               </label>
             </SettingRow>
 
-            <SettingRow icon={Circle} label={t("notch.panelShelf")} desc={t("notch.panelShelf.desc")} divider={false}>
+            <SettingRow icon={Circle} label={t("notch.panelShelf")} desc={t("notch.panelShelf.desc")}>
               <label className="toggle-switch">
                 <input type="checkbox" checked={panelShelf} onChange={togglePanelShelf} />
                 <span className="slider"></span>
               </label>
+            </SettingRow>
+
+            <SettingRow icon={Circle} label={t("notch.panelOrder")} desc={t("notch.panelOrder.desc")} divider={false}>
+              <div className="panel-order-row">
+                {(panelOrder ?? DEFAULT_PANEL_ORDER).map((id, index, all) => (
+                  <div key={id} className="panel-order-item">
+                    <button className="panel-order-arrow" disabled={index === 0} onClick={() => movePanel(id, -1)}>‹</button>
+                    <span>{t(`panel.${id}`)}</span>
+                    <button className="panel-order-arrow" disabled={index === all.length - 1} onClick={() => movePanel(id, 1)}>›</button>
+                  </div>
+                ))}
+                {panelOrder && <button className="panel-order-reset" onClick={resetPanelOrder}>{t("notch.panelOrder.reset")}</button>}
+              </div>
             </SettingRow>
           </>
         )}

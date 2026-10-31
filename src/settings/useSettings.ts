@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { DEFAULT_PANEL_ORDER, parsePanelOrder, type PanelId } from "../panelOrder";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, emit } from "@tauri-apps/api/event";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
@@ -107,6 +108,9 @@ export function useSettings() {
   );
   const [panelControlCenter, setPanelControlCenter] = useState(
     () => localStorage.getItem("nectar-panel-control-center-enabled") !== "false"
+  );
+  const [panelOrder, setPanelOrder] = useState<PanelId[] | null>(
+    () => parsePanelOrder(localStorage.getItem("nectar-panel-order"))
   );
   const [panelShelf, setPanelShelf] = useState(
     () => localStorage.getItem("nectar-panel-shelf-enabled") !== "false"
@@ -238,6 +242,7 @@ export function useSettings() {
       apply(getVal("nectar-dock-show-desktop-corner"), setDockShowDesktop, readBool);
       apply(getVal("nectar-panel-control-center-enabled"), setPanelControlCenter, (v) => v !== "false");
       apply(getVal("nectar-panel-shelf-enabled"), setPanelShelf, (v) => v !== "false");
+      apply(getVal("nectar-panel-order"), setPanelOrder, (v) => parsePanelOrder(v));
       apply(getVal("nectar-dock-recycle-enabled"), setDockRecycle, readBool);
       apply(getVal("nectar-dock-drives"), setDockDrives, parseDrives);
       apply(getVal("nectar-dock-icon-only"), setDockIconOnly, readBool);
@@ -340,6 +345,7 @@ export function useSettings() {
     "nectar-dock-show-desktop-corner": setDockShowDesktop,
     "nectar-panel-control-center-enabled": (v) => setPanelControlCenter(v !== false && v !== "false"),
     "nectar-panel-shelf-enabled": (v) => setPanelShelf(v !== false && v !== "false"),
+    "nectar-panel-order": (v) => setPanelOrder(parsePanelOrder(v === null ? null : String(v))),
     "nectar-dock-recycle-enabled": setDockRecycle,
     "nectar-dock-drives": (v) => setDockDrives(parseDrives(v)),
     "nectar-dock-icon-only": setDockIconOnly,
@@ -691,6 +697,22 @@ export function useSettings() {
     const next = !panelControlCenter;
     setPanelControlCenter(next);
     saveSetting("nectar-panel-control-center-enabled", String(next));
+  };
+
+  const movePanel = (id: PanelId, direction: -1 | 1) => {
+    const order = [...(panelOrder ?? DEFAULT_PANEL_ORDER)];
+    const from = order.indexOf(id);
+    const to = from + direction;
+    if (from < 0 || to < 0 || to >= order.length) return;
+    [order[from], order[to]] = [order[to], order[from]];
+    setPanelOrder(order);
+    saveSetting("nectar-panel-order", JSON.stringify(order));
+  };
+
+  const resetPanelOrder = () => {
+    setPanelOrder(null);
+    localStorage.removeItem("nectar-panel-order");
+    invoke("save_setting", { key: "nectar-panel-order", value: null }).catch(() => {});
   };
 
   const togglePanelShelf = () => {
@@ -1095,6 +1117,9 @@ export function useSettings() {
     togglePanelControlCenter,
     panelShelf,
     togglePanelShelf,
+    panelOrder,
+    movePanel,
+    resetPanelOrder,
     dockRecycle,
     toggleDockRecycle,
     dockDrives,

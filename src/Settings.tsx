@@ -179,6 +179,9 @@ function SettingsApp() {
               togglePanelControlCenter={settings.togglePanelControlCenter}
               panelShelf={settings.panelShelf}
               togglePanelShelf={settings.togglePanelShelf}
+              panelOrder={settings.panelOrder}
+              movePanel={settings.movePanel}
+              resetPanelOrder={settings.resetPanelOrder}
               weatherEnabled={settings.weatherEnabled}
               toggleWeather={settings.toggleWeather}
               tempUnitFahrenheit={settings.tempUnitFahrenheit}

@@ -49,6 +49,7 @@ Edit `settings.json` with any text editor while Nectar is running. Changes are a
 | `nectar-notch-remember-mode` | `"true"` / `"false"` | `"false"` | When the cursor leaves the notch and comes back, reopen the Control Center or Calendar panel you were on instead of resetting to the default (status or music). |
 | `nectar-panel-control-center-enabled` | `"true"` / `"false"` | `"true"` | Include the Control Center when scrolling through the notch panels. |
 | `nectar-panel-shelf-enabled` | `"true"` / `"false"` | `"true"` | Include the Shelf panel and accept files and text dropped on the notch. |
+| `nectar-panel-order` | JSON string, e.g. `"[\"status\",\"music\"]"` | unset | Order of the notch panels when scrolling: `command-center`, `status`, `music`, `calendar`, `shelf`. Missing panels are added at the end. Unset keeps the default order, where Music moves in front of Status while something plays. Set in Settings > Notch > Panel Order. |
 
 ### Monitors
 

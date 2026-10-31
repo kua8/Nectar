@@ -19,6 +19,7 @@ import { NotchTour } from "./components/NotchTour";
 import { useStopwatch } from "./hooks/useStopwatch";
 import { t as translate, useT } from "./i18n";
 import { NotchShelf, useShelf } from "./components/NotchShelf";
+import { parsePanelOrder } from "./panelOrder";
 import { NotchProgressBorder } from "./components/NotchProgressBorder";
 import type { WidgetConfig } from "./components/StatusWidgetConfig";
 import {
@@ -683,6 +684,7 @@ function App() {
   const [settingsRememberMode, setSettingsRememberMode] = useState(() => localStorage.getItem("nectar-notch-remember-mode") === "true");
   const [panelControlCenter, setPanelControlCenter] = useState(() => localStorage.getItem("nectar-panel-control-center-enabled") !== "false");
   const [panelShelf, setPanelShelf] = useState(() => localStorage.getItem("nectar-panel-shelf-enabled") !== "false");
+  const [panelOrder, setPanelOrder] = useState(() => parsePanelOrder(localStorage.getItem("nectar-panel-order")));
   const rememberedModeRef = useRef<"command-center" | "calendar" | null>(null);
   const [settingsVisualizerEnabled, setSettingsVisualizerEnabled] = useState(() => localStorage.getItem("nectar-visualizer-enabled") !== "false");
   const [settingsAlbumArtEnabled, setSettingsAlbumArtEnabled] = useState(() => localStorage.getItem("nectar-media-album-art-enabled") !== "false");
@@ -868,6 +870,7 @@ function App() {
       "nectar-notch-remember-mode": setSettingsRememberMode,
       "nectar-panel-control-center-enabled": (v) => setPanelControlCenter(v !== false && v !== "false"),
       "nectar-panel-shelf-enabled": (v) => setPanelShelf(v !== false && v !== "false"),
+      "nectar-panel-order": (v) => setPanelOrder(parsePanelOrder(v === null ? null : String(v))),
       "nectar-media-visualizer-enabled": setSettingsVisualizerEnabled,
       "nectar-visualizer-enabled": setSettingsVisualizerEnabled,
       "nectar-media-album-art-enabled": setSettingsAlbumArtEnabled,
@@ -973,9 +976,11 @@ function App() {
   // Paused:  command-center → status → music → calendar (secondary, after status)
   const availableNotchModes = () => {
     const musicBeforeStatus = isPlaying && mediaInfo.has_media && settingsMusicModeEnabled;
-    const modes: ('command-center' | 'status' | 'music' | 'calendar' | 'shelf')[] = musicBeforeStatus
-      ? ['command-center', 'music', 'status', 'calendar', 'shelf']
-      : ['command-center', 'status', 'music', 'calendar', 'shelf'];
+    const modes: ('command-center' | 'status' | 'music' | 'calendar' | 'shelf')[] = panelOrder
+      ? [...panelOrder]
+      : musicBeforeStatus
+        ? ['command-center', 'music', 'status', 'calendar', 'shelf']
+        : ['command-center', 'status', 'music', 'calendar', 'shelf'];
     return modes.filter(m => {
       if (m === 'music' && (!settingsMusicModeEnabled || !mediaInfo.has_media)) return false;
       if (m === 'calendar' && !productivityEnabled) return false;

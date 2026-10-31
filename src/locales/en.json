@@ -475,5 +475,13 @@
   "notch.panelControlCenter": "Control Center Panel",
   "notch.panelControlCenter.desc": "Include the Control Center when scrolling through the notch panels",
   "notch.panelShelf": "Shelf Panel",
-  "notch.panelShelf.desc": "Include the Shelf and accept files and text dropped on the notch"
+  "notch.panelShelf.desc": "Include the Shelf and accept files and text dropped on the notch",
+  "notch.panelOrder": "Panel Order",
+  "notch.panelOrder.desc": "The order the notch panels appear when you scroll through them",
+  "notch.panelOrder.reset": "Reset",
+  "panel.command-center": "Control Center",
+  "panel.status": "Status",
+  "panel.music": "Music",
+  "panel.calendar": "Calendar",
+  "panel.shelf": "Shelf"
 }

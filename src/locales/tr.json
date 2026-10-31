@@ -475,5 +475,13 @@
   "notch.panelControlCenter": "Denetim Merkezi Paneli",
   "notch.panelControlCenter.desc": "Çentik panelleri arasında gezinirken Denetim Merkezi'ni dahil et",
   "notch.panelShelf": "Raf Paneli",
-  "notch.panelShelf.desc": "Rafı dahil et ve çentiğe bırakılan dosya ve metinleri kabul et"
+  "notch.panelShelf.desc": "Rafı dahil et ve çentiğe bırakılan dosya ve metinleri kabul et",
+  "notch.panelOrder": "Panel Sırası",
+  "notch.panelOrder.desc": "Çentik panelleri arasında gezinirken görünme sırası",
+  "notch.panelOrder.reset": "Sıfırla",
+  "panel.command-center": "Denetim Merkezi",
+  "panel.status": "Durum",
+  "panel.music": "Müzik",
+  "panel.calendar": "Takvim",
+  "panel.shelf": "Raf"
 }

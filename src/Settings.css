@@ -1305,3 +1305,44 @@ input:checked + .slider:before {
 .caldav-providers {
   align-self: flex-start;
 }
+
+.panel-order-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: flex-end;
+    max-width: 330px;
+}
+
+.panel-order-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    font-size: 11px;
+}
+
+.panel-order-arrow {
+    border: none;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+    padding: 0 2px;
+    font-size: 13px;
+    line-height: 1;
+}
+
+.panel-order-arrow:disabled {
+    opacity: 0.25;
+    cursor: default;
+}
+
+.panel-order-reset {
+    border: none;
+    background: none;
+    color: var(--nectar-text-muted, rgba(255, 255, 255, 0.5));
+    font-size: 11px;
+    cursor: pointer;
+}
