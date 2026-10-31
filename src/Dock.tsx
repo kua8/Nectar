@@ -1625,6 +1625,7 @@ const Dock = memo(function Dock() {
                 <div className="submenu">
                   <div className="menu-item" onClick={() => { invoke('open_calendar_window'); closeMenu(); }}>{t("dockmenu.openCalendar")}</div>
                   <div className="menu-item" onClick={() => { invoke('open_settings_window'); closeMenu(); }}>{t("dockmenu.openSettings")}</div>
+                  <div className="menu-item" onClick={() => { invoke('open_app', { appName: 'taskmgr' }); closeMenu(); }}>{t("dockmenu.taskManager")}</div>
                   <div className="menu-item" onClick={() => invoke('restart_nectar')}>{t("general.restart")}</div>
                   <div className="menu-item" onClick={() => { handleClearIconCache(); closeMenu(); }}>{t("dockmenu.clearIconCache")}</div>
                   <div className="menu-divider" />
@@ -1663,6 +1664,7 @@ const Dock = memo(function Dock() {
                 <div className="submenu">
                   <div className="menu-item" onClick={() => { invoke('open_calendar_window'); closeMenu(); }}>{t("dockmenu.openCalendar")}</div>
                   <div className="menu-item" onClick={() => { invoke('open_settings_window'); closeMenu(); }}>{t("dockmenu.openSettings")}</div>
+                  <div className="menu-item" onClick={() => { invoke('open_app', { appName: 'taskmgr' }); closeMenu(); }}>{t("dockmenu.taskManager")}</div>
                   <div className="menu-item" onClick={() => invoke('restart_nectar')}>{t("general.restart")}</div>
                   <div className="menu-item" onClick={() => { handleClearIconCache(); closeMenu(); }}>{t("dockmenu.clearIconCache")}</div>
                   <div className="menu-divider" />

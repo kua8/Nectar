@@ -468,5 +468,6 @@
   "notch.shelfPersist": "Raf Öğelerini Koru",
   "notch.shelfPersist.desc": "Nectar yeniden başlatıldıktan sonra çentik rafındaki dosya ve metinleri koru. Dosyalar kopya değil bağlantı olarak tutulur. En fazla 10 öğe",
   "notch.rememberMode": "Son Paneli Hatırla",
-  "notch.rememberMode.desc": "İmleç çıkıp geri geldiğinde varsayılan panel yerine Denetim Merkezi'ni veya Takvim'i yeniden aç"
+  "notch.rememberMode.desc": "İmleç çıkıp geri geldiğinde varsayılan panel yerine Denetim Merkezi'ni veya Takvim'i yeniden aç",
+  "dockmenu.taskManager": "Görev Yöneticisi"
 }

@@ -109,7 +109,12 @@ $manifest = [ordered]@{
 [IO.File]::WriteAllText((Join-Path $out "latest.json"), ($manifest | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding $false))
 [IO.File]::WriteAllText((Join-Path $out "notes.md"), $notes, (New-Object Text.UTF8Encoding $false))
 
-$assets = @("latest.json", $setupName, $portable, $installerName) | ForEach-Object { Join-Path $out $_ }
+$sums = @($setupName, $portable, $installerName) | ForEach-Object {
+    "{0}  {1}" -f (Get-FileHash (Join-Path $out $_) -Algorithm SHA256).Hash.ToLower(), $_
+}
+[IO.File]::WriteAllText((Join-Path $out "SHA256SUMS.txt"), (($sums -join "`n") + "`n"), (New-Object Text.UTF8Encoding $false))
+
+$assets = @("latest.json", $setupName, $portable, $installerName, "SHA256SUMS.txt") | ForEach-Object { Join-Path $out $_ }
 Write-Host "`nBuilt:" -ForegroundColor Green
 $assets | ForEach-Object { Write-Host ("  {0}  ({1:N1} MB)" -f (Split-Path $_ -Leaf), ((Get-Item $_).Length / 1MB)) }
 
