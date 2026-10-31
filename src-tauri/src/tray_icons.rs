@@ -132,54 +132,6 @@ fn describe_elements(automation: &IUIAutomation, root: &IUIAutomationElement) ->
     }
 }
 
-fn nectar_theme_is_light() -> bool {
-    crate::state::SETTINGS_CACHE
-        .get()
-        .and_then(|cache| cache.lock().ok())
-        .and_then(|guard| guard.get("nectar-theme-mode").and_then(|v| v.as_str()).map(|m| m == "light"))
-        .unwrap_or(false)
-}
-
-static ORIGINAL_STYLE: Mutex<Option<(i32, u32, u32)>> = Mutex::new(None);
-
-fn style_flyout(flyout: HWND) {
-    use windows::Win32::Graphics::Dwm::{
-        DwmGetWindowAttribute, DWMWA_SYSTEMBACKDROP_TYPE, DWMWA_USE_IMMERSIVE_DARK_MODE, DWMWA_WINDOW_CORNER_PREFERENCE,
-    };
-    let dark = !nectar_theme_is_light();
-    if let Ok(mut saved) = ORIGINAL_STYLE.lock() {
-        if saved.is_none() {
-            let (mut d, mut c, mut b) = (0i32, 0u32, 0u32);
-            unsafe {
-                let _ = DwmGetWindowAttribute(flyout, DWMWA_USE_IMMERSIVE_DARK_MODE, &mut d as *mut _ as _, 4);
-                let _ = DwmGetWindowAttribute(flyout, DWMWA_WINDOW_CORNER_PREFERENCE, &mut c as *mut _ as _, 4);
-                let _ = DwmGetWindowAttribute(flyout, DWMWA_SYSTEMBACKDROP_TYPE, &mut b as *mut _ as _, 4);
-            }
-            if (c, b) != (2, 3) {
-                *saved = Some((d, c, b));
-            }
-        }
-    }
-    set_flyout_style(flyout, dark as i32, 2, 3);
-}
-
-fn reset_flyout_style(flyout: HWND) {
-    let (dark, corner, backdrop) = ORIGINAL_STYLE.lock().ok().and_then(|mut saved| saved.take()).unwrap_or((0, 0, 0));
-    set_flyout_style(flyout, dark, corner, backdrop);
-}
-
-fn set_flyout_style(flyout: HWND, dark: i32, corner: u32, backdrop: u32) {
-    use windows::Win32::Graphics::Dwm::{
-        DwmSetWindowAttribute, DWMWA_SYSTEMBACKDROP_TYPE, DWMWA_USE_IMMERSIVE_DARK_MODE, DWMWA_WINDOW_CORNER_PREFERENCE,
-    };
-    let dark = windows::core::BOOL(dark);
-    unsafe {
-        let _ = DwmSetWindowAttribute(flyout, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark as *const _ as _, std::mem::size_of::<windows::core::BOOL>() as u32);
-        let _ = DwmSetWindowAttribute(flyout, DWMWA_WINDOW_CORNER_PREFERENCE, &corner as *const _ as _, 4);
-        let _ = DwmSetWindowAttribute(flyout, DWMWA_SYSTEMBACKDROP_TYPE, &backdrop as *const _ as _, 4);
-    }
-}
-
 fn place_flyout(flyout: HWND, anchor: Option<(i32, i32)>) {
     unsafe {
         let mut cursor = POINT::default();
@@ -210,13 +162,6 @@ fn place_flyout(flyout: HWND, anchor: Option<(i32, i32)>) {
         let y = if below + h <= work.bottom - 8 { below } else { (ay - h - 10).max(work.top + 8) };
         let _ = SetWindowPos(flyout, Some(HWND_TOPMOST), x, y, 0, 0, SWP_NOSIZE | SWP_SHOWWINDOW);
         let _ = SetForegroundWindow(flyout);
-        style_flyout(flyout);
-    }
-}
-
-pub fn unstyle_flyout() {
-    if let Some(flyout) = find_overflow_window() {
-        reset_flyout_style(flyout);
     }
 }
 
@@ -306,9 +251,6 @@ pub fn open_native_tray(anchor: Option<(i32, i32)>) {
         for _ in 0..2400 {
             if find_overflow_window().is_none_or(|w| !unsafe { IsWindowVisible(w) }.as_bool()) { break; }
             std::thread::sleep(std::time::Duration::from_millis(150));
-        }
-        if let Some(flyout) = find_overflow_window() {
-            reset_flyout_style(flyout);
         }
         FLYOUT_OPEN.store(false, Ordering::SeqCst);
     }

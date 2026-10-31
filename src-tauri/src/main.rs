@@ -423,7 +423,6 @@ fn main() {
     app.run(|_, event| {
         if let tauri::RunEvent::Exit = event {
             set_taskbar_visibility(true, true);
-            crate::tray_icons::unstyle_flyout();
             NATIVE_TASKBAR_HIDDEN.store(false, Ordering::Relaxed);
 
         }
