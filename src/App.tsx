@@ -17,6 +17,7 @@ import { NotchClock, StopwatchReadout } from "./components/NotchClock";
 import { ConnectionsView } from "./components/ConnectionsView";
 import { NotchTour } from "./components/NotchTour";
 import { useStopwatch } from "./hooks/useStopwatch";
+import { t as translate, useT } from "./i18n";
 import type { WidgetConfig } from "./components/StatusWidgetConfig";
 import {
   DEFAULT_DUAL_CLOCK_ZONE,
@@ -106,10 +107,10 @@ function formatDuration(seconds: number): string {
 }
 
 function batteryTooltip(charging: boolean, level: number, secondsLeft: number | null): string {
-  if (charging && level >= 100) return "Fully charged";
-  const state = charging ? "Charging" : "On battery";
-  if (secondsLeft === null || secondsLeft <= 0) return `${state} — ${level}%`;
-  return `${state} — ${level}%, ${formatDuration(secondsLeft)} ${charging ? "until full" : "left"}`;
+  if (charging && level >= 100) return translate("battery.full");
+  const state = translate(charging ? "battery.charging" : "battery.onBattery");
+  if (secondsLeft === null || secondsLeft <= 0) return translate("battery.status", { state, level });
+  return translate(charging ? "battery.untilFull" : "battery.left", { state, level, duration: formatDuration(secondsLeft) });
 }
 
 function EthernetIcon() {
@@ -337,6 +338,7 @@ const TitleMarquee = ({ title }: { title: string }) => {
 
 
 function App() {
+  const t = useT();
   useEffect(() => {
     return initTheme();
   }, []);
@@ -1509,6 +1511,12 @@ function App() {
     });
   };
 
+  const conditionLabel = (condition: string) => {
+    const key = `weather.condition.${condition.toLowerCase().replace(/ /g, "")}`;
+    const label = t(key);
+    return label === key ? condition : label;
+  };
+
   const tip = (text: string | undefined) =>
     settingsLegacyMode
       ? { "data-tooltip": text }
@@ -1520,7 +1528,7 @@ function App() {
       case "weather":
         if (!settingsWeatherEnabled || temperature === null) return null;
         return (
-          <div className="passive-feature" key="weather" {...tip(cityName ? `${weatherCondition} — ${cityName}` : weatherCondition)}>
+          <div className="passive-feature" key="weather" {...tip(cityName ? `${conditionLabel(weatherCondition)} — ${cityName}` : conditionLabel(weatherCondition))}>
             <WeatherIcon size={12} strokeWidth={2.2} />
             <span className="label">{temperature}°{tempUnit === "fahrenheit" ? "F" : "C"}</span>
           </div>
@@ -1535,28 +1543,28 @@ function App() {
         );
       case "cpu":
         return (
-          <div className="passive-feature" key="cpu" {...tip("CPU Usage")}>
+          <div className="passive-feature" key="cpu" {...tip(t("widgets.cpu.tip"))}>
             <Cpu size={12} strokeWidth={2} />
             <span className="label">{cpuUsage}%</span>
           </div>
         );
       case "ram":
         return (
-          <div className="passive-feature" key="ram" {...tip("RAM Usage")}>
+          <div className="passive-feature" key="ram" {...tip(t("widgets.ram.tip"))}>
             <MemoryStick size={12} strokeWidth={2} />
             <span className="label">{Math.round(ramUsage)}%</span>
           </div>
         );
       case "disk":
         return (
-          <div className="passive-feature" key="disk" {...tip("Free Disk Space")}>
+          <div className="passive-feature" key="disk" {...tip(t("widgets.disk.tip"))}>
             <HardDrive size={12} strokeWidth={2} />
             <span className="label">{diskSpace}GB</span>
           </div>
         );
       case "net":
         return (
-          <div className="passive-feature" key="net" {...tip("Network Speed")}>
+          <div className="passive-feature" key="net" {...tip(t("widgets.net.tip"))}>
             <ArrowUpDown size={12} strokeWidth={2} />
             <span className="label">↑{formatBytes(netUpSpeed)} ↓{formatBytes(netDownSpeed)}</span>
           </div>
@@ -1810,7 +1818,7 @@ function App() {
                               <motion.img
                                 key={`art-${albumArtKey}`}
                                 src={albumArtUrl}
-                                alt="Art"
+                                alt={t("media.art")}
                                 initial={{ rotateY: 90, opacity: 0 }}
                                 animate={{ rotateY: 0, opacity: 1 }}
                                 exit={{ rotateY: -90, opacity: 0 }}
@@ -1847,7 +1855,7 @@ function App() {
                               className="classic-audio-output-btn"
                               onClick={(e) => { e.stopPropagation(); invoke('open_sound_settings').catch(() => {}); }}
                               whileTap={{ scale: 0.9 }}
-                              data-tooltip="Audio Output"
+                              data-tooltip={t("media.audioOutput")}
                             >
                               <AudioOutputIcon size={20} style={{ opacity: 0.5 }} />
                             </motion.button>
@@ -1956,7 +1964,7 @@ function App() {
                             >
                               <GreenDownArrowIcon />
                               <span className="label" style={{ color: "#32D74B" }}>
-                                Update Available
+                                {t("battery.updateAvailable")}
                               </span>
                             </motion.div>
                           ) : (
@@ -1970,7 +1978,7 @@ function App() {
                               {updateAvailable && <GreenDownArrowIcon />}
                               <BatteryIcon charging={isCharging} level={batteryLevel} threshold={lowBatteryThreshold} />
                               <span className="label" style={{ color: showLowBatteryPulse ? "#FF453A" : "inherit" }}>
-                                {showLowBatteryPulse ? "Low Battery" : (isCharging ? "Charging" : "On Battery")} • {batteryLevel}%
+                                {showLowBatteryPulse ? t("battery.low") : (isCharging ? t("battery.charging") : t("battery.onBatteryTitle"))} • {batteryLevel}%
                               </span>
                             </motion.div>
                           )
@@ -2108,7 +2116,7 @@ function App() {
                                             <motion.img
                                               key={`compact-art-${albumArtKey}`}
                                               src={albumArtUrl}
-                                              alt="Art"
+                                              alt={t("media.art")}
                                               draggable={false}
                                               initial={{ rotateY: 90, opacity: 0 }}
                                               animate={{ rotateY: 0, opacity: 1 }}
@@ -2191,11 +2199,11 @@ function App() {
                           {showLan ? <EthernetIcon /> : <WifiIcon enabled={wifiEnabled} connected={wifiConnected} />}
                         </div>
                         <div className="cc-pill-info">
-                          <span className="cc-pill-title">{showLan ? 'Ethernet' : 'Wi-Fi'}</span>
-                          <span className="cc-pill-status">{showLan ? 'Connected' : wifiStatus === null ? '…' : !wifiEnabled ? 'Off' : wifiConnected ? 'Connected' : 'Not connected'}</span>
+                          <span className="cc-pill-title">{showLan ? t('cc.ethernet') : t('cc.wifi')}</span>
+                          <span className="cc-pill-status">{showLan ? t('connections.connected') : wifiStatus === null ? '…' : !wifiEnabled ? t('common.off') : wifiConnected ? t('connections.connected') : t('cc.notConnected')}</span>
                         </div>
                         {!settingsLegacyMode && !showLan && (
-                          <span className="cc-pill-more" title="Networks" onClick={(e) => { e.stopPropagation(); setCcView('wifi'); }}>›</span>
+                          <span className="cc-pill-more" title={t("cc.networks")} onClick={(e) => { e.stopPropagation(); setCcView('wifi'); }}>›</span>
                         )}
                       </div>
 
@@ -2208,8 +2216,8 @@ function App() {
                           <DockIcon />
                         </div>
                         <div className="cc-pill-info">
-                          <span className="cc-pill-title">Dock Mode</span>
-                          <span className="cc-pill-status">{dockMode === 'fixed' ? 'Fixed' : dockMode === 'smart' ? 'Smart' : 'Peek'}</span>
+                          <span className="cc-pill-title">{t("cc.dockMode")}</span>
+                          <span className="cc-pill-status">{dockMode === 'fixed' ? t('common.fixed') : dockMode === 'smart' ? t('common.smart') : t('common.peek')}</span>
                         </div>
                       </div>
 
@@ -2223,11 +2231,11 @@ function App() {
                           <BluetoothIcon />
                         </div>
                         <div className="cc-pill-info">
-                          <span className="cc-pill-title">Bluetooth</span>
-                          <span className="cc-pill-status">{bluetoothEnabled ? 'On' : 'Off'}</span>
+                          <span className="cc-pill-title">{t("cc.bluetooth")}</span>
+                          <span className="cc-pill-status">{bluetoothEnabled ? t('common.on') : t('common.off')}</span>
                         </div>
                         {!settingsLegacyMode && (
-                          <span className="cc-pill-more" title="Devices" onClick={(e) => { e.stopPropagation(); setCcView('bluetooth'); }}>›</span>
+                          <span className="cc-pill-more" title={t("cc.devices")} onClick={(e) => { e.stopPropagation(); setCcView('bluetooth'); }}>›</span>
                         )}
                       </div>
 
@@ -2240,8 +2248,8 @@ function App() {
                           <NotchIcon />
                         </div>
                         <div className="cc-pill-info">
-                          <span className="cc-pill-title">Notch Mode</span>
-                          <span className="cc-pill-status">{notchMode === 'fixed' ? 'Fixed' : notchMode === 'smart' ? 'Smart' : 'Peek'}</span>
+                          <span className="cc-pill-title">{t("cc.notchMode")}</span>
+                          <span className="cc-pill-status">{notchMode === 'fixed' ? t('common.fixed') : notchMode === 'smart' ? t('common.smart') : t('common.peek')}</span>
                         </div>
                       </div>
                     </div>
@@ -2250,42 +2258,42 @@ function App() {
                     <div className="cc-circular-actions-row">
                       <button
                         className={`cc-circular-btn ${dndActive ? 'active' : ''}`}
-                        title="Do Not Disturb"
+                        title={t("cc.dnd")}
                         onClick={(e) => { e.stopPropagation(); setDndActive(prev => !prev); }}
                       >
                         <MoonIcon />
                       </button>
                       <button
                         className={`cc-circular-btn ${batterySaverEnabled ? 'active' : ''}`}
-                        title="Battery Saver"
+                        title={t("cc.batterySaver")}
                         onClick={(e) => { e.stopPropagation(); openBatterySaverSettings(); }}
                       >
                         <BatterySaverIcon />
                       </button>
                       <button
                         className="cc-circular-btn"
-                        title="System Tray"
+                        title={t("cc.tray")}
                         onClick={(e) => { e.stopPropagation(); invoke("open_tray_window"); }}
                       >
                         <TrayIcon />
                       </button>
                       <button
                         className="cc-circular-btn"
-                        title="Notifications"
+                        title={t("cc.notifications")}
                         onClick={(e) => { e.stopPropagation(); invoke("open_notification_center"); }}
                       >
                         <BellIcon />
                       </button>
                       <button
                         className="cc-circular-btn"
-                        title="Nectar Settings"
+                        title={t("cc.settings")}
                         onClick={(e) => { e.stopPropagation(); openSettingsWindow(); }}
                       >
                         <SettingsIcon />
                       </button>
                       <button
                         className="cc-circular-btn"
-                        title="Restart Nectar"
+                        title={t("general.restart")}
                         onClick={(e) => { e.stopPropagation(); invoke("restart_nectar"); }}
                       >
                         <ReloadIcon />
@@ -2298,11 +2306,11 @@ function App() {
                       <div className="cc-classic-slider-row">
                         <div
                           className={`cc-classic-slider-label${settingsLegacyMode ? '' : ' clickable'}`}
-                          title={settingsLegacyMode ? undefined : 'Output device'}
+                          title={settingsLegacyMode ? undefined : t('cc.outputDevice')}
                           onClick={settingsLegacyMode ? undefined : (e) => { e.stopPropagation(); setCcView('audio'); }}
                         >
                           <VolumeLowIcon style={{ opacity: 0.5 }} />
-                          <span>Volume</span>
+                          <span>{t("cc.volume")}</span>
                           {!settingsLegacyMode && <span className="cc-label-more">›</span>}
                         </div>
                         <div className="cc-classic-slider-track">
@@ -2326,7 +2334,7 @@ function App() {
                       <div className="cc-classic-slider-row">
                         <div className="cc-classic-slider-label">
                           <BrightnessLowIcon />
-                          <span>Brightness</span>
+                          <span>{t("cc.brightness")}</span>
                         </div>
                         <div className="cc-classic-slider-track">
                           <input

@@ -2754,6 +2754,10 @@ pub fn save_setting(app: AppHandle, key: String, value: serde_json::Value) -> Re
         re_register_appbars(&app, &settings);
     }
 
+    if key == "nectar-language" {
+        crate::i18n::refresh_tray_labels(&app);
+    }
+
     if MONITOR_TARGETING_KEYS.contains(&key.as_str()) {
         let app_clone = app.clone();
         tauri::async_runtime::spawn(async move {

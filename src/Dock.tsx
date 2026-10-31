@@ -6,6 +6,7 @@ import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import './Dock.css';
 import { initTheme } from './theme';
 import { useSettingsSync } from './hooks/useSettingsSync';
+import { useT } from './i18n';
 
 interface AppInfo {
   name: string;
@@ -180,6 +181,7 @@ function WindowDots({ count }: { count: number }) {
 }
 
 const Dock = memo(function Dock() {
+  const t = useT();
   useEffect(() => {
     return initTheme();
   }, []);
@@ -563,7 +565,7 @@ const Dock = memo(function Dock() {
         });
         setCustomIcons(prev => ({ ...prev, [target]: newIcon }));
       } catch (err) {
-        const msg = typeof err === 'string' ? err : 'Failed to set icon';
+        const msg = typeof err === 'string' ? err : t('dockmenu.iconError');
         if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
         setToast(msg);
         toastTimerRef.current = setTimeout(() => setToast(null), 4000);
@@ -1044,7 +1046,7 @@ const Dock = memo(function Dock() {
                   onMouseLeave={() => { setHoveredApp(null); setPressedApp(null); }}
                 >
                   {(!dockPreviewEnabled || (dockPreviewEnabled && hoveredApp === itemKey(startItem))) && (
-                    <div className="tooltip">{startItem.name}</div>
+                    <div className="tooltip">{t("dockmenu.start")}</div>
                   )}
                   <motion.div 
                     className="dock-icon"
@@ -1073,7 +1075,7 @@ const Dock = memo(function Dock() {
                   onMouseLeave={() => { setHoveredApp(null); setPressedApp(null); }}
                 >
                   {(!dockPreviewEnabled || (dockPreviewEnabled && hoveredApp === 'search')) && (
-                    <div className="tooltip">Search</div>
+                    <div className="tooltip">{t("dockmenu.search")}</div>
                   )}
                   <motion.div
                     className="dock-icon"
@@ -1102,7 +1104,7 @@ const Dock = memo(function Dock() {
                   onMouseLeave={() => { setHoveredApp(null); setPressedApp(null); }}
                 >
                   {(!dockPreviewEnabled || (dockPreviewEnabled && hoveredApp === 'calendar')) && (
-                    <div className="tooltip">Calendar</div>
+                    <div className="tooltip">{t("dockmenu.calendar")}</div>
                   )}
                   <motion.div
                     className="dock-icon"
@@ -1122,25 +1124,25 @@ const Dock = memo(function Dock() {
               )}
 
               {!legacyMode && dockTray && renderShortcut(
-                'tray', 'Hidden Icons', 0.21,
+                'tray', t('dockmenu.hiddenIcons'), 0.21,
                 () => invoke('open_tray_at_cursor').catch((err) => console.error('Failed to open tray:', err)),
                 <ChevronUpIcon />
               )}
 
               {!legacyMode && dockTaskView && renderShortcut(
-                'taskview', 'Task View', 0.22,
+                'taskview', t('dockmenu.taskView'), 0.22,
                 () => invoke('open_app', { appName: 'taskview' }).catch((err) => console.error('Failed to open Task View:', err)),
                 <TaskViewIcon />
               )}
 
               {!legacyMode && dockDrives.map((letter, i) => renderShortcut(
-                `drive-${letter}`, `Drive ${letter}:`, 0.24 + i * 0.02,
+                `drive-${letter}`, t('dock.drive', { letter }), 0.24 + i * 0.02,
                 () => invoke('open_dock_extra', { target: letter }).catch((err) => console.error('Failed to open drive:', err)),
                 <DriveIcon letter={letter} />
               ))}
 
               {!legacyMode && dockRecycle && renderShortcut(
-                'recycle', 'Recycle Bin', 0.26 + dockDrives.length * 0.02,
+                'recycle', t('dockmenu.recycleBin'), 0.26 + dockDrives.length * 0.02,
                 () => invoke('open_dock_extra', { target: 'recycle' }).catch((err) => console.error('Failed to open Recycle Bin:', err)),
                 <RecycleIcon />
               )}
@@ -1198,7 +1200,7 @@ const Dock = memo(function Dock() {
                             <button
                               className="preview-close-btn"
                               onClick={(e) => handleClosePreview(e, prev.hwnd)}
-                              data-tooltip="Close Window"
+                              data-tooltip={t("dockmenu.closeWindow")}
                             >
                               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
                                 <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -1307,7 +1309,7 @@ const Dock = memo(function Dock() {
                                   <button
                                     className="preview-close-btn"
                                     onClick={(e) => handleClosePreview(e, prev.hwnd)}
-                                    data-tooltip="Close Window"
+                                    data-tooltip={t("dockmenu.closeWindow")}
                                   >
                                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
                                       <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -1404,7 +1406,7 @@ const Dock = memo(function Dock() {
                                   <button
                                     className="preview-close-btn"
                                     onClick={(e) => handleClosePreview(e, prev.hwnd)}
-                                    data-tooltip="Close Window"
+                                    data-tooltip={t("dockmenu.closeWindow")}
                                   >
                                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
                                       <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -1482,13 +1484,13 @@ const Dock = memo(function Dock() {
               {contextMenu.app.is_running && contextMenu.app.path !== 'start' && (
                 <>
                   <div className="menu-item" onClick={() => { handleNewInstance(contextMenu.app!); closeMenu(); }}>
-                    Open New Instance
+                    {t("dockmenu.newInstance")}
                   </div>
                   <div className="menu-divider" />
                 </>
               )}
               <div className="menu-item" onClick={() => togglePin(contextMenu.app!)}>
-                {contextMenu.app.is_pinned ? 'Unpin from Dock' : 'Pin to Dock'}
+                {contextMenu.app.is_pinned ? t("dockmenu.unpin") : t("dockmenu.pin")}
               </div>
               {contextMenu.app.is_pinned && contextMenu.app.path !== 'start' && (
                 <>
@@ -1502,7 +1504,7 @@ const Dock = memo(function Dock() {
                       document.getElementById('icon-file-input')?.click();
                     }, 50);
                   }}>
-                    Change Icon...
+                    {t("dockmenu.changeIcon")}
                   </div>
                   {(() => {
                     const isHost = isBrowserHost(contextMenu.app!.path);
@@ -1512,7 +1514,7 @@ const Dock = memo(function Dock() {
                         handleRemoveCustomIcon(contextMenu.app!);
                         closeMenu();
                       }}>
-                        Reset Icon
+                        {t("dockmenu.resetIcon")}
                       </div>
                     ) : null;
                   })()}
@@ -1520,22 +1522,22 @@ const Dock = memo(function Dock() {
               )}
               <div className="menu-divider" />
               <div className="menu-item" onClick={() => { setShowAddPopup(true); closeMenu(); }}>
-                Add App to Dock...
+                {t("dockmenu.addApp")}
               </div>
               <div 
                 className="menu-item has-submenu"
                 onMouseEnter={() => setActiveSubmenu('nectar')}
                 onMouseLeave={() => setActiveSubmenu(null)}
               >
-                Nectar Options
+                {t("dockmenu.options")}
                 <span className="submenu-arrow">▶</span>
                 <div className="submenu">
-                  <div className="menu-item" onClick={() => { invoke('open_calendar_window'); closeMenu(); }}>Open Calendar</div>
-                  <div className="menu-item" onClick={() => { invoke('open_settings_window'); closeMenu(); }}>Open Settings</div>
-                  <div className="menu-item" onClick={() => invoke('restart_nectar')}>Restart Nectar</div>
-                  <div className="menu-item" onClick={() => { handleClearIconCache(); closeMenu(); }}>Clear Icon Cache</div>
+                  <div className="menu-item" onClick={() => { invoke('open_calendar_window'); closeMenu(); }}>{t("dockmenu.openCalendar")}</div>
+                  <div className="menu-item" onClick={() => { invoke('open_settings_window'); closeMenu(); }}>{t("dockmenu.openSettings")}</div>
+                  <div className="menu-item" onClick={() => invoke('restart_nectar')}>{t("general.restart")}</div>
+                  <div className="menu-item" onClick={() => { handleClearIconCache(); closeMenu(); }}>{t("dockmenu.clearIconCache")}</div>
                   <div className="menu-divider" />
-                  <div className="menu-item quit" onClick={() => invoke('quit_nectar')}>Quit Nectar</div>
+                  <div className="menu-item quit" onClick={() => invoke('quit_nectar')}>{t("general.quit")}</div>
                 </div>
               </div>
               {contextMenu.app.is_running && (
@@ -1550,7 +1552,7 @@ const Dock = memo(function Dock() {
                       closeMenu();
                     }
                   }}>
-                    Quit {contextMenu.app.name}
+                    {t("dockmenu.quitApp", { name: contextMenu.app.name })}
                   </div>
                 </>
               )}
@@ -1558,22 +1560,22 @@ const Dock = memo(function Dock() {
           ) : (
             <>
               <div className="menu-item" onClick={() => { setShowAddPopup(true); closeMenu(); }}>
-                Add App to Dock...
+                {t("dockmenu.addApp")}
               </div>
               <div 
                 className="menu-item has-submenu"
                 onMouseEnter={() => setActiveSubmenu('nectar')}
                 onMouseLeave={() => setActiveSubmenu(null)}
               >
-                Nectar Options
+                {t("dockmenu.options")}
                 <span className="submenu-arrow">▶</span>
                 <div className="submenu">
-                  <div className="menu-item" onClick={() => { invoke('open_calendar_window'); closeMenu(); }}>Open Calendar</div>
-                  <div className="menu-item" onClick={() => { invoke('open_settings_window'); closeMenu(); }}>Open Settings</div>
-                  <div className="menu-item" onClick={() => invoke('restart_nectar')}>Restart Nectar</div>
-                  <div className="menu-item" onClick={() => { handleClearIconCache(); closeMenu(); }}>Clear Icon Cache</div>
+                  <div className="menu-item" onClick={() => { invoke('open_calendar_window'); closeMenu(); }}>{t("dockmenu.openCalendar")}</div>
+                  <div className="menu-item" onClick={() => { invoke('open_settings_window'); closeMenu(); }}>{t("dockmenu.openSettings")}</div>
+                  <div className="menu-item" onClick={() => invoke('restart_nectar')}>{t("general.restart")}</div>
+                  <div className="menu-item" onClick={() => { handleClearIconCache(); closeMenu(); }}>{t("dockmenu.clearIconCache")}</div>
                   <div className="menu-divider" />
-                  <div className="menu-item quit" onClick={() => invoke('quit_nectar')}>Quit Nectar</div>
+                  <div className="menu-item quit" onClick={() => invoke('quit_nectar')}>{t("general.quit")}</div>
                 </div>
               </div>
             </>
@@ -1639,6 +1641,7 @@ function AddAppPopup({
   pinned: AppInfo[];
   bottom: number;
 }) {
+  const t = useT();
   const [apps, setApps] = useState<AppInfo[]>([]);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -1691,8 +1694,8 @@ function AddAppPopup({
         .slice(0, 60);
       const out: { title: string | null; items: AppInfo[] }[] = [];
       if (runningSuggestions.length > 0)
-        out.push({ title: "Running", items: runningSuggestions });
-      if (rest.length > 0) out.push({ title: "All apps", items: rest });
+        out.push({ title: t("dockmenu.running"), items: runningSuggestions });
+      if (rest.length > 0) out.push({ title: t("dockmenu.allApps"), items: rest });
       return out;
     }
     const starts: AppInfo[] = [];
@@ -1843,7 +1846,7 @@ function AddAppPopup({
             ref={inputRef}
             type="text"
             className="popup-search-input"
-            placeholder="Search apps..."
+            placeholder={t("dockmenu.searchApps")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -1900,8 +1903,8 @@ function AddAppPopup({
           ) : (
             <div className="popup-empty">
               {debouncedSearch.trim()
-                ? "No results"
-                : "Running apps show up here — search to pin anything else"}
+                ? t("dockmenu.noResults")
+                : t("dockmenu.emptyHint")}
             </div>
           )}
         </div>

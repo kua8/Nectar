@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+
 export const DEFAULT_DUAL_CLOCK_ZONE = "UTC";
 
 export interface ZoneOption {
@@ -89,9 +91,10 @@ export function zoneOffsetLabel(zone: string, date = new Date()): string {
 export function zoneDifferenceLabel(zone: string, date = new Date()): string {
   try {
     const diff = zoneOffsetMinutes(date, zone) - zoneOffsetMinutes(date);
-    if (diff === 0) return "Same time as here";
+    if (diff === 0) return t("dualClock.sameTime");
     const abs = Math.abs(diff);
-    return `${Math.floor(abs / 60)}h${abs % 60 ? ` ${abs % 60}m` : ""} ${diff > 0 ? "ahead" : "behind"}`;
+    const amount = `${Math.floor(abs / 60)}h${abs % 60 ? ` ${abs % 60}m` : ""}`;
+    return t(diff > 0 ? "dualClock.ahead" : "dualClock.behind", { amount });
   } catch {
     return "";
   }

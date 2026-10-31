@@ -4,15 +4,7 @@ import { CalendarDays, ChevronLeft, CloudCog, Link2, Plus, RefreshCw, Timer, Tra
 import { SettingRow } from "./SettingRow";
 import { Dropdown } from "./Dropdown";
 import { useCaldav } from "../hooks/useCaldav";
-
-function timeAgo(ms: number | null): string {
-  if (!ms) return "never";
-  const mins = Math.round((Date.now() - ms) / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins} min ago`;
-  const hours = Math.round(mins / 60);
-  return hours < 24 ? `${hours} h ago` : `${Math.round(hours / 24)} d ago`;
-}
+import { timeAgo, useT, type TFunction } from "../i18n";
 
 const PROVIDER_LABELS: Record<string, string> = {
   google: "Google Calendar",
@@ -21,8 +13,9 @@ const PROVIDER_LABELS: Record<string, string> = {
   proton: "Proton Calendar",
   fastmail: "Fastmail",
   nextcloud: "Nextcloud",
-  other: "Calendar link",
 };
+
+type Provider = "nextcloud" | "icloud" | "other";
 
 interface Guide {
   id: string;
@@ -31,95 +24,22 @@ interface Guide {
   note: string;
 }
 
-const GUIDES: Guide[] = [
-  {
-    id: "google",
-    label: "Google",
-    steps: [
-      "Open Google Calendar on the web (calendar.google.com).",
-      "Hover the calendar in the left list, click the three-dot menu, then Settings and sharing.",
-      "Scroll to Integrate calendar and copy the Secret address in iCal format.",
-    ],
-    note: "Anyone with this address can read the calendar, so keep it private. Repeat for each calendar you want. If the option is missing, your Google Workspace admin may have turned it off.",
-  },
-  {
-    id: "icloud",
-    label: "iCloud",
-    steps: [
-      "Open Calendar on icloud.com and sign in.",
-      "Click the second button from the bottom right of the window.",
-      "Click the info (i) icon next to the calendar you want.",
-      "Tick Public Calendar, then copy the link that appears.",
-    ],
-    note: "The link starts with webcal://. Paste it as it is. Only that one calendar becomes readable to anyone holding the link, and unticking Public Calendar stops sharing it.",
-  },
-  {
-    id: "outlook",
-    label: "Outlook",
-    steps: [
-      "In Outlook on the web, open Calendar and click the gear icon for Settings.",
-      "Go to Calendar, then Shared calendars.",
-      "Under Publish a calendar, pick the calendar and choose Can view all details.",
-      "Click Publish. Two links appear: copy the ICS link (it ends in .ics), not the HTML one.",
-    ],
-    note: "Work or school accounts often have publishing turned off by an admin. Without Can view all details, events would show without their titles.",
-  },
-  {
-    id: "proton",
-    label: "Proton",
-    steps: [
-      "Open Proton Calendar on the web (calendar.proton.me).",
-      "Go to Settings, All settings, Calendars, and choose the calendar.",
-      "Under Share with anyone, click Create link and pick Full view.",
-      "Click Copy link.",
-    ],
-    note: "Limited view only shows busy blocks with no titles. Anyone with the link can see the calendar, and you can delete the link from its Actions menu to cut off access.",
-  },
-  {
-    id: "nextcloud",
-    label: "Nextcloud",
-    steps: [
-      "Open the Calendar app in Nextcloud.",
-      "Click the share icon next to a calendar, then the + next to Share link.",
-      "Copy the link and paste it here. Nectar converts it to the calendar feed for you.",
-    ],
-    note: "To read your own private calendars without a public link, use the CalDAV account option further down instead.",
-  },
-  {
-    id: "other",
-    label: "Other",
-    steps: [
-      "Find the calendar's iCal or ICS subscription address in its sharing or export settings.",
-      "Paste any link that ends in .ics or starts with webcal://.",
-    ],
-    note: "This covers holidays, sports fixtures, school timetables, Fastmail and more. If the link opens a web page instead of downloading a file, it isn't the right one.",
-  },
-];
+const GUIDE_STEP_COUNTS: Record<string, number> = { google: 3, icloud: 4, outlook: 4, proton: 4, nextcloud: 3, other: 2 };
+const GUIDE_BRANDS: Record<string, string> = { google: "Google", icloud: "iCloud", outlook: "Outlook", proton: "Proton", nextcloud: "Nextcloud" };
 
-type Provider = "nextcloud" | "icloud" | "other";
+function buildGuides(t: TFunction): Guide[] {
+  return Object.keys(GUIDE_STEP_COUNTS).map((id) => ({
+    id,
+    label: GUIDE_BRANDS[id] ?? t(`calsync.guide.${id}.label`),
+    steps: Array.from({ length: GUIDE_STEP_COUNTS[id] }, (_, i) => t(`calsync.guide.${id}.step${i + 1}`)),
+    note: t(`calsync.guide.${id}.note`),
+  }));
+}
 
 const ICLOUD_URL = "https://caldav.icloud.com";
 
-const ACCOUNT_PROVIDERS: Record<Provider, { label: string; urlPlaceholder: string; userPlaceholder: string; hint: string }> = {
-  nextcloud: {
-    label: "Nextcloud",
-    urlPlaceholder: "Server address, e.g. cloud.example.com",
-    userPlaceholder: "Username",
-    hint: "Create an app password in Nextcloud under Settings › Security › Devices & sessions.",
-  },
-  icloud: {
-    label: "iCloud",
-    urlPlaceholder: "",
-    userPlaceholder: "Apple ID email",
-    hint: "Apple doesn't allow your real password here. Create an app-specific password at account.apple.com under Sign-In and Security › App-Specific Passwords.",
-  },
-  other: {
-    label: "Other CalDAV",
-    urlPlaceholder: "CalDAV server address",
-    userPlaceholder: "Username",
-    hint: "Fastmail, Synology, Radicale, Baikal and most other CalDAV servers work. Use an app password if the service offers one.",
-  },
-};
+const ACCOUNT_PROVIDERS: Provider[] = ["nextcloud", "icloud", "other"];
+const ACCOUNT_BRANDS: Partial<Record<Provider, string>> = { nextcloud: "Nextcloud", icloud: "iCloud" };
 
 interface Detection {
   provider: string;
@@ -128,7 +48,9 @@ interface Detection {
 }
 
 export function CalendarSyncPage({ onBack }: { onBack: () => void }) {
+  const t = useT();
   const state = useCaldav();
+  const guides = buildGuides(t);
   const [interval, setIntervalValue] = useState("15");
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -197,38 +119,41 @@ export function CalendarSyncPage({ onBack }: { onBack: () => void }) {
 
   const sources = (state.account ? 1 : 0) + state.links.length;
   const status = sources
-    ? `${sources} source${sources === 1 ? "" : "s"} · ${state.events.length} events · synced ${timeAgo(state.syncedAt)}`
-    : "Nothing connected yet";
+    ? t("calsync.status", {
+        sources: t(sources === 1 ? "calsync.sourceOne" : "calsync.sourceMany", { count: sources }),
+        events: state.events.length,
+        ago: timeAgo(state.syncedAt, t),
+      })
+    : t("calsync.status.empty");
 
-  const account = ACCOUNT_PROVIDERS[provider];
   const activeGuide =
-    GUIDES.find((g) => g.id === (guideId ?? detection?.provider)) ?? GUIDES[GUIDES.length - 1];
+    guides.find((g) => g.id === (guideId ?? detection?.provider)) ?? guides[guides.length - 1];
 
   return (
     <>
       <div className="caldav-page-header">
         <button className="caldav-back" onClick={onBack}>
-          <ChevronLeft size={14} /> Notch
+          <ChevronLeft size={14} /> {t("notch.group")}
         </button>
         <div className="caldav-actions">
           {sources > 0 && (
             <button className="caldav-btn" onClick={() => invoke("open_calendar_window").catch(() => {})}>
-              <CalendarDays size={11} /> Open calendar
+              <CalendarDays size={11} /> {t("calsync.openCalendar")}
             </button>
           )}
           {sources > 0 && (
             <button className="caldav-btn" disabled={busy !== null} onClick={() => run("sync", "caldav_sync_now")}>
-              <RefreshCw size={11} /> {busy === "sync" ? "Syncing..." : "Sync now"}
+              <RefreshCw size={11} /> {busy === "sync" ? t("calsync.syncing") : t("calsync.syncNow")}
             </button>
           )}
         </div>
       </div>
 
-      <div className="setting-group-label">Calendar Sync</div>
+      <div className="setting-group-label">{t("notch.calendarSync")}</div>
       <div className="setting-group">
         <SettingRow
           icon={Timer}
-          label="Sync Interval"
+          label={t("calsync.interval")}
           desc={status}
           divider={false}
         >
@@ -236,10 +161,10 @@ export function CalendarSyncPage({ onBack }: { onBack: () => void }) {
             value={interval}
             onChange={changeInterval}
             options={[
-              { value: "5", label: "5 minutes" },
-              { value: "15", label: "15 minutes" },
-              { value: "30", label: "30 minutes" },
-              { value: "60", label: "Hourly" },
+              { value: "5", label: t("calsync.interval.minutes", { count: 5 }) },
+              { value: "15", label: t("calsync.interval.minutes", { count: 15 }) },
+              { value: "30", label: t("calsync.interval.minutes", { count: 30 }) },
+              { value: "60", label: t("calsync.interval.hourly") },
             ]}
           />
         </SettingRow>
@@ -247,11 +172,10 @@ export function CalendarSyncPage({ onBack }: { onBack: () => void }) {
 
       {message && <div className="caldav-error caldav-error--page">{message}</div>}
 
-      <div className="setting-group-label setting-group-label--spaced">Calendar links</div>
+      <div className="setting-group-label setting-group-label--spaced">{t("calsync.links.group")}</div>
       <div className="setting-group">
         <div className="caldav-intro">
-          Paste a link from Google, iCloud, Outlook, Proton and more. No password or sign-in needed, and links are only
-          ever read. They are stored in Windows Credential Manager.
+          {t("calsync.links.intro")}
         </div>
 
         {state.links.map((link) => (
@@ -259,14 +183,14 @@ export function CalendarSyncPage({ onBack }: { onBack: () => void }) {
             <SettingRow
               icon={Link2}
               label={link.name}
-              desc={`${PROVIDER_LABELS[link.provider] ?? "Calendar link"} · ${link.events} events · synced ${timeAgo(link.syncedAt)}`}
+              desc={t("calsync.link.desc", { provider: PROVIDER_LABELS[link.provider] ?? t("calsync.link.other"), events: link.events, ago: timeAgo(link.syncedAt, t) })}
             >
               <button
                 className="caldav-btn danger"
                 disabled={busy !== null}
                 onClick={() => run(`rm-${link.id}`, "ics_remove_link", { id: link.id })}
               >
-                <Trash2 size={11} /> Remove
+                <Trash2 size={11} /> {t("calsync.remove")}
               </button>
             </SettingRow>
             {link.error && <div className="caldav-error">{link.error}</div>}
@@ -276,26 +200,26 @@ export function CalendarSyncPage({ onBack }: { onBack: () => void }) {
         <div className="caldav-form">
           <input
             type="text"
-            placeholder="Paste a calendar link (https:// or webcal://)"
+            placeholder={t("calsync.link.placeholder")}
             value={linkUrl}
             onChange={(e) => setLinkUrl(e.target.value)}
             spellCheck={false}
           />
           {detection && (
             <div className={`caldav-detect ${detection.problem ? "bad" : "good"}`}>
-              {detection.problem ?? `Recognized: ${detection.label}`}
+              {detection.problem ?? t("calsync.link.recognized", { name: detection.label })}
             </div>
           )}
           <input
             type="text"
-            placeholder="Name (optional)"
+            placeholder={t("calsync.link.name")}
             value={linkName}
             onChange={(e) => setLinkName(e.target.value)}
             autoComplete="off"
           />
           <div className="caldav-form-footer">
             <button className="caldav-link-btn" onClick={() => setShowGuide((v) => !v)}>
-              {showGuide ? "Hide" : "Where do I find my link?"}
+              {showGuide ? t("calsync.guide.hide") : t("calsync.guide.show")}
             </button>
             <button
               className="caldav-btn primary"
@@ -307,7 +231,7 @@ export function CalendarSyncPage({ onBack }: { onBack: () => void }) {
                 })
               }
             >
-              <Plus size={11} /> {busy === "add" ? "Adding..." : "Add link"}
+              <Plus size={11} /> {busy === "add" ? t("calsync.adding") : t("calsync.add")}
             </button>
           </div>
         </div>
@@ -315,7 +239,7 @@ export function CalendarSyncPage({ onBack }: { onBack: () => void }) {
         {showGuide && (
           <div className="caldav-guide">
             <div className="caldav-chips">
-              {GUIDES.map((g) => (
+              {guides.map((g) => (
                 <button key={g.id} className={g.id === activeGuide.id ? "active" : ""} onClick={() => setGuideId(g.id)}>
                   {g.label}
                 </button>
@@ -331,21 +255,25 @@ export function CalendarSyncPage({ onBack }: { onBack: () => void }) {
         )}
       </div>
 
-      <div className="setting-group-label setting-group-label--spaced">Calendar account</div>
+      <div className="setting-group-label setting-group-label--spaced">{t("calsync.account.group")}</div>
       <div className="setting-group">
         <SettingRow
           icon={CloudCog}
-          label="CalDAV account"
+          label={t("calsync.account")}
           desc={
             state.account
-              ? `${state.account.calendars} calendar${state.account.calendars === 1 ? "" : "s"} · ${state.account.events} events · synced ${timeAgo(state.account.syncedAt)}`
-              : "Also reads private calendars. Nextcloud, iCloud and other CalDAV servers."
+              ? t("calsync.account.desc", {
+                  calendars: t(state.account.calendars === 1 ? "calsync.calendarOne" : "calsync.calendarMany", { count: state.account.calendars }),
+                  events: state.account.events,
+                  ago: timeAgo(state.account.syncedAt, t),
+                })
+              : t("calsync.account.empty")
           }
           divider={!state.account}
         >
           {state.account && (
             <button className="caldav-btn danger" disabled={busy !== null} onClick={() => run("disconnect", "caldav_disconnect")}>
-              <Unplug size={11} /> Disconnect
+              <Unplug size={11} /> {t("calsync.disconnect")}
             </button>
           )}
         </SettingRow>
@@ -354,16 +282,16 @@ export function CalendarSyncPage({ onBack }: { onBack: () => void }) {
         {!state.account && (
           <div className="caldav-form">
             <div className="unit-toggle-minimal wide caldav-providers">
-              {(Object.keys(ACCOUNT_PROVIDERS) as Provider[]).map((key) => (
+              {ACCOUNT_PROVIDERS.map((key) => (
                 <span key={key} className={provider === key ? "active" : ""} onClick={() => pickProvider(key)}>
-                  {ACCOUNT_PROVIDERS[key].label}
+                  {ACCOUNT_BRANDS[key] ?? t(`calsync.account.${key}.label`)}
                 </span>
               ))}
             </div>
             {provider !== "icloud" && (
               <input
                 type="text"
-                placeholder={account.urlPlaceholder}
+                placeholder={t(`calsync.account.${provider}.url`)}
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 spellCheck={false}
@@ -371,7 +299,7 @@ export function CalendarSyncPage({ onBack }: { onBack: () => void }) {
             )}
             <input
               type="text"
-              placeholder={account.userPlaceholder}
+              placeholder={t(`calsync.account.${provider}.user`)}
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               spellCheck={false}
@@ -379,21 +307,21 @@ export function CalendarSyncPage({ onBack }: { onBack: () => void }) {
             />
             <input
               type="password"
-              placeholder="App password"
+              placeholder={t("calsync.account.password")}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="off"
             />
             <div className="caldav-form-footer">
               <span className="caldav-hint">
-                {account.hint} The password is stored in Windows Credential Manager, never in settings.json.
+                {t(`calsync.account.${provider}.hint`)} {t("calsync.account.storage")}
               </span>
               <button
                 className="caldav-btn primary"
                 disabled={busy !== null || !url.trim() || !username.trim() || !password}
                 onClick={() => run("connect", "caldav_connect", { url, username, password }, () => setPassword(""))}
               >
-                <Link2 size={11} /> {busy === "connect" ? "Connecting..." : "Connect"}
+                <Link2 size={11} /> {busy === "connect" ? t("calsync.connecting") : t("calsync.connect")}
               </button>
             </div>
           </div>

@@ -53,8 +53,8 @@ const WMO_CODES: Record<number, string> = {
   99: "Stormy",
 };
 
-const DELHI_LAT = 28.6139;
-const DELHI_LON = 77.2090;
+const LONDON_LAT = 51.5074;
+const LONDON_LON = -0.1278;
 const REFRESH_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 
 interface WeatherState {
@@ -184,8 +184,8 @@ async function resolveLocation(): Promise<ResolvedLocation> {
     // fall through to default
   }
 
-  // 4. Default to Delhi
-  return { lat: DELHI_LAT, lon: DELHI_LON, city: "Delhi" };
+  // 4. Default to London
+  return { lat: LONDON_LAT, lon: LONDON_LON, city: "London" };
 }
 
 async function persistWeather(

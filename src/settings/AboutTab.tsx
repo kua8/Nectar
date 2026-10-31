@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
 import { Compass, Download, RefreshCw, FileDown, Upload, RotateCcw, Trash2, ClipboardCopy, FolderOpen, Crosshair, Image as ImageIcon } from "lucide-react";
 import { SettingRow } from "./SettingRow";
+import { useT } from "../i18n";
 
 interface AboutTabProps {
   appVersion: string;
@@ -41,6 +42,7 @@ export function AboutTab({
   uninstallError,
   handleUninstallNectar,
 }: AboutTabProps) {
+  const t = useT();
   const [diagStatus, setDiagStatus] = useState<"idle" | "working" | "copied" | "error">("idle");
   const [hitboxLogging, setHitboxLogging] = useState(false);
   const [iconStatus, setIconStatus] = useState<"idle" | "working" | "done" | "error">("idle");
@@ -73,10 +75,10 @@ export function AboutTab({
   };
 
   const getIconCacheLabel = () => {
-    if (iconStatus === "working") return "Refreshing...";
-    if (iconStatus === "done") return "Icons refreshed!";
-    if (iconStatus === "error") return "Couldn't refresh icons";
-    return "Refresh App Icons";
+    if (iconStatus === "working") return t("about.icons.working");
+    if (iconStatus === "done") return t("about.icons.done");
+    if (iconStatus === "error") return t("about.icons.error");
+    return t("about.icons");
   };
 
   const toggleHitboxLogging = () => {
@@ -86,87 +88,87 @@ export function AboutTab({
   };
 
   const getDiagLabel = () => {
-    if (diagStatus === "working") return "Collecting...";
-    if (diagStatus === "copied") return "Copied to clipboard!";
-    if (diagStatus === "error") return "Couldn't copy — open the log folder instead";
-    return "Copy Diagnostics";
+    if (diagStatus === "working") return t("about.diagnostics.working");
+    if (diagStatus === "copied") return t("about.diagnostics.copied");
+    if (diagStatus === "error") return t("about.diagnostics.error");
+    return t("about.diagnostics.copy");
   };
 
   const getUpdateLabel = () => {
     switch (updateStatus) {
       case "checking":
-        return "Checking...";
+        return t("about.update.checking");
       case "available":
-        return `Update Available (v${updateVersion})`;
+        return t("about.update.available", { version: updateVersion });
       case "uptodate":
-        return "Nectar is up to date";
+        return t("about.update.uptodate");
       case "downloading":
-        return "Downloading Update...";
+        return t("about.update.downloading");
       case "installing":
-        return "Installing...";
+        return t("about.update.installing");
       case "error":
-        return "No updates found";
+        return t("about.update.error");
       default:
-        return "Check for Updates";
+        return t("about.update.check");
     }
   };
 
   const getUpdateDesc = () =>
-    updateStatus === "available" ? "Click to install and restart" : `Currently running v${appVersion}`;
+    updateStatus === "available" ? t("about.update.available.desc") : t("about.update.current", { version: appVersion });
 
   const getPillLabel = () => {
     switch (updateStatus) {
       case "checking":
-        return "Checking...";
+        return t("about.update.checking");
       case "available":
-        return `Update to v${updateVersion}`;
+        return t("about.pill.update", { version: updateVersion });
       case "uptodate":
-        return "Up to date";
+        return t("about.pill.uptodate");
       case "downloading":
-        return "Downloading...";
+        return t("about.pill.downloading");
       case "installing":
-        return "Installing...";
+        return t("about.update.installing");
       case "error":
-        return "Retry check";
+        return t("about.pill.error");
       default:
-        return "Check for updates";
+        return t("about.pill.check");
     }
   };
 
   const pillBusy = ["checking", "downloading", "installing"].includes(updateStatus);
 
   const getExportLabel = () => {
-    if (exportStatus === "exporting") return "Exporting...";
-    if (exportStatus === "success") return "Exported!";
-    return "Export Settings";
+    if (exportStatus === "exporting") return t("about.export.working");
+    if (exportStatus === "success") return t("about.export.done");
+    return t("about.export");
   };
 
   const getImportLabel = () => {
-    if (importStatus === "importing") return "Importing...";
-    if (importStatus === "success") return "Imported!";
-    return "Import Settings";
+    if (importStatus === "importing") return t("about.import.working");
+    if (importStatus === "success") return t("about.import.done");
+    return t("about.import");
   };
 
   const getResetLabel = () => {
-    if (resetStatus === "resetting") return "Resetting...";
-    if (resetStatus === "confirm") return "Click Again to Confirm";
-    return "Reset to Defaults";
+    if (resetStatus === "resetting") return t("about.reset.working");
+    if (resetStatus === "confirm") return t("about.confirmAgain");
+    return t("about.reset");
   };
 
   const getResetDesc = () =>
-    resetStatus === "confirm" ? "This will erase all settings — cannot be undone" : "Restore all settings to defaults";
+    resetStatus === "confirm" ? t("about.reset.confirm.desc") : t("about.reset.desc");
 
   const getUninstallLabel = () => {
-    if (uninstallStatus === "uninstalling") return "Uninstalling...";
-    if (uninstallStatus === "confirm") return "Click Again to Confirm";
-    if (uninstallStatus === "error") return "Couldn't Start Uninstaller";
-    return "Uninstall Nectar";
+    if (uninstallStatus === "uninstalling") return t("about.uninstall.working");
+    if (uninstallStatus === "confirm") return t("about.confirmAgain");
+    if (uninstallStatus === "error") return t("about.uninstall.error");
+    return t("about.uninstall");
   };
 
   const getUninstallDesc = () => {
-    if (uninstallStatus === "confirm") return "This will remove Nectar from your computer";
-    if (uninstallStatus === "error") return uninstallError || "Try again, or use Windows Settings > Apps";
-    return "Doesn't require Windows Settings to be open";
+    if (uninstallStatus === "confirm") return t("about.uninstall.confirm.desc");
+    if (uninstallStatus === "error") return uninstallError || t("about.uninstall.error.desc");
+    return t("about.uninstall.desc");
   };
 
 
@@ -175,7 +177,7 @@ export function AboutTab({
       <div className="about-header">
         <img src="/nectar.png" className="about-logo" alt="Nectar Logo" />
         <h1 className="about-title">Nectar</h1>
-        <p className="about-version">Version {appVersion || "—"}</p>
+        <p className="about-version">{t("about.version", { version: appVersion || "—" })}</p>
         <button
           className={`update-pill update-pill--${updateStatus || "idle"}`}
           disabled={pillBusy}
@@ -185,9 +187,9 @@ export function AboutTab({
         </button>
       </div>
 
-      <div className="setting-group-label">Software Updates</div>
+      <div className="setting-group-label">{t("about.updates.group")}</div>
       <div className="setting-group">
-        <SettingRow icon={Download} label="Auto Update" desc="Update automatically on startup">
+        <SettingRow icon={Download} label={t("about.autoUpdate")} desc={t("about.autoUpdate.desc")}>
           <label className="toggle-switch">
             <input type="checkbox" checked={autoUpdate} onChange={toggleAutoUpdate} />
             <span className="slider"></span>
@@ -205,16 +207,16 @@ export function AboutTab({
       </div>
 
       <div className="setting-group-label setting-group-label--spaced">
-        Data
+        {t("about.data.group")}
       </div>
       <div className="setting-group">
-        <SettingRow icon={Compass} label="Replay Tour" desc="Walk through the notch, Control Center and dock again" action onClick={() => emit("start-tour")} />
-        <SettingRow icon={FileDown} label={getExportLabel()} desc="Save settings to a file" action onClick={handleExportSettings} />
-        <SettingRow icon={Upload} label={getImportLabel()} desc="Load settings from a file" action onClick={handleImportSettings} />
+        <SettingRow icon={Compass} label={t("about.tour")} desc={t("about.tour.desc")} action onClick={() => emit("start-tour")} />
+        <SettingRow icon={FileDown} label={getExportLabel()} desc={t("about.export.desc")} action onClick={handleExportSettings} />
+        <SettingRow icon={Upload} label={getImportLabel()} desc={t("about.import.desc")} action onClick={handleImportSettings} />
         <SettingRow
           icon={ImageIcon}
           label={getIconCacheLabel()}
-          desc="Re-read app icons if one looks wrong or missing"
+          desc={t("about.icons.desc")}
           action
           onClick={refreshIconCache}
         />
@@ -230,21 +232,21 @@ export function AboutTab({
       </div>
 
       <div className="setting-group-label setting-group-label--spaced">
-        Diagnostics
+        {t("about.diagnostics.group")}
       </div>
       <div className="setting-group">
         <SettingRow
           icon={ClipboardCopy}
           label={getDiagLabel()}
-          desc="System info and recent log, to paste into a bug report"
+          desc={t("about.diagnostics.desc")}
           action
           onClick={copyDiagnostics}
         />
-        <SettingRow icon={FolderOpen} label="Open Log Folder" desc="nectar.log and diagnostics.txt" action onClick={() => invoke("open_log_folder").catch(() => {})} />
+        <SettingRow icon={FolderOpen} label={t("about.logs")} desc={t("about.logs.desc")} action onClick={() => invoke("open_log_folder").catch(() => {})} />
         <SettingRow
           icon={Crosshair}
-          label="Log Dock and Notch Clicks"
-          desc="Turn on, move over the dock and notch for a few seconds, then copy diagnostics. Resets on restart"
+          label={t("about.hitbox")}
+          desc={t("about.hitbox.desc")}
           divider={false}
         >
           <label className="toggle-switch">
@@ -255,7 +257,7 @@ export function AboutTab({
       </div>
 
       <div className="setting-group-label setting-group-label--spaced">
-        Danger Zone
+        {t("about.danger.group")}
       </div>
       <div className="setting-group">
         <SettingRow
@@ -270,7 +272,7 @@ export function AboutTab({
       </div>
 
       <div className="about-footer">
-        <p>Made with ❤️ by kua8</p>
+        <p>{t("about.footer")}</p>
       </div>
     </div>
   );

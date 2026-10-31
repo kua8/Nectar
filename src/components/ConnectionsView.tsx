@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ChevronLeft, Lock, X, Bluetooth, Check, Speaker } from "lucide-react";
+import { useT } from "../i18n";
 
 interface WifiNetwork {
   ssid: string;
@@ -31,9 +32,10 @@ interface Props {
 const REFRESH_MS = 6000;
 
 function SignalBars({ signal }: { signal: number }) {
+  const t = useT();
   const level = signal >= 75 ? 4 : signal >= 50 ? 3 : signal >= 25 ? 2 : 1;
   return (
-    <span className="cv-signal" aria-label={`Signal ${signal}%`}>
+    <span className="cv-signal" aria-label={t("connections.signal", { percent: signal })}>
       {[1, 2, 3, 4].map((bar) => (
         <i key={bar} className={bar <= level ? "on" : ""} style={{ height: 3 + bar * 2.5 }} />
       ))}
@@ -79,6 +81,7 @@ export function ConnectionsView({ kind, onBack, onOpenWindowsSettings }: Props) 
     return () => clearInterval(timer);
   }, [refresh]);
 
+  const t = useT();
   const run = async (label: string, action: () => Promise<unknown>) => {
     setBusy(label);
     setError("");
@@ -115,21 +118,21 @@ export function ConnectionsView({ kind, onBack, onOpenWindowsSettings }: Props) 
   const list = kind === "wifi" ? networks : kind === "audio" ? outputs : devices;
   const loading = list === null;
   const empty = list?.length === 0;
-  const title = kind === "wifi" ? "Wi-Fi networks" : kind === "audio" ? "Output devices" : "Bluetooth devices";
-  const emptyText = kind === "wifi" ? "No networks found" : kind === "audio" ? "No output devices" : "No paired devices";
+  const title = t(kind === "wifi" ? "connections.wifi.title" : kind === "audio" ? "connections.audio.title" : "connections.bluetooth.title");
+  const emptyText = t(kind === "wifi" ? "connections.wifi.empty" : kind === "audio" ? "connections.audio.empty" : "connections.bluetooth.empty");
 
   return (
     <div className="cv-root" onClick={(e) => e.stopPropagation()}>
       <div className="cv-header">
-        <button className="cv-back" onClick={onBack} aria-label="Back">
+        <button className="cv-back" onClick={onBack} aria-label={t("common.back")}>
           <ChevronLeft size={16} />
         </button>
         <span className="cv-title">{title}</span>
-        <button className="cv-link" onClick={onOpenWindowsSettings}>Windows settings</button>
+        <button className="cv-link" onClick={onOpenWindowsSettings}>{t("connections.windowsSettings")}</button>
       </div>
 
       <div className="cv-list">
-        {loading && <div className="cv-hint">{kind === "wifi" ? "Scanning…" : "Loading…"}</div>}
+        {loading && <div className="cv-hint">{kind === "wifi" ? t("connections.scanning") : t("connections.loading")}</div>}
         {!loading && empty && !error && <div className="cv-hint">{emptyText}</div>}
 
         {kind === "audio" && outputs?.map((o) => (
@@ -140,7 +143,7 @@ export function ConnectionsView({ kind, onBack, onOpenWindowsSettings }: Props) 
           >
             <Speaker size={13} className="cv-bt-icon" />
             <span className="cv-name">{o.name}</span>
-            {o.is_default ? <Check size={14} /> : <span className="cv-status">{busy === o.id ? "Switching…" : ""}</span>}
+            {o.is_default ? <Check size={14} /> : <span className="cv-status">{busy === o.id ? t("connections.switching") : ""}</span>}
           </div>
         ))}
 
@@ -153,16 +156,16 @@ export function ConnectionsView({ kind, onBack, onOpenWindowsSettings }: Props) 
               <SignalBars signal={n.signal} />
               <span className="cv-name">{n.ssid}</span>
               {n.secured && <Lock size={11} className="cv-lock" />}
-              <span className="cv-status">{busy === n.ssid ? "Connecting…" : n.connected ? "Connected" : n.known ? "Saved" : ""}</span>
+              <span className="cv-status">{busy === n.ssid ? t("connections.connecting") : n.connected ? t("connections.connected") : n.known ? t("connections.saved") : ""}</span>
               {n.connected && (
                 <button className="cv-action" onClick={(e) => { e.stopPropagation(); void run(n.ssid, () => invoke("wifi_disconnect")); }}>
-                  Disconnect
+                  {t("connections.disconnect")}
                 </button>
               )}
               {n.known && !n.connected && (
                 <button
                   className="cv-icon-btn"
-                  title="Forget network"
+                  title={t("connections.forget")}
                   onClick={(e) => { e.stopPropagation(); void run(n.ssid, () => invoke("wifi_forget", { ssid: n.ssid })); }}
                 >
                   <X size={12} />
@@ -176,10 +179,10 @@ export function ConnectionsView({ kind, onBack, onOpenWindowsSettings }: Props) 
                   autoFocus
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Network password"
+                  placeholder={t("connections.password")}
                   spellCheck={false}
                 />
-                <button type="submit" disabled={!password}>Join</button>
+                <button type="submit" disabled={!password}>{t("connections.join")}</button>
               </form>
             )}
           </div>
@@ -189,16 +192,16 @@ export function ConnectionsView({ kind, onBack, onOpenWindowsSettings }: Props) 
           <div key={d.id} className={`cv-row${d.connected ? " connected" : ""}`}>
             <Bluetooth size={13} className="cv-bt-icon" />
             <span className="cv-name">{d.name}</span>
-            <span className="cv-status">{d.connected ? "Connected" : "Paired"}</span>
+            <span className="cv-status">{d.connected ? t("connections.connected") : t("connections.paired")}</span>
             {confirmRemove === d.id ? (
               <button
                 className="cv-action danger"
                 onClick={() => { setConfirmRemove(null); void run(d.id, () => invoke("bluetooth_unpair", { id: d.id })); }}
               >
-                Remove?
+                {t("connections.removeConfirm")}
               </button>
             ) : (
-              <button className="cv-icon-btn" title="Remove device" onClick={() => setConfirmRemove(d.id)}>
+              <button className="cv-icon-btn" title={t("connections.removeDevice")} onClick={() => setConfirmRemove(d.id)}>
                 <X size={12} />
               </button>
             )}

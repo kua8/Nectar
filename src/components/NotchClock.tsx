@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Stopwatch } from "../hooks/useStopwatch";
 import { formatStopwatch, parseDuration } from "../clockFormat";
+import { useT } from "../i18n";
 
 type Tab = "timer" | "stopwatch";
 
@@ -61,6 +62,7 @@ export function NotchClock({
   onResetTimer,
   stopwatch,
 }: Props) {
+  const t = useT();
   const [savedTab, setSavedTab] = useState<Tab>(readTab);
   const [custom, setCustom] = useState("");
   const [invalid, setInvalid] = useState(false);
@@ -96,7 +98,7 @@ export function NotchClock({
         {timerEnabled && stopwatchEnabled && (
           <div className="clock-tabs" role="tablist">
             <button role="tab" aria-selected={tab === "timer"} className={tab === "timer" ? "active" : ""} onClick={() => pickTab("timer")}>
-              Timer
+              {t("clock.timer")}
             </button>
             <button
               role="tab"
@@ -104,7 +106,7 @@ export function NotchClock({
               className={tab === "stopwatch" ? "active" : ""}
               onClick={() => pickTab("stopwatch")}
             >
-              Stopwatch
+              {t("clock.stopwatch")}
             </button>
           </div>
         )}
@@ -117,10 +119,10 @@ export function NotchClock({
 
             <div className="timer-controls-new">
               <button onClick={onToggleTimer} className="timer-btn primary">
-                {isTimerRunning ? "Pause" : "Start"}
+                {isTimerRunning ? t("clock.pause") : t("clock.start")}
               </button>
               <button onClick={onResetTimer} className="timer-btn secondary">
-                Reset
+                {t("clock.reset")}
               </button>
             </div>
 
@@ -139,12 +141,12 @@ export function NotchClock({
                   setCustom(e.target.value);
                   setInvalid(false);
                 }}
-                placeholder="Custom: 12, 1:30 or 0:45:00"
+                placeholder={t("clock.custom.placeholder")}
                 spellCheck={false}
-                aria-label="Custom timer length"
+                aria-label={t("clock.custom.label")}
               />
               <button type="submit" disabled={!custom.trim()}>
-                Go
+                {t("clock.go")}
               </button>
             </form>
           </>
@@ -158,21 +160,21 @@ export function NotchClock({
 
             <div className="timer-controls-new">
               <button onClick={stopwatch.toggle} className="timer-btn primary">
-                {stopwatch.running ? "Pause" : "Start"}
+                {stopwatch.running ? t("clock.pause") : t("clock.start")}
               </button>
               <button onClick={stopwatch.lap} className="timer-btn secondary" disabled={!stopwatch.running && stopwatch.base === 0}>
-                Lap
+                {t("clock.lap")}
               </button>
               <button onClick={stopwatch.reset} className="timer-btn secondary">
-                Reset
+                {t("clock.reset")}
               </button>
             </div>
 
             <div className="sw-laps">
-              {recentLaps.length === 0 && <span className="sw-hint">Laps show up here</span>}
+              {recentLaps.length === 0 && <span className="sw-hint">{t("clock.laps.empty")}</span>}
               {recentLaps.map((lap) => (
                 <div key={lap.number} className="sw-lap">
-                  <span>Lap {lap.number}</span>
+                  <span>{t("clock.lapNumber", { number: lap.number })}</span>
                   <span>{formatStopwatch(lap.split, true)}</span>
                 </div>
               ))}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { isValidZone, searchZones, zoneOffsetLabel, type ZoneOption } from "../dualClock";
+import { useT } from "../i18n";
 
 interface Props {
   onSelect: (option: { label: string; zone: string }) => void;
@@ -9,6 +10,7 @@ interface Props {
 const MAX_RESULTS = 6;
 
 export function DualClockPicker({ onSelect }: Props) {
+  const t = useT();
   const [query, setQuery] = useState("");
   const [cities, setCities] = useState<ZoneOption[]>([]);
   const [open, setOpen] = useState(false);
@@ -56,7 +58,7 @@ export function DualClockPicker({ onSelect }: Props) {
       <div className="city-input-row">
         <input
           type="text"
-          placeholder="Search city or time zone..."
+          placeholder={t("dualClock.search")}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -74,7 +76,7 @@ export function DualClockPicker({ onSelect }: Props) {
           }}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           spellCheck={false}
-          aria-label="Second clock time zone"
+          aria-label={t("dualClock.zone")}
         />
         {query && (
           <button
@@ -83,7 +85,7 @@ export function DualClockPicker({ onSelect }: Props) {
               e.preventDefault();
               setQuery("");
             }}
-            title="Clear search"
+            title={t("dualClock.clear")}
           >
             <X size={10} strokeWidth={2.5} />
           </button>

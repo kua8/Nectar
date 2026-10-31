@@ -31,6 +31,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import type { ComponentType, SVGProps } from "react";
+import { useT } from "../i18n";
 
 export interface WidgetConfig {
   left: string[];
@@ -39,18 +40,17 @@ export interface WidgetConfig {
 
 interface WidgetDef {
   id: string;
-  label: string;
   icon: ComponentType<SVGProps<SVGSVGElement> & { size?: number; strokeWidth?: number }>;
   color: string;
 }
 
 const WIDGET_DEFS: WidgetDef[] = [
-  { id: "weather", label: "Weather", icon: CloudSun, color: "#60a5fa" },
-  { id: "battery", label: "Battery", icon: BatteryFull, color: "#4ade80" },
-  { id: "cpu", label: "CPU", icon: Cpu, color: "#f97316" },
-  { id: "ram", label: "RAM", icon: MemoryStick, color: "#a78bfa" },
-  { id: "disk", label: "Disk", icon: HardDrive, color: "#38bdf8" },
-  { id: "net", label: "Net", icon: ArrowUpDown, color: "#2dd4bf" },
+  { id: "weather", icon: CloudSun, color: "#60a5fa" },
+  { id: "battery", icon: BatteryFull, color: "#4ade80" },
+  { id: "cpu", icon: Cpu, color: "#f97316" },
+  { id: "ram", icon: MemoryStick, color: "#a78bfa" },
+  { id: "disk", icon: HardDrive, color: "#38bdf8" },
+  { id: "net", icon: ArrowUpDown, color: "#2dd4bf" },
 ];
 
 const DEFAULT_CONFIG: WidgetConfig = {
@@ -62,6 +62,7 @@ const MAX_PER_ZONE = 2;
 
 /* ── Draggable pool chip ── */
 function PoolChip({ id }: { id: string }) {
+  const t = useT();
   const def = WIDGET_DEFS.find((w) => w.id === id)!;
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id });
   const Icon = def.icon;
@@ -73,7 +74,7 @@ function PoolChip({ id }: { id: string }) {
       {...attributes}
     >
       <Icon size={12} strokeWidth={2} style={{ color: def.color }} />
-      <span>{def.label}</span>
+      <span>{t(`widgets.${def.id}`)}</span>
     </div>
   );
 }
@@ -94,6 +95,7 @@ function SortablePlacedChip({
   onRemove: (id: string) => void;
   onMove: (id: string, dir: -1 | 1) => void;
 }) {
+  const t = useT();
   const def = WIDGET_DEFS.find((w) => w.id === id)!;
   const {
     attributes,
@@ -117,7 +119,7 @@ function SortablePlacedChip({
     <div ref={setNodeRef} style={style} className={`widget-pill widget-pill--placed ${isDragging ? "dragging" : ""}`}>
       <div {...attributes} {...listeners} className="widget-pill-drag-handle">
         <Icon size={12} strokeWidth={2} style={{ color: def.color }} />
-        <span>{def.label}</span>
+        <span>{t(`widgets.${def.id}`)}</span>
       </div>
       <div className="widget-pill-btns">
         {idx > 0 && (
@@ -130,10 +132,10 @@ function SortablePlacedChip({
             <ChevronDown size={9} />
           </button>
         )}
-        <button className="widget-pill-btn" title="Swap side" onClick={() => onSwap(id)}>
+        <button className="widget-pill-btn" title={t("widgets.swap")} onClick={() => onSwap(id)}>
           <ArrowLeftRight size={9} />
         </button>
-        <button className="widget-pill-btn widget-pill-btn--x" title="Remove" onClick={() => onRemove(id)}>
+        <button className="widget-pill-btn widget-pill-btn--x" title={t("widgets.remove")} onClick={() => onRemove(id)}>
           <X size={10} />
         </button>
       </div>
@@ -157,13 +159,14 @@ function DropZone({
   onRemove: (id: string) => void;
   onMove: (id: string, dir: -1 | 1) => void;
 }) {
+  const t = useT();
   const { setNodeRef, isOver } = useDroppable({ id });
   return (
     <div
       ref={setNodeRef}
       className={`widget-config-zone ${isOver ? "widget-config-zone--over" : ""}`}
     >
-      <span className="widget-config-side">{side === "left" ? "Left" : "Right"}</span>
+      <span className="widget-config-side">{side === "left" ? t("widgets.left") : t("widgets.right")}</span>
       <div className="widget-config-chips">
         <SortableContext items={items} strategy={horizontalListSortingStrategy}>
           {items.length > 0
@@ -178,7 +181,7 @@ function DropZone({
                   onMove={onMove}
                 />
               ))
-            : <span className="widget-config-empty">Drop here</span>}
+            : <span className="widget-config-empty">{t("widgets.drop")}</span>}
         </SortableContext>
       </div>
     </div>
@@ -193,6 +196,7 @@ interface StatusWidgetConfigProps {
 }
 
 export function StatusWidgetConfig({ value, onChange, hasBattery = true }: StatusWidgetConfigProps) {
+  const t = useT();
   const availableDefs = hasBattery ? WIDGET_DEFS : WIDGET_DEFS.filter((w) => w.id !== "battery");
 
   const sanitize = (cfg: WidgetConfig): WidgetConfig =>
@@ -384,7 +388,7 @@ export function StatusWidgetConfig({ value, onChange, hasBattery = true }: Statu
         {activeDef ? (
           <div className="widget-pill widget-pill--dragging">
             <activeDef.icon size={12} strokeWidth={2} style={{ color: activeDef.color }} />
-            <span>{activeDef.label}</span>
+            <span>{t(`widgets.${activeDef.id}`)}</span>
           </div>
         ) : null}
       </DragOverlay>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { X, RefreshCw } from "lucide-react";
+import { useT } from "../i18n";
 
 interface ProcessInfo {
   pid: number;
@@ -29,6 +30,7 @@ function ProcessIcon({ path }: { path: string | null }) {
 }
 
 export function ProcessesTab() {
+  const t = useT();
   const [processes, setProcesses] = useState<ProcessInfo[]>([]);
   const [endingPid, setEndingPid] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,14 +67,14 @@ export function ProcessesTab() {
   return (
     <>
       <div className="setting-group-label">
-        Background Tasks
-        <button className="processes-refresh-btn" onClick={refresh} title="Refresh">
+        {t("processes.group")}
+        <button className="processes-refresh-btn" onClick={refresh} title={t("processes.refresh")}>
           <RefreshCw size={12} strokeWidth={1.75} />
         </button>
       </div>
       <div className="setting-group processes-list">
-        {loading && <div className="processes-empty">Loading...</div>}
-        {!loading && processes.length === 0 && <div className="processes-empty">No processes found</div>}
+        {loading && <div className="processes-empty">{t("common.loading")}</div>}
+        {!loading && processes.length === 0 && <div className="processes-empty">{t("processes.empty")}</div>}
         {!loading && processes.map((proc) => (
           <div className="process-row" key={proc.pid}>
             <ProcessIcon path={proc.exe_path} />
@@ -84,7 +86,7 @@ export function ProcessesTab() {
               className="process-end-btn"
               disabled={endingPid === proc.pid}
               onClick={() => handleEnd(proc)}
-              title="End task"
+              title={t("processes.end")}
             >
               <X size={13} strokeWidth={1.75} />
             </button>

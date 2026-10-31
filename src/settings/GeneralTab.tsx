@@ -1,5 +1,7 @@
-import { Power, Download, Clock, History, BatteryWarning, RefreshCw, LogOut } from "lucide-react";
+import { Power, Download, Clock, History, BatteryWarning, RefreshCw, LogOut, Languages } from "lucide-react";
 import { SettingRow } from "./SettingRow";
+import { Dropdown } from "./Dropdown";
+import { LANGUAGES, getLanguagePreference, setLanguagePreference, useT } from "../i18n";
 
 interface GeneralTabProps {
   autostart: boolean;
@@ -30,25 +32,34 @@ export function GeneralTab({
   restartNectar,
   quitNectar,
 }: GeneralTabProps) {
+  const t = useT();
+  const languageOptions = [
+    { value: "system", label: t("general.language.system") },
+    ...Object.entries(LANGUAGES).map(([value, { name }]) => ({ value, label: name })),
+  ];
   return (
     <>
-      <div className="setting-group-label">System</div>
+      <div className="setting-group-label">{t("general.system")}</div>
       <div className="setting-group">
-        <SettingRow icon={Power} label="Launch at Login" desc="Open Nectar automatically">
+        <SettingRow icon={Power} label={t("general.launchAtLogin")} desc={t("general.launchAtLogin.desc")}>
           <label className="toggle-switch">
             <input type="checkbox" checked={autostart} onChange={toggleAutostart} />
             <span className="slider"></span>
           </label>
         </SettingRow>
 
-        <SettingRow icon={Download} label="Update Indicator" desc="Show green dot when update available">
+        <SettingRow icon={Download} label={t("general.updateIndicator")} desc={t("general.updateIndicator.desc")}>
           <label className="toggle-switch">
             <input type="checkbox" checked={showUpdateIndicator} onChange={toggleUpdateIndicator} />
             <span className="slider"></span>
           </label>
         </SettingRow>
 
-        <SettingRow icon={Clock} label="24-Hour Time" desc="Use 24-hour clock format">
+        <SettingRow icon={Languages} label={t("general.language")} desc={t("general.language.desc")}>
+          <Dropdown value={getLanguagePreference()} options={languageOptions} onChange={setLanguagePreference} />
+        </SettingRow>
+
+        <SettingRow icon={Clock} label={t("general.time24h")} desc={t("general.time24h.desc")}>
           <label className="toggle-switch">
             <input type="checkbox" checked={timeFormat24h} onChange={toggleTimeFormat24h} />
             <span className="slider"></span>
@@ -57,8 +68,8 @@ export function GeneralTab({
 
         <SettingRow
           icon={History}
-          label="Legacy Mode"
-          desc="Keep the classic notch and dock. Turns off features added since 1.4"
+          label={t("general.legacyMode")}
+          desc={t("general.legacyMode.desc")}
         >
           <label className="toggle-switch">
             <input type="checkbox" checked={legacyMode} onChange={toggleLegacyMode} />
@@ -68,8 +79,8 @@ export function GeneralTab({
 
         <SettingRow
           icon={BatteryWarning}
-          label="Low Battery Alert"
-          desc={`Trigger at ${lowBatteryThreshold}%`}
+          label={t("general.lowBattery")}
+          desc={t("general.lowBattery.desc", { percent: lowBatteryThreshold })}
           divider={false}
         >
           <input
@@ -84,10 +95,10 @@ export function GeneralTab({
         </SettingRow>
       </div>
 
-      <div className="setting-group-label">App</div>
+      <div className="setting-group-label">{t("general.app")}</div>
       <div className="setting-group">
-        <SettingRow icon={RefreshCw} label="Restart Nectar" desc="Reinitialize all components" action onClick={restartNectar} />
-        <SettingRow icon={LogOut} label="Quit Nectar" desc="Exit application completely" action danger onClick={quitNectar} divider={false} />
+        <SettingRow icon={RefreshCw} label={t("general.restart")} desc={t("general.restart.desc")} action onClick={restartNectar} />
+        <SettingRow icon={LogOut} label={t("general.quit")} desc={t("general.quit.desc")} action danger onClick={quitNectar} divider={false} />
       </div>
     </>
   );

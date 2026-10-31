@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { useT } from "../i18n";
 import "./WindowControls.css";
 
 export function WindowControls() {
+  const t = useT();
   const [focused, setFocused] = useState(true);
 
   useEffect(() => {
@@ -16,8 +18,8 @@ export function WindowControls() {
 
   return (
     <div className={`wc${focused ? "" : " blurred"}`}>
-      <button className="wc-btn minimize" aria-label="Minimize" onClick={() => win.minimize().catch(() => {})} />
-      <button className="wc-btn close" aria-label="Close" onClick={() => win.hide().catch(() => {})} />
+      <button className="wc-btn minimize" aria-label={t("window.minimize")} onClick={() => win.minimize().catch(() => {})} />
+      <button className="wc-btn close" aria-label={t("window.close")} onClick={() => win.hide().catch(() => {})} />
     </div>
   );
 }

@@ -18,6 +18,7 @@ mod ics;
 mod active_look;
 mod connections;
 mod audio_devices;
+mod i18n;
 
 use tauri::Manager;
 use windows::Win32::System::Console::SetConsoleCtrlHandler;
@@ -346,13 +347,16 @@ fn main() {
             {
                 use tauri::menu::{Menu, MenuItem};
                 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-                let quit_item = MenuItem::with_id(app, "quit", "Quit Nectar", true, None::<&str>)?;
-                let restart_item =
-                    MenuItem::with_id(app, "restart", "Restart Nectar", true, None::<&str>)?;
-                let settings_item =
-                    MenuItem::with_id(app, "settings", "Open Settings", true, None::<&str>)?;
-                let calendar_item =
-                    MenuItem::with_id(app, "calendar", "Open Calendar", true, None::<&str>)?;
+                let handle = app.handle();
+                let make = |id: &str, key: &'static str| -> tauri::Result<MenuItem<tauri::Wry>> {
+                    let item = MenuItem::with_id(app, id, crate::i18n::tr(handle, key), true, None::<&str>)?;
+                    crate::i18n::register_tray_item(item.clone(), key);
+                    Ok(item)
+                };
+                let quit_item = make("quit", "general.quit")?;
+                let restart_item = make("restart", "general.restart")?;
+                let settings_item = make("settings", "dockmenu.openSettings")?;
+                let calendar_item = make("calendar", "dockmenu.openCalendar")?;
                 let menu = Menu::with_items(app, &[&calendar_item, &settings_item, &restart_item, &quit_item])?;
                 let ah = app.handle().clone();
                 TrayIconBuilder::new()

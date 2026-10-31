@@ -8,15 +8,16 @@ import { Check, ChevronLeft, ChevronRight, RefreshCw, Settings as SettingsIcon }
 import { WindowControls } from "./components/WindowControls";
 import { initTheme } from "./theme";
 import { useCaldav, type CalEvent } from "./hooks/useCaldav";
+import { dateLocale, timeAgo, useT, weekdayNames } from "./i18n";
 import "./Calendar.css";
 
 type View = "day" | "week" | "month" | "agenda";
 
-const VIEWS: { id: View; label: string }[] = [
-  { id: "day", label: "Day" },
-  { id: "week", label: "Week" },
-  { id: "month", label: "Month" },
-  { id: "agenda", label: "Agenda" },
+const VIEWS: { id: View; labelKey: string }[] = [
+  { id: "day", labelKey: "calendar.view.day" },
+  { id: "week", labelKey: "calendar.view.week" },
+  { id: "month", labelKey: "calendar.view.month" },
+  { id: "agenda", labelKey: "calendar.view.agenda" },
 ];
 
 const VIEW_KEY = "nectar-calendar-window-view";
@@ -63,20 +64,12 @@ function readHidden(): Set<string> {
   }
 }
 
-function ago(ms: number | null): string {
-  if (!ms) return "never";
-  const mins = Math.round((Date.now() - ms) / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins} min ago`;
-  const hours = Math.round(mins / 60);
-  return hours < 24 ? `${hours} h ago` : `${Math.round(hours / 24)} d ago`;
-}
-
 function colorStyle(e: CalEvent): React.CSSProperties {
   return { ["--c" as string]: e.color ?? "var(--nectar-text, #fff)" };
 }
 
 function CalendarWindow() {
+  const t = useT();
   const state = useCaldav();
   const today = startOfDay(new Date());
   const [view, setViewState] = useState<View>(readView);
@@ -95,7 +88,7 @@ function CalendarWindow() {
     return () => document.removeEventListener("contextmenu", preventContext);
   }, []);
 
-  const time = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12 });
+  const time = (ms: number) => new Date(ms).toLocaleTimeString(dateLocale(), { hour: "numeric", minute: "2-digit", hour12 });
 
   const setView = (next: View) => {
     setViewState(next);
@@ -151,14 +144,14 @@ function CalendarWindow() {
   if (view === "week") {
     const first = addDays(anchor, -anchor.getDay());
     const last = addDays(first, 6);
-    const fmt = (d: Date) => d.toLocaleDateString("default", { month: "short", day: "numeric" });
+    const fmt = (d: Date) => d.toLocaleDateString(dateLocale(), { month: "short", day: "numeric" });
     title = `${fmt(first)} – ${first.getMonth() === last.getMonth() ? last.getDate() : fmt(last)}`;
   } else if (view === "day") {
-    title = anchor.toLocaleDateString("default", { weekday: "long", month: "long", day: "numeric" });
+    title = anchor.toLocaleDateString(dateLocale(), { weekday: "long", month: "long", day: "numeric" });
   } else if (view === "agenda") {
-    title = "Upcoming";
+    title = t("calendar.upcoming");
   } else {
-    title = anchor.toLocaleDateString("default", { month: "long", year: "numeric" });
+    title = anchor.toLocaleDateString(dateLocale(), { month: "long", year: "numeric" });
   }
 
   const selectedEvents = eventsOn(events, anchor);
@@ -167,14 +160,14 @@ function CalendarWindow() {
     <div className="cw">
       <div className="cw-titlebar" data-tauri-drag-region>
         <span className="cw-title-text" data-tauri-drag-region>
-          Calendar
+          {t("calendar.title")}
         </span>
         <WindowControls />
       </div>
 
       <div className="cw-body">
         <aside className="cw-sidebar">
-          <div className="cw-label">Calendars</div>
+          <div className="cw-label">{t("calendar.calendars")}</div>
           <ul className="cw-sources">
             {state.calendars.map((c) => {
               const off = hidden.has(c.name);
@@ -190,19 +183,19 @@ function CalendarWindow() {
                 </li>
               );
             })}
-            {state.calendars.length === 0 && <li className="cw-muted">No calendars yet</li>}
+            {state.calendars.length === 0 && <li className="cw-muted">{t("calendar.noCalendars")}</li>}
           </ul>
 
           <div className="cw-sidebar-foot">
             <div className="cw-sync-row">
-              <span>Synced {syncing ? "now…" : ago(state.syncedAt)}</span>
+              <span>{t("calendar.synced", { when: syncing ? t("calendar.syncing") : timeAgo(state.syncedAt, t) })}</span>
               <button onClick={sync} disabled={syncing || !state.connected}>
-                <RefreshCw size={11} className={syncing ? "spin" : ""} /> Sync
+                <RefreshCw size={11} className={syncing ? "spin" : ""} /> {t("calendar.sync")}
               </button>
             </div>
             {syncError && <div className="cw-error">{syncError}</div>}
             <button className="cw-manage" onClick={manageSources}>
-              <SettingsIcon size={12} /> Manage sources
+              <SettingsIcon size={12} /> {t("calendar.manageSources")}
             </button>
           </div>
         </aside>
@@ -210,12 +203,12 @@ function CalendarWindow() {
         <main className="cw-main">
           {!state.connected ? (
             <div className="cw-empty-state">
-              <div className="cw-empty-title">No calendar connected</div>
+              <div className="cw-empty-title">{t("calendar.empty.title")}</div>
               <div className="cw-empty-text">
-                Add a Google, iCloud or Outlook calendar link, or connect Nextcloud, to see your events here.
+                {t("calendar.empty.text")}
               </div>
               <button className="cw-primary" onClick={manageSources}>
-                Set up Calendar Sync
+                {t("calendar.empty.setup")}
               </button>
             </div>
           ) : (
@@ -232,19 +225,19 @@ function CalendarWindow() {
                         className={view === v.id ? "active" : ""}
                         onClick={() => setView(v.id)}
                       >
-                        {v.label}
+                        {t(v.labelKey)}
                       </button>
                     ))}
                   </div>
                   {view !== "agenda" && (
                     <div className="cw-nav">
                       <button className="cw-today" onClick={() => setAnchor(today)}>
-                        Today
+                        {t("calendar.today")}
                       </button>
-                      <button aria-label="Previous" onClick={() => shift(-1)}>
+                      <button aria-label={t("calendar.previous")} onClick={() => shift(-1)}>
                         <ChevronLeft size={15} />
                       </button>
-                      <button aria-label="Next" onClick={() => shift(1)}>
+                      <button aria-label={t("calendar.next")} onClick={() => shift(1)}>
                         <ChevronRight size={15} />
                       </button>
                     </div>
@@ -255,13 +248,13 @@ function CalendarWindow() {
               {view === "month" && (
                 <div className="cw-selected-strip">
                   <span className="cw-selected-date">
-                    {anchor.toLocaleDateString("default", { weekday: "long", month: "long", day: "numeric" })}
+                    {anchor.toLocaleDateString(dateLocale(), { weekday: "long", month: "long", day: "numeric" })}
                   </span>
                   <span className="cw-selected-count">
-                    {selectedEvents.length === 0 ? "No events" : `${selectedEvents.length} event${selectedEvents.length === 1 ? "" : "s"}`}
+                    {selectedEvents.length === 0 ? t("calendar.noEvents") : t(selectedEvents.length === 1 ? "calendar.eventOne" : "calendar.eventMany", { count: selectedEvents.length })}
                   </span>
                   <button className="cw-primary small" onClick={() => openDay(anchor)}>
-                    Open day &#8250;
+                    {t("calendar.openDay")} &#8250;
                   </button>
                 </div>
               )}
@@ -285,9 +278,10 @@ function DayNumber({ day, today, muted }: { day: Date; today: Date; muted?: bool
 }
 
 function Chip({ event, time, stacked }: { event: CalEvent; time?: (ms: number) => string; stacked?: boolean }) {
+  const t = useT();
   return (
     <div className={`cw-chip${stacked ? " stacked" : ""}`} style={colorStyle(event)}>
-      {time && <i>{event.allDay ? "All day" : time(event.start)}</i>}
+      {time && <i>{event.allDay ? t("calendar.allDay") : time(event.start)}</i>}
       <span>{event.title}</span>
     </div>
   );
@@ -311,6 +305,7 @@ interface HoverCard {
 const CARD_WIDTH = 236;
 
 function MonthView({ anchor, today, events, time, onSelect, onOpen }: MonthProps) {
+  const t = useT();
   const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
   const gridStart = addDays(first, -first.getDay());
   const days = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
@@ -353,7 +348,7 @@ function MonthView({ anchor, today, events, time, onSelect, onOpen }: MonthProps
   return (
     <div ref={wrapRef} className="cw-month">
       <div className="cw-dow">
-        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
+        {weekdayNames("short").map((d) => (
           <div key={d}>{d}</div>
         ))}
       </div>
@@ -412,18 +407,18 @@ function MonthView({ anchor, today, events, time, onSelect, onOpen }: MonthProps
       {hover && (
         <div className="cw-hover" style={{ left: hover.left, top: hover.top, width: CARD_WIDTH }}>
           <div className="cw-hover-title">
-            {hover.day.toLocaleDateString("default", { weekday: "long", month: "short", day: "numeric" })}
+            {hover.day.toLocaleDateString(dateLocale(), { weekday: "long", month: "short", day: "numeric" })}
           </div>
           {hoverList.slice(0, 6).map((e, i) => (
             <div key={`${e.uid}-${e.start}-${i}`} className="cw-hover-row" style={colorStyle(e)}>
               <span className="cw-hover-name">{e.title}</span>
               <span className="cw-hover-meta">
-                {e.allDay ? "All day" : `${time(e.start)} – ${time(e.end)}`}
+                {e.allDay ? t("calendar.allDay") : `${time(e.start)} – ${time(e.end)}`}
                 {e.location ? ` · ${e.location}` : ""}
               </span>
             </div>
           ))}
-          {hoverList.length > 6 && <div className="cw-hover-more">+{hoverList.length - 6} more</div>}
+          {hoverList.length > 6 && <div className="cw-hover-more">{t("calendar.more", { count: hoverList.length - 6 })}</div>}
         </div>
       )}
     </div>
@@ -431,6 +426,7 @@ function MonthView({ anchor, today, events, time, onSelect, onOpen }: MonthProps
 }
 
 function WeekView({ anchor, today, events, time, onOpen }: { anchor: Date; today: Date; events: CalEvent[]; time: (ms: number) => string; onOpen: (d: Date) => void }) {
+  const t = useT();
   const first = addDays(anchor, -anchor.getDay());
   return (
     <div className="cw-week">
@@ -440,14 +436,14 @@ function WeekView({ anchor, today, events, time, onOpen }: { anchor: Date; today
         return (
           <div key={i} className={`cw-week-col${sameDay(day, today) ? " today" : ""}`}>
             <button className="cw-week-head" onClick={() => onOpen(day)}>
-              <em>{day.toLocaleDateString("default", { weekday: "short" })}</em>
+              <em>{day.toLocaleDateString(dateLocale(), { weekday: "short" })}</em>
               <DayNumber day={day} today={today} />
             </button>
             <div className="cw-week-events">
               {list.map((e, k) => (
                 <Chip key={`${e.uid}-${e.start}-${k}`} event={e} time={time} stacked />
               ))}
-              {list.length === 0 && <span className="cw-muted center">Free</span>}
+              {list.length === 0 && <span className="cw-muted center">{t("calendar.free")}</span>}
             </div>
           </div>
         );
@@ -457,9 +453,10 @@ function WeekView({ anchor, today, events, time, onOpen }: { anchor: Date; today
 }
 
 function DayView({ day, events, time }: { day: Date; events: CalEvent[]; time: (ms: number) => string }) {
+  const t = useT();
   const list = eventsOn(events, day);
   const [nowMs] = useState(() => Date.now());
-  if (list.length === 0) return <div className="cw-empty-day">Nothing planned</div>;
+  if (list.length === 0) return <div className="cw-empty-day">{t("calendar.nothingPlanned")}</div>;
   return (
     <div className="cw-list">
       {list.map((e, i) => {
@@ -468,7 +465,7 @@ function DayView({ day, events, time }: { day: Date; events: CalEvent[]; time: (
           <div key={`${e.uid}-${e.start}-${i}`} className="cw-day-event" style={colorStyle(e)}>
             <span className="cw-day-time">
               {e.allDay ? (
-                <b>All day</b>
+                <b>{t("calendar.allDay")}</b>
               ) : (
                 <>
                   <b>{time(e.start)}</b>
@@ -479,7 +476,7 @@ function DayView({ day, events, time }: { day: Date; events: CalEvent[]; time: (
             <span className="cw-day-body">
               <span className="cw-day-title">
                 {e.title}
-                {live && <em>Now</em>}
+                {live && <em>{t("calendar.now")}</em>}
               </span>
               <span className="cw-day-meta">{[e.location, e.calendar].filter(Boolean).join(" · ")}</span>
             </span>
@@ -491,17 +488,18 @@ function DayView({ day, events, time }: { day: Date; events: CalEvent[]; time: (
 }
 
 function AgendaView({ today, events, time, onOpen }: { today: Date; events: CalEvent[]; time: (ms: number) => string; onOpen: (d: Date) => void }) {
+  const t = useT();
   const groups = Array.from({ length: 30 }, (_, i) => addDays(today, i))
     .map((day) => ({ day, list: eventsOn(events, day) }))
     .filter((g) => g.list.length > 0);
 
-  if (groups.length === 0) return <div className="cw-empty-day">Nothing in the next 30 days</div>;
+  if (groups.length === 0) return <div className="cw-empty-day">{t("calendar.agenda.empty", { days: 30 })}</div>;
 
   const heading = (day: Date) => {
     const diff = Math.round((day.getTime() - today.getTime()) / 86_400_000);
-    if (diff === 0) return "Today";
-    if (diff === 1) return "Tomorrow";
-    return day.toLocaleDateString("default", { weekday: "long", month: "short", day: "numeric" });
+    if (diff === 0) return t("calendar.today");
+    if (diff === 1) return t("calendar.tomorrow");
+    return day.toLocaleDateString(dateLocale(), { weekday: "long", month: "short", day: "numeric" });
   };
 
   return (

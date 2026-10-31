@@ -1,14 +1,15 @@
 import { useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { CaldavState, CalEvent } from "../hooks/useCaldav";
+import { dateLocale, useT, weekdayNames } from "../i18n";
 
 type View = "day" | "week" | "month" | "agenda";
 
-const VIEWS: { id: View; label: string }[] = [
-  { id: "day", label: "Day" },
-  { id: "week", label: "Week" },
-  { id: "month", label: "Month" },
-  { id: "agenda", label: "Agenda" },
+const VIEWS: { id: View; labelKey: string }[] = [
+  { id: "day", labelKey: "calendar.view.day" },
+  { id: "week", labelKey: "calendar.view.week" },
+  { id: "month", labelKey: "calendar.view.month" },
+  { id: "agenda", labelKey: "calendar.view.agenda" },
 ];
 
 const VIEW_KEY = "nectar-calendar-view";
@@ -55,12 +56,13 @@ interface Props {
 }
 
 export function NotchCalendar({ caldav, hour12 }: Props) {
+  const t = useT();
   const connected = caldav.connected;
   const today = startOfDay(new Date());
   const [view, setViewState] = useState<View>(readView);
   const [anchor, setAnchor] = useState<Date>(today);
 
-  const time = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12 });
+  const time = (ms: number) => new Date(ms).toLocaleTimeString(dateLocale(), { hour: "numeric", minute: "2-digit", hour12 });
 
   const setView = (next: View) => {
     setViewState(next);
@@ -90,14 +92,14 @@ export function NotchCalendar({ caldav, hour12 }: Props) {
   if (activeView === "week") {
     const first = addDays(anchor, -anchor.getDay());
     const last = addDays(first, 6);
-    const fmt = (d: Date) => d.toLocaleDateString("default", { month: "short", day: "numeric" });
+    const fmt = (d: Date) => d.toLocaleDateString(dateLocale(), { month: "short", day: "numeric" });
     title = `${fmt(first)} – ${first.getMonth() === last.getMonth() ? last.getDate() : fmt(last)}`;
   } else if (activeView === "day") {
-    title = anchor.toLocaleDateString("default", { weekday: "short", month: "short", day: "numeric" });
+    title = anchor.toLocaleDateString(dateLocale(), { weekday: "short", month: "short", day: "numeric" });
   } else if (activeView === "agenda") {
-    title = "Upcoming";
+    title = t("calendar.upcoming");
   } else {
-    title = anchor.toLocaleDateString("default", { month: "long", year: "numeric" });
+    title = anchor.toLocaleDateString(dateLocale(), { month: "long", year: "numeric" });
   }
 
   const showToday = connected && activeView !== "agenda" && !sameDay(anchor, today);
@@ -108,7 +110,7 @@ export function NotchCalendar({ caldav, hour12 }: Props) {
         <span className="month-year">{title}</span>
         {connected && (
           <span className="cal-nav-group">
-            <button className="cal-open" onClick={() => invoke("open_calendar_window").catch(() => {})} title="Open full calendar" aria-label="Open full calendar">
+            <button className="cal-open" onClick={() => invoke("open_calendar_window").catch(() => {})} title={t("calendar.openFull")} aria-label={t("calendar.openFull")}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M15 3h6v6" />
                 <path d="M10 14L21 3" />
@@ -117,15 +119,15 @@ export function NotchCalendar({ caldav, hour12 }: Props) {
             </button>
             {showToday && (
               <button className="cal-today" onClick={() => setAnchor(today)}>
-                Today
+                {t("calendar.today")}
               </button>
             )}
             {activeView !== "agenda" && (
               <>
-                <button className="cal-nav" onClick={() => shift(-1)} aria-label="Previous">
+                <button className="cal-nav" onClick={() => shift(-1)} aria-label={t("calendar.previous")}>
                   &#8249;
                 </button>
-                <button className="cal-nav" onClick={() => shift(1)} aria-label="Next">
+                <button className="cal-nav" onClick={() => shift(1)} aria-label={t("calendar.next")}>
                   &#8250;
                 </button>
               </>
@@ -144,7 +146,7 @@ export function NotchCalendar({ caldav, hour12 }: Props) {
               className={view === v.id ? "active" : ""}
               onClick={() => setView(v.id)}
             >
-              {v.label}
+              {t(v.labelKey)}
             </button>
           ))}
         </div>
@@ -216,7 +218,7 @@ function MonthGrid({ anchor, today, events, connected, onPick }: MonthProps) {
 
   return (
     <div className="calendar-grid">
-      {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
+      {weekdayNames("narrow").map((d, i) => (
         <div key={`${d}-${i}`} className="day-name">
           {d}
         </div>
@@ -231,24 +233,25 @@ interface TimeProps {
 }
 
 function SelectedDay({ day, events, time, onOpen }: TimeProps & { day: Date; events: CalEvent[]; onOpen: () => void }) {
+  const t = useT();
   const list = eventsOn(events, day);
-  const label = day.toLocaleDateString("default", { weekday: "short", day: "numeric" });
+  const label = day.toLocaleDateString(dateLocale(), { weekday: "short", day: "numeric" });
   return (
     <div className="calendar-agenda">
       <button className="agenda-title" onClick={onOpen}>
         {label} <span aria-hidden>&#8250;</span>
       </button>
-      {list.length === 0 && <div className="agenda-empty">No events</div>}
+      {list.length === 0 && <div className="agenda-empty">{t("calendar.noEvents")}</div>}
       {list.slice(0, 3).map((e, i) => (
         <div key={`${e.uid}-${e.start}-${i}`} className="agenda-item" style={colorVar(e)} title={e.location ? `${e.title} · ${e.location}` : e.title}>
           <span className="agenda-dot" />
-          <span className="agenda-time">{e.allDay ? "All day" : time(e.start)}</span>
+          <span className="agenda-time">{e.allDay ? t("calendar.allDay") : time(e.start)}</span>
           <span className="agenda-name">{e.title}</span>
         </div>
       ))}
       {list.length > 3 && (
         <button className="agenda-more" onClick={onOpen}>
-          +{list.length - 3} more
+          {t("calendar.more", { count: list.length - 3 })}
         </button>
       )}
     </div>
@@ -256,15 +259,17 @@ function SelectedDay({ day, events, time, onOpen }: TimeProps & { day: Date; eve
 }
 
 function Chip({ event, time }: TimeProps & { event: CalEvent }) {
+  const t = useT();
   return (
     <span className="cal-chip" style={colorVar(event)} title={event.location ? `${event.title} · ${event.location}` : event.title}>
-      <i>{event.allDay ? "All day" : time(event.start)}</i>
+      <i>{event.allDay ? t("calendar.allDay") : time(event.start)}</i>
       <span>{event.title}</span>
     </span>
   );
 }
 
 function WeekList({ anchor, today, events, time, onOpen }: TimeProps & { anchor: Date; today: Date; events: CalEvent[]; onOpen: (d: Date) => void }) {
+  const t = useT();
   const first = addDays(anchor, -anchor.getDay());
   return (
     <div className="cal-scroll">
@@ -274,15 +279,15 @@ function WeekList({ anchor, today, events, time, onOpen }: TimeProps & { anchor:
         return (
           <button key={i} className={`cal-week-row${sameDay(day, today) ? " today" : ""}`} onClick={() => onOpen(day)}>
             <span className="cal-week-label">
-              <em>{day.toLocaleDateString("default", { weekday: "short" })}</em>
+              <em>{day.toLocaleDateString(dateLocale(), { weekday: "short" })}</em>
               <b>{day.getDate()}</b>
             </span>
             <span className="cal-week-events">
-              {list.length === 0 && <span className="cal-none">Free</span>}
+              {list.length === 0 && <span className="cal-none">{t("calendar.free")}</span>}
               {list.slice(0, 2).map((e, k) => (
                 <Chip key={`${e.uid}-${e.start}-${k}`} event={e} time={time} />
               ))}
-              {list.length > 2 && <span className="cal-more">+{list.length - 2} more</span>}
+              {list.length > 2 && <span className="cal-more">{t("calendar.more", { count: list.length - 2 })}</span>}
             </span>
           </button>
         );
@@ -292,10 +297,11 @@ function WeekList({ anchor, today, events, time, onOpen }: TimeProps & { anchor:
 }
 
 function DayList({ day, events, time }: TimeProps & { day: Date; events: CalEvent[] }) {
+  const t = useT();
   const list = eventsOn(events, day);
   const [nowMs] = useState(() => Date.now());
   if (list.length === 0) {
-    return <div className="cal-empty">Nothing planned</div>;
+    return <div className="cal-empty">{t("calendar.nothingPlanned")}</div>;
   }
   return (
     <div className="cal-scroll">
@@ -305,7 +311,7 @@ function DayList({ day, events, time }: TimeProps & { day: Date; events: CalEven
           <div key={`${e.uid}-${e.start}-${i}`} className="cal-day-event" style={colorVar(e)}>
             <span className="cal-day-time">
               {e.allDay ? (
-                <b>All day</b>
+                <b>{t("calendar.allDay")}</b>
               ) : (
                 <>
                   <b>{time(e.start)}</b>
@@ -316,7 +322,7 @@ function DayList({ day, events, time }: TimeProps & { day: Date; events: CalEven
             <span className="cal-day-body">
               <span className="cal-day-title">
                 {e.title}
-                {live && <em>Now</em>}
+                {live && <em>{t("calendar.now")}</em>}
               </span>
               <span className="cal-day-meta">{[e.location, e.calendar].filter(Boolean).join(" · ")}</span>
             </span>
@@ -328,19 +334,20 @@ function DayList({ day, events, time }: TimeProps & { day: Date; events: CalEven
 }
 
 function AgendaList({ today, events, time, onOpen }: TimeProps & { today: Date; events: CalEvent[]; onOpen: (d: Date) => void }) {
+  const t = useT();
   const groups = Array.from({ length: AGENDA_DAYS }, (_, i) => addDays(today, i))
     .map((day) => ({ day, list: eventsOn(events, day) }))
     .filter((g) => g.list.length > 0);
 
   if (groups.length === 0) {
-    return <div className="cal-empty">Nothing in the next two weeks</div>;
+    return <div className="cal-empty">{t("calendar.agenda.empty", { days: AGENDA_DAYS })}</div>;
   }
 
   const heading = (day: Date) => {
     const diff = Math.round((day.getTime() - today.getTime()) / 86_400_000);
-    if (diff === 0) return "Today";
-    if (diff === 1) return "Tomorrow";
-    return day.toLocaleDateString("default", { weekday: "short", month: "short", day: "numeric" });
+    if (diff === 0) return t("calendar.today");
+    if (diff === 1) return t("calendar.tomorrow");
+    return day.toLocaleDateString(dateLocale(), { weekday: "short", month: "short", day: "numeric" });
   };
 
   return (

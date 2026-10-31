@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { invoke } from '@tauri-apps/api/core';
 import { Visualizer } from './App';
+import { useT } from './i18n';
 import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, MusicNoteIcon, SpeakerIcon, AudioOutputIcon, VolumeLowIcon, VolumeHighIcon } from './icons';
 
 interface MediaInfo {
@@ -115,6 +116,7 @@ export function CompactMediaPlayer({
   onAnimateNext,
   onLayoutChange,
 }: CompactMediaPlayerProps) {
+  const t = useT();
   const seekRef = useRef<HTMLInputElement>(null);
 
   const positionMs = mediaInfo.position_ms ?? 0;
@@ -185,7 +187,7 @@ export function CompactMediaPlayer({
               <motion.img
                 key={`art-${albumArtKey}`}
                 src={albumArtUrl}
-                alt="Art"
+                alt={t("media.art")}
                 draggable={false}
                 initial={{ rotateY: 90, opacity: 0 }}
                 animate={{ rotateY: 0, opacity: 1 }}
@@ -249,7 +251,7 @@ export function CompactMediaPlayer({
           className="cmp-btn cmp-btn-side"
           onClick={(e) => { e.stopPropagation(); onVolumeExpandedChange(!volumeExpanded); }}
           whileTap={{ scale: 0.9 }}
-          data-tooltip="Volume"
+          data-tooltip={t("cc.volume")}
         >
           <SpeakerIcon size={22} muted={volume === 0} />
         </motion.button>
@@ -292,7 +294,7 @@ export function CompactMediaPlayer({
             invoke('open_sound_settings').catch(() => {});
           }}
           whileTap={{ scale: 0.9 }}
-          data-tooltip="Audio Output"
+          data-tooltip={t("media.audioOutput")}
         >
           <AudioOutputIcon size={22} />
         </motion.button>

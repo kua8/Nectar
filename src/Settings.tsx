@@ -18,20 +18,22 @@ import {
 } from "./settings/index";
 import type { SettingsTab } from "./settings/index";
 import { initTheme } from "./theme";
+import { useT } from "./i18n";
 import "./Settings.css";
 
 const appWindow = getCurrentWebviewWindow();
 
-const TABS: { id: SettingsTab; label: string; icon: typeof Settings }[] = [
-  { id: "general", label: "General", icon: Settings },
-  { id: "appearance", label: "Appearance", icon: Palette },
-  { id: "notch", label: "Notch", icon: PanelTop },
-  { id: "dock", label: "Dock", icon: Monitor },
-  { id: "overlays", label: "Overlays", icon: Layers },
-  { id: "about", label: "About", icon: Info },
+const TABS: { id: SettingsTab; labelKey: string; icon: typeof Settings }[] = [
+  { id: "general", labelKey: "tabs.general", icon: Settings },
+  { id: "appearance", labelKey: "tabs.appearance", icon: Palette },
+  { id: "notch", labelKey: "tabs.notch", icon: PanelTop },
+  { id: "dock", labelKey: "tabs.dock", icon: Monitor },
+  { id: "overlays", labelKey: "tabs.overlays", icon: Layers },
+  { id: "about", labelKey: "tabs.about", icon: Info },
 ];
 
 function SettingsApp() {
+  const t = useT();
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
   const settings = useSettings();
 
@@ -70,14 +72,14 @@ function SettingsApp() {
     <div className="settings-container" style={{ zoom: settings.scale }}>
       <div className="title-bar" data-tauri-drag-region>
         <span className="title-text" data-tauri-drag-region>
-          Settings
+          {t("settings.title")}
         </span>
         <WindowControls />
       </div>
 
       <div className="settings-body">
         <div className="settings-sidebar">
-          {TABS.map(({ id, label, icon: Icon }) => (
+          {TABS.map(({ id, labelKey, icon: Icon }) => (
             <button
               key={id}
               className={`sidebar-tab ${activeTab === id || (id === "notch" && activeTab === "calendar-sync") ? "active" : ""}`}
@@ -86,7 +88,7 @@ function SettingsApp() {
               <div className="sidebar-tab-icon">
                 <Icon size={14} strokeWidth={1.5} />
               </div>
-              <span>{label}</span>
+              <span>{t(labelKey)}</span>
             </button>
           ))}
         </div>

@@ -8,6 +8,7 @@ import { useTrailingThrottle } from "./hooks/useTrailingThrottle";
 import { getVersion } from "@tauri-apps/api/app";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { MixerIcon, SpeakerIcon } from "./icons";
+import { useT } from "./i18n";
 import "./Overlay.css";
 import { initTheme } from "./theme";
 
@@ -32,6 +33,7 @@ function MixerTile({
   onMuteToggle: (pid: number) => void;
   draggingRef: { current: number | null };
 }) {
+  const t = useT();
   const [icon, setIcon] = useState<string | null>(null);
   const [showPercentage, setShowPercentage] = useState(false);
   const barRef = useRef<HTMLDivElement>(null);
@@ -112,7 +114,7 @@ function MixerTile({
           showPercentage ? "showing-percent" : ""
         }`}
         onClick={() => onMuteToggle(session.pid)}
-        title={session.is_muted ? "Unmute" : "Mute"}
+        title={session.is_muted ? t("overlay.unmute") : t("overlay.mute")}
       >
         {icon ? (
           <img src={icon} alt="" draggable={false} />
@@ -153,6 +155,7 @@ function VolumeNotch({
   mixerExpanded: boolean;
   onMixerExpandedChange: (expanded: boolean) => void;
 }) {
+  const t = useT();
   const percentage = Math.round(volume * 100);
   const barRef = useRef<HTMLDivElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
@@ -397,7 +400,7 @@ function VolumeNotch({
               e.stopPropagation();
               onMixerExpandedChange(!mixerExpanded);
             }}
-            title="App volume mixer"
+            title={t("overlay.mixer")}
           >
             <span className="volume-notch-action-icon">
               <SpeakerIcon size={16} muted={isMuted} />
@@ -432,10 +435,10 @@ function VolumeNotch({
                 {sessions.length === 0 ? (
                   <div className="volume-mixer-empty">
                     {!sessionsLoaded
-                      ? "Loading..."
+                      ? t("common.loading")
                       : sessionsError
-                        ? "Couldn't read audio sessions"
-                        : "No apps with audio"}
+                        ? t("overlay.mixer.error")
+                        : t("overlay.mixer.empty")}
                   </div>
                 ) : (
                   sessions.map((session) => (
@@ -544,6 +547,7 @@ function BrightnessNotch({
 // ─── Main Overlay Component ─────────────────────────────────────────────────
 
 function OverlayApp() {
+  const t = useT();
   useEffect(() => {
     return initTheme();
   }, []);
@@ -891,9 +895,9 @@ function OverlayApp() {
             <div className="update-splash-card">
               <img src="/nectar.png" className="update-splash-logo" alt="Nectar" />
               <p className="update-splash-text">
-                {updateStatus === 'checking' && "Checking for updates..."}
-                {updateStatus === 'downloading' && `Downloading update... ${updateProgress}%`}
-                {updateStatus === 'installing' && "Installing update..."}
+                {updateStatus === 'checking' && t("overlay.update.checking")}
+                {updateStatus === 'downloading' && t("overlay.update.downloading", { percent: updateProgress })}
+                {updateStatus === 'installing' && t("overlay.update.installing")}
               </p>
               {updateStatus === 'downloading' && (
                 <div className="update-progress-bar">
