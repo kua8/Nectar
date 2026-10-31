@@ -420,6 +420,22 @@ body {
   height: 32px;
 }
 
+.dock-icon .nectar-icon-img.start-img {
+  width: 24px;
+  height: 24px;
+}
+
+.dock-icon img.solid-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+}
+
+.dock-icon-only .dock-icon img.solid-icon {
+  width: 26px;
+  height: 26px;
+}
+
 .dock-icon svg {
   width: 24px;
   height: 24px;

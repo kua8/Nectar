@@ -95,6 +95,39 @@ function parseDrives(val: string | null): string[] {
   }
 }
 
+const solidIconCache = new Map<string, boolean>();
+
+function hasOpaqueCorners(img: HTMLImageElement): boolean {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 16;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return false;
+    ctx.drawImage(img, 0, 0, 16, 16);
+    const data = ctx.getImageData(0, 0, 16, 16).data;
+    return [[0, 0], [15, 0], [0, 15], [15, 15]].every(([x, y]) => data[(y * 16 + x) * 4 + 3] > 235);
+  } catch {
+    return false;
+  }
+}
+
+function DockAppIcon({ src, alt, nectar }: { src: string | undefined; alt: string; nectar: boolean }) {
+  const [solid, setSolid] = useState(() => (src ? solidIconCache.get(src) ?? false : false));
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={nectar ? 'nectar-icon-img' : solid ? 'solid-icon' : ''}
+      draggable={false}
+      onLoad={(e) => {
+        if (nectar || !src) return;
+        if (!solidIconCache.has(src)) solidIconCache.set(src, hasOpaqueCorners(e.currentTarget));
+        setSolid(solidIconCache.get(src) ?? false);
+      }}
+    />
+  );
+}
+
 // Start button icon: a public asset, or the data URI of an uploaded icon ("custom:" prefix).
 function resolveStartIcon(startIcon: string): string {
   if (startIcon === "windows") return "/windows.png";
@@ -1117,7 +1150,7 @@ const Dock = memo(function Dock() {
                       handleAppClick(startItem);
                     }}
                   >
-                    <img src={resolveStartIcon(startIcon)} alt="Start" className="nectar-icon-img" style={startIcon.startsWith("custom:") ? { borderRadius: "8px" } : undefined} draggable={false} />
+                    <img src={resolveStartIcon(startIcon)} alt="Start" className={startIcon === "default" ? "nectar-icon-img" : "nectar-icon-img start-img"} style={startIcon.startsWith("custom:") ? { borderRadius: "8px" } : undefined} draggable={false} />
                   </motion.div>
                 </motion.div>
               )}
@@ -1295,12 +1328,7 @@ const Dock = memo(function Dock() {
                     const isNectarOrSettings = isNectarWindow(app);
                     
                     return (icon || isNectarOrSettings) ? (
-                      <img 
-                        src={isNectarOrSettings ? "/nectar.png" : (icon ?? undefined)} 
-                        alt={app.name} 
-                        className={isNectarOrSettings ? "nectar-icon-img" : ""} 
-                        draggable={false} 
-                      />
+                      <DockAppIcon src={isNectarOrSettings ? "/nectar.png" : (icon ?? undefined)} alt={app.name} nectar={isNectarOrSettings} />
                     ) : (
                       <div className="fallback-icon">{app.name[0]}</div>
                     );
@@ -1401,7 +1429,7 @@ const Dock = memo(function Dock() {
                     const icon = customIcons[cacheKey] || (allowPathFallback && customIcons[app.path]) || iconsRef.current[cacheKey] || (allowPathFallback && iconsRef.current[app.path]) || app.icon;
                           const isNectarOrSettings = isNectarWindow(app);
                           return (icon || isNectarOrSettings) ? (
-                            <img src={isNectarOrSettings ? "/nectar.png" : (icon ?? undefined)} alt={app.name} className={isNectarOrSettings ? "nectar-icon-img" : ""} draggable={false} />
+                            <DockAppIcon src={isNectarOrSettings ? "/nectar.png" : (icon ?? undefined)} alt={app.name} nectar={isNectarOrSettings} />
                           ) : (
                             <div className="fallback-icon">{app.name[0]}</div>
                           );
@@ -1500,7 +1528,7 @@ const Dock = memo(function Dock() {
                     const icon = customIcons[cacheKey] || (allowPathFallback && customIcons[app.path]) || iconsRef.current[cacheKey] || (allowPathFallback && iconsRef.current[app.path]) || app.icon;
                           const isNectarOrSettings = isNectarWindow(app);
                           return (icon || isNectarOrSettings) ? (
-                            <img src={isNectarOrSettings ? "/nectar.png" : (icon ?? undefined)} alt={app.name} className={isNectarOrSettings ? "nectar-icon-img" : ""} draggable={false} />
+                            <DockAppIcon src={isNectarOrSettings ? "/nectar.png" : (icon ?? undefined)} alt={app.name} nectar={isNectarOrSettings} />
                           ) : (
                             <div className="fallback-icon">{app.name[0]}</div>
                           );
