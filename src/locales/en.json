@@ -451,5 +451,7 @@
   "dualClock.sameTime": "Same time as here",
   "dualClock.ahead": "{amount} ahead",
   "dualClock.behind": "{amount} behind",
-  "battery.updateAvailable": "Update Available"
+  "battery.updateAvailable": "Update Available",
+  "notch.scrollVolume": "Scroll on Volume Sliders",
+  "notch.scrollVolume.desc": "Scroll with mouse wheel over volume sliders to adjust system volume"
 }

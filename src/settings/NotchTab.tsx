@@ -16,6 +16,7 @@ import {
   Timer,
   BellRing,
   Globe,
+  Volume2,
 } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { Dropdown } from "./Dropdown";
@@ -62,6 +63,8 @@ interface NotchTabProps {
   toggleAmbience: () => void;
   mediaCompactGlowEnabled: boolean;
   toggleCompactGlow: () => void;
+  notchScrollVolume: boolean;
+  toggleNotchScrollVolume: () => void;
   weatherEnabled: boolean;
   toggleWeather: () => void;
   tempUnitFahrenheit: boolean;
@@ -114,6 +117,8 @@ export function NotchTab({
   toggleAmbience,
   mediaCompactGlowEnabled,
   toggleCompactGlow,
+  notchScrollVolume,
+  toggleNotchScrollVolume,
   weatherEnabled,
   toggleWeather,
   tempUnitFahrenheit,
@@ -301,9 +306,16 @@ export function NotchTab({
               </label>
             </SettingRow>
 
-            <SettingRow icon={Circle} label={t("notch.compactGlow")} desc={t("notch.compactGlow.desc")} divider={false}>
+            <SettingRow icon={Circle} label={t("notch.compactGlow")} desc={t("notch.compactGlow.desc")}>
               <label className="toggle-switch">
                 <input type="checkbox" checked={mediaCompactGlowEnabled} onChange={toggleCompactGlow} />
+                <span className="slider"></span>
+              </label>
+            </SettingRow>
+
+            <SettingRow icon={Volume2} label={t("notch.scrollVolume")} desc={t("notch.scrollVolume.desc")} divider={false}>
+              <label className="toggle-switch">
+                <input type="checkbox" checked={notchScrollVolume} onChange={toggleNotchScrollVolume} />
                 <span className="slider"></span>
               </label>
             </SettingRow>

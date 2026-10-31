@@ -166,6 +166,8 @@ function SettingsApp() {
               toggleAmbience={settings.toggleAmbience}
               mediaCompactGlowEnabled={settings.mediaCompactGlowEnabled}
               toggleCompactGlow={settings.toggleCompactGlow}
+              notchScrollVolume={settings.notchScrollVolume}
+              toggleNotchScrollVolume={settings.toggleNotchScrollVolume}
               weatherEnabled={settings.weatherEnabled}
               toggleWeather={settings.toggleWeather}
               tempUnitFahrenheit={settings.tempUnitFahrenheit}
