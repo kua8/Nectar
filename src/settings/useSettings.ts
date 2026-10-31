@@ -48,6 +48,9 @@ export function useSettings() {
   );
   const [musicModeEnabled, setMusicModeEnabled] = useState(true);
   const [musicCompactNotch, setMusicCompactNotch] = useState(true);
+  const [notchScrollVolume, setNotchScrollVolume] = useState(
+    () => localStorage.getItem("nectar-notch-scroll-volume") === "true"
+  );
   const [volumeOverlayEnabled, setVolumeOverlayEnabled] = useState(true);
   const [volumeEdgeEnabled, setVolumeEdgeEnabled] = useState(
     () => localStorage.getItem("nectar-volume-edge-enabled") !== "false"
@@ -196,6 +199,7 @@ export function useSettings() {
       apply(getVal("nectar-dual-clock-label"), setDualClockLabel, (v) => v);
       apply(getVal("nectar-music-mode-enabled"), setMusicModeEnabled, readBool);
       apply(getVal("nectar-music-compact-notch"), setMusicCompactNotch, readBool);
+      apply(getVal("nectar-notch-scroll-volume"), setNotchScrollVolume, (v) => v === "true");
       apply(getVal("nectar-volume-overlay-enabled"), setVolumeOverlayEnabled, readBool);
       apply(getVal("nectar-brightness-overlay-enabled"), setBrightnessOverlayEnabled, readBool);
       apply(getVal("nectar-media-ambience-enabled"), setMediaAmbienceEnabled, readBool);
@@ -327,6 +331,7 @@ export function useSettings() {
     "nectar-dual-clock-label": (v) => setDualClockLabel(String(v)),
     "nectar-music-mode-enabled": setMusicModeEnabled,
     "nectar-music-compact-notch": setMusicCompactNotch,
+    "nectar-notch-scroll-volume": setNotchScrollVolume,
     "nectar-media-ambience-enabled": setMediaAmbienceEnabled,
     "nectar-media-compact-glow-enabled": setMediaCompactGlowEnabled,
     "nectar-media-layout": setMediaLayout,
@@ -526,6 +531,12 @@ export function useSettings() {
     const next = !musicCompactNotch;
     setMusicCompactNotch(next);
     saveSetting("nectar-music-compact-notch", String(next));
+  };
+
+  const toggleNotchScrollVolume = () => {
+    const next = !notchScrollVolume;
+    setNotchScrollVolume(next);
+    saveSetting("nectar-notch-scroll-volume", String(next));
   };
 
   const toggleMediaLayout = (layout: "classic" | "compact") => {
@@ -964,6 +975,8 @@ export function useSettings() {
     toggleMusicMode,
     musicCompactNotch,
     toggleMusicCompactNotch,
+    notchScrollVolume,
+    toggleNotchScrollVolume,
     mediaLayout,
     toggleMediaLayout,
     mediaAmbienceEnabled,

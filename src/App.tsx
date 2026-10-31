@@ -676,6 +676,7 @@ function App() {
   const productivityEnabled = settingsCalendarEnabled || showClockColumn;
   const [settingsMusicModeEnabled, setSettingsMusicModeEnabled] = useState(() => localStorage.getItem("nectar-music-mode-enabled") !== "false");
   const [settingsMusicCompactNotch, setSettingsMusicCompactNotch] = useState(() => localStorage.getItem("nectar-music-compact-notch") !== "false");
+  const [settingsScrollVolume, setSettingsScrollVolume] = useState(() => localStorage.getItem("nectar-notch-scroll-volume") === "true");
   const [settingsVisualizerEnabled, setSettingsVisualizerEnabled] = useState(() => localStorage.getItem("nectar-visualizer-enabled") !== "false");
   const [settingsAlbumArtEnabled, setSettingsAlbumArtEnabled] = useState(() => localStorage.getItem("nectar-media-album-art-enabled") !== "false");
   const [settingsAmbienceEnabled, setSettingsAmbienceEnabled] = useState(() => localStorage.getItem("nectar-media-ambience-enabled") !== "false");
@@ -855,6 +856,7 @@ function App() {
       "nectar-dual-clock-label": (value) => setDualClockLabel(String(value)),
       "nectar-music-mode-enabled": setSettingsMusicModeEnabled,
       "nectar-music-compact-notch": setSettingsMusicCompactNotch,
+      "nectar-notch-scroll-volume": setSettingsScrollVolume,
       "nectar-media-visualizer-enabled": setSettingsVisualizerEnabled,
       "nectar-visualizer-enabled": setSettingsVisualizerEnabled,
       "nectar-media-album-art-enabled": setSettingsAlbumArtEnabled,
@@ -2333,7 +2335,16 @@ function App() {
                           <span>{t("cc.volume")}</span>
                           {!settingsLegacyMode && <span className="cc-label-more">›</span>}
                         </div>
-                        <div className="cc-classic-slider-track">
+                        <div
+                          className="cc-classic-slider-track"
+                          onWheel={(e) => {
+                            if (!settingsScrollVolume) return;
+                            e.stopPropagation();
+                            const change = e.deltaY < 0 ? 0.02 : -0.02;
+                            const newVol = Math.min(1, Math.max(0, Math.round((volume + change) * 100) / 100));
+                            handleVolumeChange(newVol);
+                          }}
+                        >
                           <input
                             type="range"
                             min="0"

@@ -320,7 +320,15 @@ export function CompactMediaPlayer({
           >
             <div className="cmp-volume-row">
               <VolumeLowIcon size={14} style={{ opacity: 0.65, flexShrink: 0 }} />
-              <div className="cmp-volume-track">
+              <div
+                className="cmp-volume-track"
+                onWheel={(e) => {
+                  if (localStorage.getItem("nectar-notch-scroll-volume") !== "true") return;
+                  e.stopPropagation();
+                  const change = e.deltaY < 0 ? 0.02 : -0.02;
+                  onVolumeChange(Math.min(1, Math.max(0, Math.round((volume + change) * 100) / 100)));
+                }}
+              >
                 <div className="cmp-volume-fill" style={{ width: `${volume * 100}%` }} />
                 <input
                   type="range"
