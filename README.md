@@ -14,7 +14,7 @@
 <br />
 
 [![Latest release](https://shieldcn.dev/badge/release-v1.7.0.svg?logo=lu:Tag)](https://github.com/kua8/Nectar/releases/latest)
-[![Downloads](https://shieldcn.dev/badge/downloads-17.7k.svg?logo=lu:Download)](https://github.com/kua8/Nectar/releases)
+[![Downloads](https://badges.kua8.lol/downloads.svg)](https://github.com/kua8/Nectar/releases)
 [![License](https://shieldcn.dev/github/license/kua8/Nectar.svg?logo=lu:Scale)](LICENSE)
 [![Platform](https://shieldcn.dev/badge/platform-Windows.svg?logo=ri:FaWindows)](https://www.microsoft.com/windows)
 
