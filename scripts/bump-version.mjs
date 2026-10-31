@@ -47,8 +47,9 @@ function updatePackageLockJson(relativePath) {
 function updateReadmeBadges() {
   const path = resolve(root, "README.md");
   const content = readFileSync(path, "utf8");
-  const pattern = /(shieldcn\.dev\/github\/(?:release|downloads)\/kua8\/Nectar\.svg\?logo=[^)&]*)(?:&v=[^)&]*)?/g;
-  writeFileSync(path, content.replace(pattern, `$1&v=${version}`));
+  const release = /shieldcn\.dev\/badge\/release-v[\d.]+\.svg/;
+  const downloads = /(shieldcn\.dev\/github\/downloads\/kua8\/Nectar\.svg\?logo=[^)&]*)(?:&v=[^)&]*)?/;
+  writeFileSync(path, content.replace(release, `shieldcn.dev/badge/release-v${version}.svg`).replace(downloads, `$1&v=${version}`));
 }
 
 updateJson("package.json");
