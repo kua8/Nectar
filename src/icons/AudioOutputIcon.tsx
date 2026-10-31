@@ -1,4 +1,4 @@
-import AudioOutputSvg from './sf/speaker.wave.3.fill.svg?react';
+import AudioOutputSvg from './sf/headphones.svg?react';
 
 interface AudioOutputIconProps {
   size?: number;
