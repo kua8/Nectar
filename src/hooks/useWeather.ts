@@ -136,9 +136,7 @@ const IP_LOCATION_KEY = "nectar-weather-ip-location";
 function rememberIpLocation(location: ResolvedLocation): ResolvedLocation {
   try {
     localStorage.setItem(IP_LOCATION_KEY, JSON.stringify(location));
-  } catch {
-    // storage unavailable
-  }
+  } catch {}
   return location;
 }
 
@@ -204,7 +202,7 @@ async function resolveLocation(): Promise<ResolvedLocation> {
     // fall through to default
   }
 
-  // 4. Last location an IP lookup found, then London
+  // 4. Default to London
   const last = lastIpLocation();
   if (last) return last;
   return { lat: LONDON_LAT, lon: LONDON_LON, city: "London" };

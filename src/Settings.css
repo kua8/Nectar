@@ -252,7 +252,6 @@ body {
   border: 1px solid var(--nectar-border, rgba(255, 255, 255, 0.05));
 }
 
-/* A group with a single dropdown row needs to let the menu spill out of it. */
 .setting-group--menu {
   overflow: visible;
 }

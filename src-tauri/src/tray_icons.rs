@@ -131,7 +131,6 @@ fn place_flyout(flyout: HWND, anchor: Option<(i32, i32)>) {
     }
 }
 
-/// Loads UI Automation and walks the taskbar once, so the first real click isn't the slow one.
 pub fn warm_up() {
     unsafe {
         let _ = CoInitializeEx(None, COINIT_MULTITHREADED);

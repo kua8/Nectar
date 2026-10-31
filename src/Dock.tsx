@@ -178,8 +178,6 @@ interface AppMediaSession {
   is_playing: boolean;
 }
 
-// Media sessions are keyed by app id: an exe name for desktop apps (Spotify.exe),
-// a package id for packaged ones (SpotifyAB.SpotifyMusic_...!Spotify).
 function sessionForApp(app: AppInfo, sessions: AppMediaSession[]): AppMediaSession | undefined {
   const exe = (app.executable || app.path.split(/[\\/]/).pop() || "").toLowerCase().replace(/\.exe$/, "");
   if (!exe) return undefined;
