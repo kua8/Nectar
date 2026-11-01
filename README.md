@@ -24,11 +24,11 @@
 
 <br /><br />
 
-<a href="docs/nectar-trailer-glass.mp4">
-  <img src="docs/trailer-preview.png" width="860" alt="Watch Nectar in action — 40-second trailer" />
+<a href="https://nectar.kua8.lol/trailer/">
+  <img src="docs/trailer-preview.svg" width="860" alt="Watch Nectar in action — 40-second trailer" />
 </a>
 
-[**▶ Watch Nectar in action**](docs/nectar-trailer-glass.mp4) · 40 seconds
+[**▶ Watch Nectar in action**](https://nectar.kua8.lol/trailer/) · 40 seconds
 
 </div>
 
