@@ -307,7 +307,7 @@ export function DockTab({
               </label>
             </SettingRow>
 
-            {dockSearchEnabled && (
+            {!legacyMode && dockSearchEnabled && (
               <SettingRow
                 icon={TextSearch}
                 label={t("dock.searchWith")}
@@ -321,7 +321,7 @@ export function DockTab({
               </SettingRow>
             )}
 
-            {dockSearchEnabled && (dockSearchProvider === "raycast" || dockSearchProvider === "shortcut") && (
+            {!legacyMode && dockSearchEnabled && (dockSearchProvider === "raycast" || dockSearchProvider === "shortcut") && (
               <SettingRow
                 icon={Keyboard}
                 label={t("dock.searchShortcut")}

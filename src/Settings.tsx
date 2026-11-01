@@ -130,6 +130,7 @@ function SettingsApp() {
               themeAccentColor={settings.themeAccentColor}
               handleAccentColorChange={settings.handleAccentColorChange}
               applyThemePreset={settings.applyThemePreset}
+              legacyMode={settings.legacyMode}
               cornersEnabled={settings.cornersEnabled}
               toggleCorners={settings.toggleCorners}
               scale={settings.scale}

@@ -574,7 +574,8 @@ pub async fn open_app(app: AppHandle, window: Window, app_name: String, args: Op
     }
 
     if app_name == "search" {
-        let provider = get_setting_str(&app, "nectar-dock-search-provider").unwrap_or_default();
+        let legacy = get_setting_str(&app, "nectar-legacy-mode").is_some_and(|v| v == "true");
+        let provider = if legacy { String::new() } else { get_setting_str(&app, "nectar-dock-search-provider").unwrap_or_default() };
         let shortcut = get_setting_str(&app, "nectar-dock-search-shortcut");
         let label = window.label().to_string();
         tauri::async_runtime::spawn_blocking(move || {

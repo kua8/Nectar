@@ -179,10 +179,11 @@ let accentGeneration = 0;
 async function applyAccent(
   root: HTMLElement,
   surface: string,
-  material: { op: number; opExpanded: number; opPanel: number; fallback: string } | null
+  material: { op: number; opExpanded: number; opPanel: number; fallback: string } | null,
+  legacy: boolean
 ) {
   const generation = ++accentGeneration;
-  const accentMode = localStorage.getItem("nectar-theme-accent") || "mono";
+  const accentMode = legacy ? "mono" : localStorage.getItem("nectar-theme-accent") || "mono";
   let color: string | null = null;
   if (accentMode === "custom") {
     color = localStorage.getItem("nectar-theme-accent-color") || DEFAULT_ACCENT_COLOR;
@@ -217,7 +218,9 @@ export async function applyTheme(
   const root = document.documentElement;
   mode = resolveMode(mode);
 
-  const style = localStorage.getItem("nectar-theme-style") || "solid";
+  // Legacy Mode keeps the classic look: no glass or Material You, and monochrome highlights.
+  const legacy = localStorage.getItem("nectar-legacy-mode") === "true";
+  const style = legacy ? "solid" : localStorage.getItem("nectar-theme-style") || "solid";
   root.classList.remove(...THEME_STYLES.map((s) => `style-${s}`));
   root.classList.add(`style-${(THEME_STYLES as readonly string[]).includes(style) ? style : "solid"}`);
 
@@ -336,7 +339,8 @@ export async function applyTheme(
     applyAccent(
       root,
       surface,
-      style === "material" ? { op, opExpanded, opPanel, fallback: isHex(customColor) ? customColor : DEFAULT_ACCENT_COLOR } : null
+      style === "material" ? { op, opExpanded, opPanel, fallback: isHex(customColor) ? customColor : DEFAULT_ACCENT_COLOR } : null,
+      legacy
     ),
     applyBackdrop(root, style),
   ]);
@@ -366,7 +370,7 @@ export function initTheme(options: { backdrop?: boolean } = {}) {
     const brightnessVal = settings['nectar-theme-brightness'] ? parseFloat(String(settings['nectar-theme-brightness'])) : syncBrightness;
 
     let styleOrAccentChanged = false;
-    for (const key of ['nectar-theme-accent', 'nectar-theme-accent-color', 'nectar-theme-style']) {
+    for (const key of ['nectar-theme-accent', 'nectar-theme-accent-color', 'nectar-theme-style', 'nectar-legacy-mode']) {
       const val = settings[key];
       if (val !== undefined && val !== null && String(val) !== localStorage.getItem(key)) {
         localStorage.setItem(key, String(val));
@@ -410,6 +414,7 @@ export function initTheme(options: { backdrop?: boolean } = {}) {
     'nectar-theme-accent',
     'nectar-theme-accent-color',
     'nectar-theme-style',
+    'nectar-legacy-mode',
     'nectar-scale',
   ];
 

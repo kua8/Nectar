@@ -33,6 +33,7 @@ interface AppearanceTabProps {
   themeAccentColor: string;
   handleAccentColorChange: (color: string) => void;
   applyThemePreset: (preset: ThemePreset) => void;
+  legacyMode: boolean;
 }
 
 export function AppearanceTab({
@@ -57,9 +58,10 @@ export function AppearanceTab({
   themeAccentColor,
   handleAccentColorChange,
   applyThemePreset,
+  legacyMode,
 }: AppearanceTabProps) {
   const t = useT();
-  const isMaterial = themeStyle === "material";
+  const isMaterial = !legacyMode && themeStyle === "material";
   const showCustomColor = themeMode === "custom";
   // Material You builds the whole palette from the accent, so these don't apply there.
   const showAdvancedSliders = !isMaterial && (themeMode === "custom" || themeMode === "adaptive");
@@ -72,25 +74,29 @@ export function AppearanceTab({
   return (
     <>
       <SettingSection id="appearance-theme" title={t("appearance.theme.group")} defaultOpen>
-        <SettingRow icon={Layers} label={t("appearance.style")} desc={t("appearance.style.desc")} divider={false} />
-        <div className="style-tiles" role="radiogroup" aria-label={t("appearance.style")}>
-          {STYLES.map((style) => (
-            <button
-              key={style}
-              type="button"
-              role="radio"
-              aria-checked={themeStyle === style}
-              className={`style-tile${themeStyle === style ? " active" : ""}`}
-              onClick={() => handleThemeStyleChange(style)}
-            >
-              <span className={`style-tile-preview style-preview-${style}`}>
-                <span className="style-tile-pill" />
-              </span>
-              <span className="style-tile-label">{t(`appearance.style.${style}`)}</span>
-            </button>
-          ))}
-        </div>
-        <div className="setting-divider" />
+        {!legacyMode && (
+          <>
+            <SettingRow icon={Layers} label={t("appearance.style")} desc={t("appearance.style.desc")} divider={false} />
+            <div className="style-tiles" role="radiogroup" aria-label={t("appearance.style")}>
+              {STYLES.map((style) => (
+                <button
+                  key={style}
+                  type="button"
+                  role="radio"
+                  aria-checked={themeStyle === style}
+                  className={`style-tile${themeStyle === style ? " active" : ""}`}
+                  onClick={() => handleThemeStyleChange(style)}
+                >
+                  <span className={`style-tile-preview style-preview-${style}`}>
+                    <span className="style-tile-pill" />
+                  </span>
+                  <span className="style-tile-label">{t(`appearance.style.${style}`)}</span>
+                </button>
+              ))}
+            </div>
+            <div className="setting-divider" />
+          </>
+        )}
 
         <SettingRow icon={Palette} label={t("appearance.mode")} desc={t("appearance.mode.desc")}>
           <Dropdown
@@ -127,23 +133,25 @@ export function AppearanceTab({
           </div>
         </SettingRow>
 
-        <SettingRow
-          icon={Highlighter}
-          label={t("appearance.accent")}
-          desc={isMaterial ? t("appearance.accent.descMaterial") : t("appearance.accent.desc")}
-        >
-          <Dropdown
-            value={isMaterial && themeAccent === "mono" ? "system" : themeAccent}
-            onChange={handleAccentChange}
-            options={[
-              ...(isMaterial ? [] : [{ value: "mono", label: t("appearance.accent.mono") }]),
-              { value: "system", label: t("appearance.accent.system") },
-              { value: "custom", label: t("appearance.accent.custom") },
-            ]}
-          />
-        </SettingRow>
+        {!legacyMode && (
+          <SettingRow
+            icon={Highlighter}
+            label={t("appearance.accent")}
+            desc={isMaterial ? t("appearance.accent.descMaterial") : t("appearance.accent.desc")}
+          >
+            <Dropdown
+              value={isMaterial && themeAccent === "mono" ? "system" : themeAccent}
+              onChange={handleAccentChange}
+              options={[
+                ...(isMaterial ? [] : [{ value: "mono", label: t("appearance.accent.mono") }]),
+                { value: "system", label: t("appearance.accent.system") },
+                { value: "custom", label: t("appearance.accent.custom") },
+              ]}
+            />
+          </SettingRow>
+        )}
 
-        {themeAccent === "custom" && (
+        {!legacyMode && themeAccent === "custom" && (
           <SettingRow icon={Droplet} label={t("appearance.accentColor")} desc={t("appearance.accentColor.desc")}>
             <div className="color-picker-row">
               <input
