@@ -17,6 +17,7 @@ mod calendar_sync;
 mod ics;
 mod active_look;
 mod connections;
+mod wallpaper;
 
 use tauri::Manager;
 use windows::Win32::System::Console::SetConsoleCtrlHandler;
@@ -175,6 +176,7 @@ fn main() {
             has_battery,
             open_battery_saver_settings,
             get_system_accent_color,
+            wallpaper::get_wallpaper_backdrop,
             get_monitors,
             get_dock_mode_for_window,
             get_notch_mode_for_window,

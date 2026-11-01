@@ -354,7 +354,7 @@ const TitleMarquee = ({ title }: { title: string }) => {
 
 function App() {
   useEffect(() => {
-    return initTheme();
+    return initTheme({ backdrop: true });
   }, []);
 
   const [time, setTime] = useState("");
@@ -1735,6 +1735,8 @@ function App() {
           default: { type: "spring", stiffness: 500, damping: 30, mass: 1 }
         }}
       >
+        <div className="surface-backdrop" aria-hidden="true" />
+        <div className="surface-backdrop-corners" aria-hidden="true" />
         {widgetTip && isHovered && <div className="widget-tip">{widgetTip}</div>}
 
         <AnimatePresence>

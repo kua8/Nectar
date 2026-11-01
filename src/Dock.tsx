@@ -183,7 +183,7 @@ function WindowDots({ count }: { count: number }) {
 
 const Dock = memo(function Dock() {
   useEffect(() => {
-    return initTheme();
+    return initTheme({ backdrop: true });
   }, []);
 
   const [pinnedApps, setPinnedApps] = useState<AppInfo[]>([]);
@@ -1016,6 +1016,8 @@ const Dock = memo(function Dock() {
         style={{ originX: 0.5, originY: 1, minWidth: 34 }}
         onContextMenu={(e) => handleContextMenu(e, null)}
       >
+        <div className="surface-backdrop" aria-hidden="true" />
+        <div className="surface-backdrop-corners" aria-hidden="true" />
         <AnimatePresence>
           {isExpanded && (
             <motion.div
