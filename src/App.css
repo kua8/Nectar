@@ -220,24 +220,12 @@ img {
     left: -13px;
     -webkit-mask-image: radial-gradient(circle at 0% 100%, transparent 12.5px, black 13px);
     mask-image: radial-gradient(circle at 0% 100%, transparent 12.5px, black 13px);
-    background-image:
-        radial-gradient(circle at 0 13px,
-            transparent 12px,
-            rgba(255, 255, 255, 0.1) 12.7px,
-            rgba(255, 255, 255, 0.1) 13.3px,
-            transparent 14px);
 }
 
 .nectar.is-impacted::after {
     right: -13px;
     -webkit-mask-image: radial-gradient(circle at 100% 100%, transparent 12.5px, black 13px);
     mask-image: radial-gradient(circle at 100% 100%, transparent 12.5px, black 13px);
-    background-image:
-        radial-gradient(circle at 13px 13px,
-            transparent 12px,
-            rgba(255, 255, 255, 0.1) 12.7px,
-            rgba(255, 255, 255, 0.1) 13.3px,
-            transparent 14px);
 }
 
 .time-center {

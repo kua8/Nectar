@@ -1356,11 +1356,25 @@ input:checked + .slider:before {
 }
 
 .panel-order-reset {
-    border: none;
-    background: none;
-    color: var(--nectar-text-muted, rgba(255, 255, 255, 0.5));
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    align-self: flex-end;
+    padding: 5px 12px;
+    border: 1px solid var(--nectar-border, rgba(255, 255, 255, 0.1));
+    border-radius: 8px;
+    background: transparent;
+    color: var(--nectar-text-muted, rgba(255, 255, 255, 0.6));
     font-size: 11px;
+    font-weight: 500;
     cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.panel-order-reset:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--nectar-text, rgba(255, 255, 255, 0.9));
+    border-color: rgba(255, 255, 255, 0.2);
 }
 
 .setting-section {

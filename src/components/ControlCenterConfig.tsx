@@ -13,7 +13,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Bell, BatteryCharging, Bluetooth, ChevronUp, Moon, PanelBottom, PanelTop, RotateCw, Settings, Sun, Volume2, Wifi, X } from "lucide-react";
+import { Bell, BatteryCharging, Bluetooth, ChevronUp, Moon, PanelBottom, PanelTop, RotateCcw, RotateCw, Settings, Sun, Volume2, Wifi, X } from "lucide-react";
 import type { ComponentType } from "react";
 import { resolveCcLayout, type CcKind, type CcLayout } from "../panelOrder";
 import { useT } from "../i18n";
@@ -154,7 +154,7 @@ export function ControlCenterConfig({ value, onChange, onReset, customized }: Pr
             </div>
           </div>
         )}
-        {customized && <button className="panel-order-reset" onClick={onReset}>{t("notch.panelOrder.reset")}</button>}
+        {customized && <button className="panel-order-reset" onClick={onReset}><RotateCcw size={12} />{t("notch.panelOrder.reset")}</button>}
       </div>
       <DragOverlay>
         {activeItem && activeId ? (
