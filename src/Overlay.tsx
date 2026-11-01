@@ -7,7 +7,8 @@ import { useSettingsSync } from "./hooks/useSettingsSync";
 import { useTrailingThrottle } from "./hooks/useTrailingThrottle";
 import { getVersion } from "@tauri-apps/api/app";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { MixerIcon, SpeakerIcon } from "./icons";
+import { Check, ChevronRight } from "lucide-react";
+import { AudioOutputIcon, MixerIcon, SpeakerIcon } from "./icons";
 import { useT } from "./i18n";
 import "./Overlay.css";
 import { initTheme } from "./theme";
@@ -20,6 +21,12 @@ interface AudioSession {
   process_path: string | null;
   volume: number;
   is_muted: boolean;
+}
+
+interface OutputDevice {
+  id: string;
+  name: string;
+  is_default: boolean;
 }
 
 function MixerTile({
@@ -145,9 +152,17 @@ const MIXER_COLUMN_GAP = 4;
 const MIXER_PANEL_PADDING = 8;
 const MIXER_MAX_COLUMNS = 4;
 const MIXER_EMPTY_COLUMNS = 2;
+// The output picker always opens at the widest mixer size so device names have room.
+const DEVICES_PANEL_WIDTH =
+  MIXER_PANEL_PADDING * 2 +
+  MIXER_MAX_COLUMNS * MIXER_COLUMN_WIDTH +
+  (MIXER_MAX_COLUMNS - 1) * MIXER_COLUMN_GAP;
+
+type PanelView = "mixer" | "devices";
 
 // Last session list, so reopening renders at the right width.
 let lastKnownSessions: AudioSession[] = [];
+let lastKnownDevices: OutputDevice[] = [];
 
 function VolumeNotch({
   volume,
@@ -174,6 +189,12 @@ function VolumeNotch({
   const [showPercentage, setShowPercentage] = useState(false);
   const percentageTimeoutRef = useRef<any>(null);
 
+  const [view, setView] = useState<PanelView>("mixer");
+  const [devices, setDevices] = useState<OutputDevice[]>(lastKnownDevices);
+  const [devicesLoaded, setDevicesLoaded] = useState(false);
+  const [devicesError, setDevicesError] = useState(false);
+  const [switchingId, setSwitchingId] = useState<string | null>(null);
+
   // Panel width follows the app count (empty state keeps room for the message).
   const mixerColumns =
     sessions.length === 0 ? MIXER_EMPTY_COLUMNS : Math.min(sessions.length, MIXER_MAX_COLUMNS);
@@ -181,6 +202,18 @@ function VolumeNotch({
     MIXER_PANEL_PADDING * 2 +
     mixerColumns * MIXER_COLUMN_WIDTH +
     (mixerColumns - 1) * MIXER_COLUMN_GAP;
+  const panelWidth = view === "devices" ? DEVICES_PANEL_WIDTH : mixerPanelWidth;
+  const currentDevice = devices.find((d) => d.is_default);
+
+  // The same buttons open the panel on their view, or close it when it's already showing.
+  const togglePanel = (target: PanelView) => {
+    if (mixerExpanded && view === target) {
+      onMixerExpandedChange(false);
+      return;
+    }
+    setView(target);
+    if (!mixerExpanded) onMixerExpandedChange(true);
+  };
 
   // Show the percentage instead of the icon when the volume changes.
   useEffect(() => {
@@ -236,6 +269,42 @@ function VolumeNotch({
     const interval = setInterval(refreshSessions, 2000);
     return () => clearInterval(interval);
   }, [mixerExpanded, refreshSessions]);
+
+  const refreshDevices = useCallback(() => {
+    invoke<OutputDevice[]>("get_audio_devices")
+      .then((list) => {
+        lastKnownDevices = list;
+        setDevices(list);
+        setDevicesLoaded(true);
+        setDevicesError(false);
+      })
+      .catch(() => {
+        setDevicesLoaded(true);
+        setDevicesError(true);
+      });
+  }, []);
+
+  // The header shows the current output in both views, so load the list whenever the panel opens.
+  useEffect(() => {
+    if (!mixerExpanded) return;
+    refreshDevices();
+  }, [mixerExpanded, view, refreshDevices]);
+
+  const handleSelectDevice = useCallback(
+    (device: OutputDevice) => {
+      if (device.is_default || switchingId) return;
+      setSwitchingId(device.id);
+      setDevices((prev) => prev.map((d) => ({ ...d, is_default: d.id === device.id })));
+      // The volume worker picks up the new endpoint on its own and emits volume-change.
+      invoke("set_default_audio_device", { id: device.id })
+        .catch(() => {})
+        .finally(() => {
+          setSwitchingId(null);
+          refreshDevices();
+        });
+    },
+    [switchingId, refreshDevices]
+  );
 
   // Report the card bounds (notch + panel) so the mouse hook keeps it clickable and closes it when the cursor leaves.
   const expandedRef = useRef(mixerExpanded);
@@ -374,7 +443,7 @@ function VolumeNotch({
       <motion.div
         ref={shellRef}
         className="volume-notch"
-        animate={{ width: mixerExpanded ? 42 + mixerPanelWidth : 42 }}
+        animate={{ width: mixerExpanded ? 42 + panelWidth : 42 }}
         transition={{ type: "spring", bounce: 0, duration: 0.35 }}
         onAnimationComplete={reportPanelBounds}
       >
@@ -389,6 +458,16 @@ function VolumeNotch({
           exit={{ opacity: 0, x: -5, transition: { duration: 0.15 } }}
           transition={{ delay: 0.05, duration: 0.2, ease: "easeOut" }}
         >
+          <button
+            className={`volume-notch-device ${mixerExpanded && view === "devices" ? "active" : ""}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              togglePanel("devices");
+            }}
+            title={currentDevice ? `${t("overlay.output")}: ${currentDevice.name}` : t("overlay.output")}
+          >
+            <AudioOutputIcon size={14} />
+          </button>
           <div
             ref={barRef}
             className="volume-notch-bar"
@@ -404,12 +483,12 @@ function VolumeNotch({
             />
           </div>
           <button
-            className={`volume-notch-action ${mixerExpanded ? "active" : ""} ${
+            className={`volume-notch-action ${mixerExpanded && view === "mixer" ? "active" : ""} ${
               showPercentage ? "showing-percent" : ""
             }`}
             onClick={(e) => {
               e.stopPropagation();
-              onMixerExpandedChange(!mixerExpanded);
+              togglePanel("mixer");
             }}
             title={t("overlay.mixer")}
           >
@@ -427,7 +506,7 @@ function VolumeNotch({
           {mixerExpanded && (
             <motion.div
               className="volume-mixer-panel"
-              style={{ width: mixerPanelWidth }}
+              style={{ width: panelWidth }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{
@@ -439,30 +518,75 @@ function VolumeNotch({
                 }
               }}
             >
-              <div
-                className="volume-mixer-list"
-                style={{ gridTemplateColumns: `repeat(${mixerColumns}, 1fr)` }}
-              >
-                {sessions.length === 0 ? (
-                  <div className="volume-mixer-empty">
-                    {!sessionsLoaded
-                      ? t("common.loading")
-                      : sessionsError
-                        ? t("overlay.mixer.error")
-                        : t("overlay.mixer.empty")}
-                  </div>
-                ) : (
-                  sessions.map((session) => (
-                    <MixerTile
-                      key={session.pid}
-                      session={session}
-                      onVolumeChange={handleAppVolumeChange}
-                      onMuteToggle={handleAppMuteToggle}
-                      draggingRef={draggingRef}
-                    />
-                  ))
-                )}
-              </div>
+              {/* Sits level with the output button so the sliders below stay aligned with the main bar. */}
+              {view === "mixer" ? (
+                <button
+                  className="volume-panel-header clickable"
+                  onClick={() => setView("devices")}
+                  title={t("overlay.output")}
+                >
+                  <span className="volume-panel-header-text">
+                    {currentDevice?.name ?? t("overlay.output")}
+                  </span>
+                  <ChevronRight size={12} />
+                </button>
+              ) : (
+                <div className="volume-panel-header">
+                  <span className="volume-panel-header-text">{t("overlay.output")}</span>
+                </div>
+              )}
+              {view === "devices" ? (
+                <div className="volume-device-list">
+                  {devices.length === 0 ? (
+                    <div className="volume-mixer-empty">
+                      {!devicesLoaded
+                        ? t("common.loading")
+                        : devicesError
+                          ? t("overlay.output.error")
+                          : t("overlay.output.empty")}
+                    </div>
+                  ) : (
+                    devices.map((device) => (
+                      <button
+                        key={device.id}
+                        className={`volume-device-row ${device.is_default ? "selected" : ""} ${
+                          switchingId === device.id ? "busy" : ""
+                        }`}
+                        onClick={() => handleSelectDevice(device)}
+                        title={device.name}
+                      >
+                        <span className="volume-device-name">{device.name}</span>
+                        {device.is_default && <Check size={12} />}
+                      </button>
+                    ))
+                  )}
+                </div>
+              ) : (
+                <div
+                  className="volume-mixer-list"
+                  style={{ gridTemplateColumns: `repeat(${mixerColumns}, 1fr)` }}
+                >
+                  {sessions.length === 0 ? (
+                    <div className="volume-mixer-empty">
+                      {!sessionsLoaded
+                        ? t("common.loading")
+                        : sessionsError
+                          ? t("overlay.mixer.error")
+                          : t("overlay.mixer.empty")}
+                    </div>
+                  ) : (
+                    sessions.map((session) => (
+                      <MixerTile
+                        key={session.pid}
+                        session={session}
+                        onVolumeChange={handleAppVolumeChange}
+                        onMuteToggle={handleAppMuteToggle}
+                        draggingRef={draggingRef}
+                      />
+                    ))
+                  )}
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
