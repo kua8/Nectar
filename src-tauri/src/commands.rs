@@ -574,7 +574,9 @@ pub async fn open_app(app: AppHandle, app_name: String, args: Option<String>) {
     }
 
     if app_name == "search" {
-        tauri::async_runtime::spawn_blocking(|| send_win_chord(windows::Win32::UI::Input::KeyboardAndMouse::VK_S));
+        let provider = get_setting_str(&app, "nectar-dock-search-provider").unwrap_or_default();
+        let shortcut = get_setting_str(&app, "nectar-dock-search-shortcut");
+        tauri::async_runtime::spawn_blocking(move || crate::launchers::open_search(&provider, shortcut.as_deref()));
         return;
     }
 

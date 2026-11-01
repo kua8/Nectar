@@ -79,7 +79,7 @@
   "dock.previews": "Uygulama Önizlemeleri",
   "dock.previews.desc": "Üzerine gelindiğinde pencere küçük resimlerini göster",
   "dock.search": "Arama Simgesi",
-  "dock.search.desc": "Başlat'ın yanında Windows Arama kısayolu göster",
+  "dock.search.desc": "Başlat'ın yanında bir arama kısayolu göster",
   "dock.calendar": "Takvim Simgesi",
   "dock.calendar.desc": "Takvim penceresini açan bir kısayol göster",
   "dock.tray": "Gizli Simgeler Düğmesi",

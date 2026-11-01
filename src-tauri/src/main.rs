@@ -21,6 +21,7 @@ mod audio_devices;
 mod i18n;
 mod shelf;
 mod wallpaper;
+mod launchers;
 
 use tauri::Manager;
 use windows::Win32::System::Console::SetConsoleCtrlHandler;

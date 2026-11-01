@@ -99,6 +99,12 @@ export function useSettings() {
   const [dockEnabled, setDockEnabled] = useState(true);
   const [dockPreviewEnabled, setDockPreviewEnabled] = useState(true);
   const [dockSearchEnabled, setDockSearchEnabled] = useState(true);
+  const [dockSearchProvider, setDockSearchProvider] = useState(
+    () => localStorage.getItem("nectar-dock-search-provider") || "windows"
+  );
+  const [dockSearchShortcut, setDockSearchShortcut] = useState(
+    () => localStorage.getItem("nectar-dock-search-shortcut") || ""
+  );
   const [dockCalendarEnabled, setDockCalendarEnabled] = useState(true);
   const [dockTray, setDockTray] = useState(
     () => localStorage.getItem("nectar-dock-tray-enabled") !== "false"
@@ -244,6 +250,8 @@ export function useSettings() {
       apply(getVal("nectar-dock-enabled"), setDockEnabled, readBool);
       apply(getVal("nectar-dock-preview-enabled"), setDockPreviewEnabled, readBool);
       apply(getVal("nectar-dock-search-enabled"), setDockSearchEnabled, readBool);
+      apply(getVal("nectar-dock-search-provider"), setDockSearchProvider, (v) => v);
+      apply(getVal("nectar-dock-search-shortcut"), setDockSearchShortcut, (v) => v);
       apply(getVal("nectar-dock-calendar-enabled"), setDockCalendarEnabled, readBool);
       apply(getVal("nectar-dock-tray-enabled"), setDockTray, (v) => v !== "false");
       apply(getVal("nectar-dock-taskview-enabled"), setDockTaskView, readBool);
@@ -367,6 +375,8 @@ export function useSettings() {
     "nectar-dock-win-number-enabled": setDockWinNumberEnabled,
     "nectar-dock-preview-enabled": setDockPreviewEnabled,
     "nectar-dock-search-enabled": setDockSearchEnabled,
+    "nectar-dock-search-provider": (v) => setDockSearchProvider(String(v)),
+    "nectar-dock-search-shortcut": (v) => setDockSearchShortcut(String(v)),
     "nectar-dock-calendar-enabled": setDockCalendarEnabled,
     "nectar-dock-mixed-reorder": setDockMixedReorder,
     "nectar-weather-enabled": setWeatherEnabled,
@@ -689,6 +699,16 @@ export function useSettings() {
     const next = !dockPreviewEnabled;
     setDockPreviewEnabled(next);
     saveSetting("nectar-dock-preview-enabled", String(next));
+  };
+
+  const handleDockSearchProviderChange = (provider: string) => {
+    setDockSearchProvider(provider);
+    saveSetting("nectar-dock-search-provider", provider);
+  };
+
+  const handleDockSearchShortcutChange = (shortcut: string) => {
+    setDockSearchShortcut(shortcut);
+    saveSetting("nectar-dock-search-shortcut", shortcut);
   };
 
   const toggleDockSearch = () => {
@@ -1170,6 +1190,10 @@ export function useSettings() {
     toggleDockPreview,
     dockSearchEnabled,
     toggleDockSearch,
+    dockSearchProvider,
+    handleDockSearchProviderChange,
+    dockSearchShortcut,
+    handleDockSearchShortcutChange,
     dockCalendarEnabled,
     toggleDockCalendar,
     dockTray,

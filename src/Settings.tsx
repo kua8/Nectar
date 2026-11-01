@@ -219,6 +219,10 @@ function SettingsApp() {
               toggleDockPreview={settings.toggleDockPreview}
               dockSearchEnabled={settings.dockSearchEnabled}
               toggleDockSearch={settings.toggleDockSearch}
+              dockSearchProvider={settings.dockSearchProvider}
+              handleDockSearchProviderChange={settings.handleDockSearchProviderChange}
+              dockSearchShortcut={settings.dockSearchShortcut}
+              handleDockSearchShortcutChange={settings.handleDockSearchShortcutChange}
               dockCalendarEnabled={settings.dockCalendarEnabled}
               toggleDockCalendar={settings.toggleDockCalendar}
               legacyMode={settings.legacyMode}
