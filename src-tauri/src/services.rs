@@ -1089,6 +1089,8 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
         use windows::Win32::Foundation::{RECT, POINT};
         let mut last_visible = true;
         let mut last_dock_overlap: Option<bool> = None;
+        let mut last_dock_fullscreen: Option<bool> = None;
+        let mut last_secondary_dock_fullscreen = std::collections::HashMap::<String, (bool, Instant)>::new();
         let mut last_notch_overlap: Option<bool> = None;
         let mut last_dock_maximized: Option<bool> = None;
         let mut last_fg_maximized = false;
@@ -1296,6 +1298,12 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                 crate::state::set_overlap(crate::state::dock_overlap(), "dock", if effective_dock_overlap { 1 } else { 0 });
                 crate::state::set_overlap(crate::state::notch_overlap(), "main", if should_notch_overlap { 1 } else { 0 });
                 CURRENT_FOREGROUND_FULLSCREEN.store(current_is_fs, Ordering::Relaxed);
+                let fullscreen_on_dock = current_is_fs && fg_on("dock");
+                CURRENT_FOREGROUND_FULLSCREEN_ON_DOCK.store(fullscreen_on_dock, Ordering::Relaxed);
+                if Some(fullscreen_on_dock) != last_dock_fullscreen || last_emit.elapsed() >= Duration::from_secs(3) {
+                    let _ = handle_visibility.emit_to("dock", "dock-fullscreen", fullscreen_on_dock);
+                    last_dock_fullscreen = Some(fullscreen_on_dock);
+                }
 
                 if Some(effective_dock_overlap) != last_dock_overlap || last_emit.elapsed() >= Duration::from_secs(3) {
                     let _ = handle_visibility.emit_to("dock", "dock-overlap", effective_dock_overlap);
@@ -1316,6 +1324,15 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                     }
                     let Ok(w_hwnd) = win.hwnd() else { continue };
                     let Some((mx, my, _mw, _mh)) = monitor_rect_for_hwnd(w_hwnd) else { continue };
+                    if is_dock {
+                        let fullscreen_here = current_is_fs && fg_info.is_some_and(|(screen, _, _)| screen.left == mx && screen.top == my);
+                        let needs_update = last_secondary_dock_fullscreen.get(&label)
+                            .is_none_or(|(previous, sent_at)| *previous != fullscreen_here || sent_at.elapsed() >= Duration::from_secs(3));
+                        if needs_update {
+                            let _ = handle_visibility.emit_to(label.as_str(), "dock-fullscreen", fullscreen_here);
+                            last_secondary_dock_fullscreen.insert(label.clone(), (fullscreen_here, now));
+                        }
+                    }
                     let overlap = match fg_info {
                         Some((screen, rect, covers)) if screen.left == mx && screen.top == my => {
                             if covers {
@@ -1880,6 +1897,10 @@ fn in_show_desktop_corner(x: i32, y: i32) -> bool {
     x >= right - CORNER && x < right && y >= bottom - CORNER && y < bottom
 }
 
+fn dock_edge_hover_allowed(fullscreen_on_dock: bool, at_bottom_edge: bool, dock_hovered: bool) -> bool {
+    !fullscreen_on_dock && (at_bottom_edge || dock_hovered)
+}
+
 unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Foundation::POINT) {
     let now = now_ms();
     TOP_EDGE_PENDING.store(false, Ordering::Relaxed);
@@ -1950,6 +1971,7 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
             let (notch_mon_w, _notch_mon_h) = (notch_cached_size.0 as i32, notch_cached_size.1 as i32);
 
             let fg_fs = CURRENT_FOREGROUND_FULLSCREEN.load(Ordering::Relaxed);
+            let dock_fg_fs = CURRENT_FOREGROUND_FULLSCREEN_ON_DOCK.load(Ordering::Relaxed);
 
             // --- Dock Interaction ---
             if let Some(dock_win) = app_handle.get_webview_window("dock") {
@@ -2015,14 +2037,17 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
                     let at_bottom_edge = cursor.y >= (dock_mon_y + dock_mon_h - (8.0 * scale) as i32) &&
                                          cursor.x >= dock_mon_x && cursor.x <= (dock_mon_x + dock_mon_w);
 
-                    if at_bottom_edge || in_dock_hover {
+                    if dock_fg_fs {
+                        MH_DOCK_EXPIRY_MS.store(0, Ordering::Relaxed);
+                    }
+                    if dock_edge_hover_allowed(dock_fg_fs, at_bottom_edge, in_dock_hover) {
                         is_hovered = true;
                         MH_DOCK_EXPIRY_MS.store(now + 500, Ordering::Relaxed);
                     }
 
                     // Approaching along the bottom edge keeps the dock interactive
                     // while near its horizontal span, so the reveal can't be clicked
-                    if at_bottom_edge && !fg_fs {
+                    if at_bottom_edge && !dock_fg_fs {
                         if let Some((span_left, span_right)) = dock_span {
                             let edge_pad = (60.0 * scale) as i32;
                             if cursor.x >= span_left - edge_pad && cursor.x <= span_right + edge_pad {
@@ -2047,9 +2072,9 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
                         dbg_scale, dbg_box, is_click_interactive, MH_LAST_DOCK_IGNORE.load(Ordering::Relaxed),
                     ));
 
-                    let should_ignore = !is_click_interactive
+                    let should_ignore = dock_fg_fs || (!is_click_interactive
                         && !MENU_IS_OPEN.load(Ordering::Relaxed)
-                        && !DOCK_IS_DRAGGING.load(Ordering::Relaxed);
+                        && !DOCK_IS_DRAGGING.load(Ordering::Relaxed));
                     let prev_ignore = MH_LAST_DOCK_IGNORE.load(Ordering::Relaxed);
                     let new_ignore = if should_ignore { 1 } else { 0 };
                     if prev_ignore != new_ignore {
@@ -3519,7 +3544,21 @@ fn recover_from_webview_failure(handle: &AppHandle) {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_helper_name, is_launchable_entry, win_number_index};
+    use super::{dock_edge_hover_allowed, is_helper_name, is_launchable_entry, win_number_index};
+
+    #[test]
+    fn fullscreen_dock_does_not_reveal_on_edge_or_hover() {
+        assert!(!dock_edge_hover_allowed(true, true, false));
+        assert!(!dock_edge_hover_allowed(true, false, true));
+        assert!(!dock_edge_hover_allowed(true, true, true));
+    }
+
+    #[test]
+    fn ordinary_dock_preserves_edge_and_hover_reveal() {
+        assert!(dock_edge_hover_allowed(false, true, false));
+        assert!(dock_edge_hover_allowed(false, false, true));
+        assert!(!dock_edge_hover_allowed(false, false, false));
+    }
 
     #[test]
     fn win_number_maps_top_row_digits_only() {
