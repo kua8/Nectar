@@ -1431,3 +1431,24 @@ input:checked + .slider:before {
   outline: 2px solid var(--nectar-highlight, var(--nectar-text, #fff));
   outline-offset: 2px;
 }
+
+/* Dock › Launcher Shortcut */
+.shortcut-input {
+  width: 120px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--nectar-border, rgba(255, 255, 255, 0.12));
+  background: var(--nectar-group-bg, rgba(255, 255, 255, 0.04));
+  color: var(--nectar-text, #fff);
+  font-size: 12px;
+  text-align: center;
+  outline: none;
+}
+
+.shortcut-input:focus {
+  border-color: var(--nectar-highlight, var(--nectar-accent, #007aff));
+}
+
+.shortcut-input.invalid {
+  border-color: #ff453a;
+}

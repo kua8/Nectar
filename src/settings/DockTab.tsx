@@ -1,11 +1,80 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent, CSSProperties } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Monitor, Eye, EyeOff, Circle, Search, Shuffle, MonitorCheck, CalendarDays, Maximize2, Keyboard, Sparkles, RotateCcw, LayoutGrid, Trash2, HardDrive } from "lucide-react";
+import { Monitor, Eye, EyeOff, Circle, Search, Shuffle, MonitorCheck, CalendarDays, Maximize2, Keyboard, Sparkles, RotateCcw, LayoutGrid, Trash2, HardDrive, TextSearch } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { Dropdown } from "./Dropdown";
 import type { MonitorInfo, MonitorMode } from "./types";
 import { usePerMonitor } from "./usePerMonitor";
+
+const SEARCH_PROVIDERS = [
+  { value: "windows", label: "Windows Search", desc: "Opens Windows Search (Win+S)" },
+  { value: "cmdpal", label: "PowerToys Command Palette", desc: "Needs PowerToys with Command Palette turned on" },
+  { value: "ptrun", label: "PowerToys Run", desc: "Needs PowerToys with PowerToys Run turned on" },
+  { value: "raycast", label: "Raycast", desc: "Presses Raycast's shortcut; needs Raycast for Windows running" },
+  { value: "shortcut", label: "Other Launcher", desc: "Presses your launcher's shortcut (Flow Launcher, Listary…)" },
+];
+
+const SHORTCUT_MODIFIERS: Record<string, string> = {
+  ctrl: "Ctrl",
+  control: "Ctrl",
+  alt: "Alt",
+  shift: "Shift",
+  win: "Win",
+  windows: "Win",
+  meta: "Win",
+  super: "Win",
+};
+const NAMED_KEYS = ["Space", "Enter", "Tab", "Esc", "Backspace", "Delete", "Insert", "Home", "End", "PageUp", "PageDown", "Up", "Down", "Left", "Right"];
+
+// Same grammar the dock's Rust side presses (launchers.rs): modifiers, then one key.
+// Returns the tidied shortcut, "" for empty, or null if it can't be pressed.
+function normalizeShortcut(text: string): string | null {
+  const parts = text.split("+").map((p) => p.trim()).filter(Boolean);
+  if (parts.length === 0) return "";
+  const mods = new Set<string>();
+  let key: string | null = null;
+  for (const part of parts) {
+    const mod = SHORTCUT_MODIFIERS[part.toLowerCase()];
+    if (mod) {
+      mods.add(mod);
+      continue;
+    }
+    if (key) return null;
+    if (/^[a-z0-9]$/i.test(part) || /^f([1-9]|1\d|2[0-4])$/i.test(part)) key = part.toUpperCase();
+    else if (part.length === 1 && "`-=,./;'[]\\".includes(part)) key = part;
+    else key = NAMED_KEYS.find((k) => k.toLowerCase() === part.toLowerCase()) ?? null;
+    if (!key) return null;
+  }
+  if (!key) return null;
+  return [...["Win", "Ctrl", "Alt", "Shift"].filter((m) => mods.has(m)), key].join("+");
+}
+
+function ShortcutField({ value, placeholder, onCommit }: { value: string; placeholder: string; onCommit: (shortcut: string) => void }) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  const normalized = normalizeShortcut(draft);
+  const commit = () => {
+    if (normalized === null) return;
+    setDraft(normalized);
+    if (normalized !== value) onCommit(normalized);
+  };
+  return (
+    <input
+      className={`shortcut-input${normalized === null ? " invalid" : ""}`}
+      value={draft}
+      placeholder={placeholder}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") commit();
+      }}
+      spellCheck={false}
+      aria-label="Launcher shortcut"
+      title={normalized === null ? "Use modifiers and one key, like Alt+Space or Ctrl+Shift+K" : undefined}
+    />
+  );
+}
 
 const START_ICON_PRESETS = [
   { key: "default", src: "/nectar.png", label: "Nectar" },
@@ -42,6 +111,10 @@ interface DockTabProps {
   toggleDockPreview: () => void;
   dockSearchEnabled: boolean;
   toggleDockSearch: () => void;
+  dockSearchProvider: string;
+  handleDockSearchProviderChange: (provider: string) => void;
+  dockSearchShortcut: string;
+  handleDockSearchShortcutChange: (shortcut: string) => void;
   dockCalendarEnabled: boolean;
   toggleDockCalendar: () => void;
   legacyMode: boolean;
@@ -80,6 +153,10 @@ export function DockTab({
   toggleDockPreview,
   dockSearchEnabled,
   toggleDockSearch,
+  dockSearchProvider,
+  handleDockSearchProviderChange,
+  dockSearchShortcut,
+  handleDockSearchShortcutChange,
   dockCalendarEnabled,
   toggleDockCalendar,
   legacyMode,
@@ -211,12 +288,40 @@ export function DockTab({
               </label>
             </SettingRow>
 
-            <SettingRow icon={Search} label="Search Icon" desc="Show a Windows Search shortcut next to Start">
+            <SettingRow icon={Search} label="Search Icon" desc="Show a search shortcut next to Start">
               <label className="toggle-switch">
                 <input type="checkbox" checked={dockSearchEnabled} onChange={toggleDockSearch} />
                 <span className="slider"></span>
               </label>
             </SettingRow>
+
+            {dockSearchEnabled && (
+              <SettingRow
+                icon={TextSearch}
+                label="Search With"
+                desc={(SEARCH_PROVIDERS.find((p) => p.value === dockSearchProvider) ?? SEARCH_PROVIDERS[0]).desc}
+              >
+                <Dropdown
+                  value={dockSearchProvider}
+                  onChange={handleDockSearchProviderChange}
+                  options={SEARCH_PROVIDERS.map(({ value, label }) => ({ value, label }))}
+                />
+              </SettingRow>
+            )}
+
+            {dockSearchEnabled && (dockSearchProvider === "raycast" || dockSearchProvider === "shortcut") && (
+              <SettingRow
+                icon={Keyboard}
+                label="Launcher Shortcut"
+                desc={dockSearchProvider === "raycast" ? "Change this if you changed Raycast's hotkey" : "The shortcut that opens your launcher"}
+              >
+                <ShortcutField
+                  value={dockSearchShortcut}
+                  placeholder={dockSearchProvider === "raycast" ? "Alt+Space" : "e.g. Alt+Space"}
+                  onCommit={handleDockSearchShortcutChange}
+                />
+              </SettingRow>
+            )}
 
             <SettingRow icon={CalendarDays} label="Calendar Icon" desc="Show a shortcut that opens the Calendar window">
               <label className="toggle-switch">

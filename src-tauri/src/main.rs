@@ -18,6 +18,7 @@ mod ics;
 mod active_look;
 mod connections;
 mod wallpaper;
+mod launchers;
 
 use tauri::Manager;
 use windows::Win32::System::Console::SetConsoleCtrlHandler;
