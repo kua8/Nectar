@@ -1,6 +1,8 @@
 /* Surface styles from Settings › Appearance › Style, applied as a class on <html> by theme.ts.
-   The notch, dock and overlays sit in transparent windows, so nothing behind them can be blurred;
-   the glass looks come from haze, grain, rims and sheen over the theme fill. Solid is the plain fill. */
+   The notch, dock and overlays sit in transparent windows, so CSS can't blur what's behind them.
+   The glass styles draw a blurred copy of the wallpaper behind the notch and dock instead (see the
+   backdrop section at the end); these first rules are the look without it (overlays, or a solid
+   color wallpaper): haze, grain, rims and sheen over the theme fill. Solid is the plain fill. */
 
 :root {
     --surface-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.62 0 0 0 0 0.62 0 0 0 0 0.62 0.26 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
@@ -90,4 +92,161 @@
 .style-material .volume-notch,
 .style-material .brightness-notch {
     box-shadow: inset 0 0 0 1px var(--nectar-border, rgba(255, 255, 255, 0.12));
+}
+
+/* ── Wallpaper backdrop (Frosted and Liquid Glass) ──
+   backdrop.ts loads a pre-blurred copy of the wallpaper and sets --backdrop-*; it's drawn behind
+   the notch and dock lined up with the screen, so they show what's actually behind them. The
+   layers sit on two children: one covering the body, and one spanning the concave corners (the
+   ::before/::after "ears") masked down to them. Both share the surface's centre, so the image is
+   lined up from the centre and stays put while the shape animates. Sheen and rims move onto the
+   body layer, because a negative z-index child paints over its parent's background. */
+
+.surface-backdrop,
+.surface-backdrop-corners {
+    display: none;
+    position: absolute;
+    z-index: -1;
+    pointer-events: none;
+    background-repeat: no-repeat;
+}
+
+.surface-backdrop {
+    inset: 0;
+    border-radius: inherit;
+}
+
+.has-backdrop:is(.style-frosted, .style-liquid) :is(.nectar, .dock) {
+    isolation: isolate;
+    background: transparent;
+    --glass-tint: color-mix(in srgb, var(--notch-bg, var(--nectar-bg, rgba(0, 0, 0, 0.8))) 62%, transparent);
+}
+
+.has-backdrop:is(.style-frosted, .style-liquid) .dock {
+    --glass-tint: color-mix(in srgb, var(--nectar-bg, rgba(0, 0, 0, 0.8)) 62%, transparent);
+    box-shadow: 0 -6px 30px rgba(0, 0, 0, 0.25);
+}
+
+.has-backdrop:is(.style-frosted, .style-liquid) .nectar {
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.has-backdrop:is(.style-frosted, .style-liquid) :is(.surface-backdrop, .surface-backdrop-corners) {
+    display: block;
+}
+
+.has-backdrop:is(.style-frosted, .style-liquid) :is(.nectar.is-impacted, .dock)::before,
+.has-backdrop:is(.style-frosted, .style-liquid) :is(.nectar.is-impacted, .dock)::after {
+    display: none;
+}
+
+/* Concave corners: the notch's hang from the top, the dock's sit on the bottom */
+.nectar > .surface-backdrop-corners {
+    top: 0;
+    left: -13px;
+    right: -13px;
+    height: 13px;
+    -webkit-mask:
+        radial-gradient(circle at 0 100%, transparent 12.5px, #000 13px) left top / 13px 13px no-repeat,
+        radial-gradient(circle at 100% 100%, transparent 12.5px, #000 13px) right top / 13px 13px no-repeat;
+    mask:
+        radial-gradient(circle at 0 100%, transparent 12.5px, #000 13px) left top / 13px 13px no-repeat,
+        radial-gradient(circle at 100% 100%, transparent 12.5px, #000 13px) right top / 13px 13px no-repeat;
+}
+
+.nectar:not(.is-impacted) > .surface-backdrop-corners {
+    display: none !important;
+}
+
+.dock > .surface-backdrop-corners {
+    bottom: 0;
+    left: -13px;
+    right: -13px;
+    height: 13px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    -webkit-mask:
+        radial-gradient(circle at 0 0, transparent 12.5px, #000 13px) left bottom / 13px 13px no-repeat,
+        radial-gradient(circle at 100% 0, transparent 12.5px, #000 13px) right bottom / 13px 13px no-repeat;
+    mask:
+        radial-gradient(circle at 0 0, transparent 12.5px, #000 13px) left bottom / 13px 13px no-repeat,
+        radial-gradient(circle at 100% 0, transparent 12.5px, #000 13px) right bottom / 13px 13px no-repeat;
+}
+
+.dock.dock-expanded > .surface-backdrop-corners {
+    opacity: 1;
+}
+
+/* Corners: tint over the wallpaper */
+.has-backdrop :is(.nectar, .dock) > .surface-backdrop-corners {
+    background-image: linear-gradient(var(--glass-tint), var(--glass-tint)), var(--backdrop-image);
+    background-size: auto, var(--backdrop-size);
+}
+
+.has-backdrop .nectar > .surface-backdrop-corners {
+    background-position: 0 0, var(--backdrop-x) var(--backdrop-top);
+}
+
+.has-backdrop .dock > .surface-backdrop-corners {
+    background-position: 0 0, var(--backdrop-x) var(--backdrop-bottom);
+}
+
+/* Frosted body: grain and a light haze over the tinted, heavily blurred wallpaper */
+.has-backdrop.style-frosted :is(.nectar, .dock) > .surface-backdrop {
+    background-image:
+        var(--surface-grain),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
+        linear-gradient(var(--glass-tint), var(--glass-tint)),
+        var(--backdrop-image);
+    background-size: auto, auto, auto, var(--backdrop-size);
+    background-repeat: repeat, no-repeat, no-repeat, no-repeat;
+    box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.2);
+}
+
+.has-backdrop.style-frosted.light-mode :is(.nectar, .dock) > .surface-backdrop {
+    background-image:
+        var(--surface-grain),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.25), rgba(255, 255, 255, 0.12)),
+        linear-gradient(var(--glass-tint), var(--glass-tint)),
+        var(--backdrop-image);
+    box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.6);
+}
+
+.has-backdrop.style-frosted .nectar > .surface-backdrop {
+    background-position: 0 0, 0 0, 0 0, var(--backdrop-x) var(--backdrop-top);
+}
+
+.has-backdrop.style-frosted .dock > .surface-backdrop {
+    background-position: 0 0, 0 0, 0 0, var(--backdrop-x) var(--backdrop-bottom);
+}
+
+/* Liquid body: lightly blurred wallpaper, specular rims, an edge highlight and inner glow */
+.has-backdrop.style-liquid .nectar > .surface-backdrop {
+    background-image:
+        linear-gradient(0deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 22px),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 40px),
+        linear-gradient(var(--glass-tint), var(--glass-tint)),
+        var(--backdrop-image);
+    background-size: auto, auto, auto, var(--backdrop-size);
+    background-position: 0 0, 0 0, 0 0, var(--backdrop-x) var(--backdrop-top);
+    box-shadow:
+        inset 0 -1px 1.5px rgba(255, 255, 255, 0.5),
+        inset 1px 0 1px rgba(255, 255, 255, 0.2),
+        inset -1px 0 1px rgba(255, 255, 255, 0.2),
+        inset 0 -8px 18px rgba(255, 255, 255, 0.1);
+}
+
+.has-backdrop.style-liquid .dock > .surface-backdrop {
+    background-image:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0) 22px),
+        linear-gradient(0deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0) 30px),
+        linear-gradient(var(--glass-tint), var(--glass-tint)),
+        var(--backdrop-image);
+    background-size: auto, auto, auto, var(--backdrop-size);
+    background-position: 0 0, 0 0, 0 0, var(--backdrop-x) var(--backdrop-bottom);
+    box-shadow:
+        inset 0 1px 1.5px rgba(255, 255, 255, 0.5),
+        inset 1px 0 1px rgba(255, 255, 255, 0.2),
+        inset -1px 0 1px rgba(255, 255, 255, 0.2),
+        inset 0 8px 18px rgba(255, 255, 255, 0.1);
 }

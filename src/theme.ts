@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { applyBackdrop, enableBackdrop, usesBackdrop } from "./backdrop";
 
 // Convert a hex color string to rgba with a specified alpha
 function hexToRgba(hex: string, alpha: number): string {
@@ -331,14 +332,19 @@ export async function applyTheme(
     root.classList.remove('theme-light', 'theme-custom', 'theme-adaptive');
   }
 
-  await applyAccent(
-    root,
-    surface,
-    style === "material" ? { op, opExpanded, opPanel, fallback: isHex(customColor) ? customColor : DEFAULT_ACCENT_COLOR } : null
-  );
+  await Promise.all([
+    applyAccent(
+      root,
+      surface,
+      style === "material" ? { op, opExpanded, opPanel, fallback: isHex(customColor) ? customColor : DEFAULT_ACCENT_COLOR } : null
+    ),
+    applyBackdrop(root, style),
+  ]);
 }
 
-export function initTheme() {
+// `backdrop`: this window draws the notch or dock, which show the wallpaper in the glass styles.
+export function initTheme(options: { backdrop?: boolean } = {}) {
+  if (options.backdrop) enableBackdrop();
   const syncMode = localStorage.getItem('nectar-theme-mode') || 'dark';
   const syncColor = localStorage.getItem('nectar-theme-color') || '#007aff';
   const syncOpacityVal = localStorage.getItem('nectar-theme-opacity');
@@ -404,6 +410,7 @@ export function initTheme() {
     'nectar-theme-accent',
     'nectar-theme-accent-color',
     'nectar-theme-style',
+    'nectar-scale',
   ];
 
   // Listen to setting changes broadcasted from settings window
@@ -422,10 +429,16 @@ export function initTheme() {
       currentMode === 'adaptive' ||
       currentMode === 'auto' ||
       localStorage.getItem('nectar-theme-accent') === 'system' ||
-      localStorage.getItem('nectar-theme-style') === 'material'
+      localStorage.getItem('nectar-theme-style') === 'material' ||
+      usesBackdrop(localStorage.getItem('nectar-theme-style'))
     ) {
       applyThemeFromStorage();
     }
+  });
+
+  // The wallpaper backdrop is lined up with the window's place on its monitor
+  const monitorsPromise = listen('monitors-changed', () => {
+    if (usesBackdrop(localStorage.getItem('nectar-theme-style'))) applyThemeFromStorage();
   });
 
   // Follow Windows light/dark in auto mode
@@ -447,6 +460,7 @@ export function initTheme() {
     settingsPromise.then(f => f());
     accentPromise.then(f => f());
     externalPromise.then(f => f());
+    monitorsPromise.then(f => f());
     darkScheme?.removeEventListener('change', onSchemeChange);
   };
 }
