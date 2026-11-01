@@ -47,6 +47,12 @@ body {
   transform: translate(-50%, 0) scale(1);
 }
 
+/* A message on an icon (e.g. why Search fell back), shown without hovering */
+.tooltip.tooltip-note {
+  opacity: 1;
+  transform: translate(-50%, 0) scale(1);
+}
+
 .tooltip.tooltip-hidden {
   opacity: 0 !important;
   transition: opacity 0.1s ease !important;
