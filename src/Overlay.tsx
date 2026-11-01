@@ -609,6 +609,9 @@ function OverlayApp() {
   // Load scale from settings
   useEffect(() => {
     invoke("load_settings").then((settings: any) => {
+      if (settings && settings["nectar-notch-scroll-volume"] !== undefined) {
+        localStorage.setItem("nectar-notch-scroll-volume", String(settings["nectar-notch-scroll-volume"]));
+      }
       if (settings && settings["nectar-scale"] !== undefined) {
         setScale(parseFloat(settings["nectar-scale"]));
       }

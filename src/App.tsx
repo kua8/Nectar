@@ -748,6 +748,9 @@ function App() {
       setSettingsCornersEnabled(getVal("nectar-corners-enabled", "false") === "true");
       setTimeFormat24h(getVal("nectar-time-format-24h") === "true");
       setSettingsLegacyMode(getVal("nectar-legacy-mode") === "true");
+      const scrollVolume = getVal("nectar-notch-scroll-volume") === "true";
+      localStorage.setItem("nectar-notch-scroll-volume", String(scrollVolume));
+      setSettingsScrollVolume(scrollVolume);
 
       const thresholdStr = getVal("nectar-low-battery-threshold", "20");
       if (thresholdStr) setLowBatteryThreshold(parseInt(thresholdStr as string));
