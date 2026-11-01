@@ -309,7 +309,8 @@ body {
   z-index: 2;
   transform-origin: bottom center;
   pointer-events: auto;
-  transition: padding 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  /* No CSS transition on padding: framer-motion animates the size, and a running
+     padding transition makes it measure the wrong target and snap at the end. */
   overflow: visible;
   /* Re-enable pointer events for the dock itself */
 }
@@ -474,9 +475,9 @@ body {
   bottom: -4px;
   width: 4px;
   height: 4px;
-  background: white;
+  background: var(--nectar-highlight, white);
   border-radius: 50%;
-  box-shadow: 0 0 4px rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 4px var(--nectar-highlight, rgba(255, 255, 255, 0.8));
 }
 
 .start-icon-inner {
@@ -851,8 +852,8 @@ body {
 }
 
 .light-mode .active-indicator {
-  background: var(--nectar-text);
-  box-shadow: 0 0 3px var(--nectar-text);
+  background: var(--nectar-highlight, var(--nectar-text));
+  box-shadow: 0 0 3px var(--nectar-highlight, var(--nectar-text));
 }
 
 .light-mode .tooltip {

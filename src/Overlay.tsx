@@ -10,6 +10,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { MixerIcon, SpeakerIcon } from "./icons";
 import { useT } from "./i18n";
 import "./Overlay.css";
+import "./surfaces.css";
 import { initTheme } from "./theme";
 
 // ─── App Volume Mixer ───────────────────────────────────────────────────────
@@ -347,15 +348,14 @@ function VolumeNotch({
     <motion.div
       className="volume-notch-wrapper"
       style={{ transformOrigin: "left center" }}
-      initial={{ scaleX: 0, scaleY: 0.5, opacity: 0, filter: "blur(12px)", y: "-50%" }}
-      animate={{ scaleX: 1, scaleY: 1, opacity: 1, filter: "blur(0px)", y: "-50%" }}
+      initial={{ scaleX: 0, scaleY: 0.5, opacity: 0, y: "-50%" }}
+      animate={{ scaleX: 1, scaleY: 1, opacity: 1, y: "-50%" }}
       exit={
         mixerExpanded
           ? {
               // Retract as one piece, scaling X would squash the app list into the edge.
               x: -64,
               opacity: 0,
-              filter: "blur(8px)",
               y: "-50%",
               transition: { duration: 0.22, ease: [0.32, 0.72, 0, 1] }
             }
@@ -363,12 +363,11 @@ function VolumeNotch({
               scaleX: 0,
               scaleY: 0.8,
               opacity: 0,
-              filter: "blur(12px)",
               y: "-50%",
               transition: { duration: 0.2, ease: [0.32, 0.72, 0, 1] }
             }
       }
-      transition={{ type: "spring", stiffness: 450, damping: 25, mass: 0.7 }}
+      transition={{ type: "spring", stiffness: 450, damping: 30, mass: 0.7 }}
     >
       <div className="volume-notch-flares" />
       <motion.div
@@ -525,10 +524,10 @@ function BrightnessNotch({
     <motion.div
       className="brightness-notch-wrapper"
       style={{ transformOrigin: "right center" }}
-      initial={{ scaleX: 0, scaleY: 0.5, opacity: 0, filter: "blur(12px)", y: "-50%" }}
-      animate={{ scaleX: 1, scaleY: 1, opacity: 1, filter: "blur(0px)", y: "-50%" }}
-      exit={{ scaleX: 0, scaleY: 0.8, opacity: 0, filter: "blur(12px)", y: "-50%", transition: { duration: 0.2, ease: [0.32, 0.72, 0, 1] } }}
-      transition={{ type: "spring", stiffness: 450, damping: 25, mass: 0.7 }}
+      initial={{ scaleX: 0, scaleY: 0.5, opacity: 0, y: "-50%" }}
+      animate={{ scaleX: 1, scaleY: 1, opacity: 1, y: "-50%" }}
+      exit={{ scaleX: 0, scaleY: 0.8, opacity: 0, y: "-50%", transition: { duration: 0.2, ease: [0.32, 0.72, 0, 1] } }}
+      transition={{ type: "spring", stiffness: 450, damping: 30, mass: 0.7 }}
     >
       <div className="brightness-notch">
         <motion.div

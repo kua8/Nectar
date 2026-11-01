@@ -281,8 +281,8 @@ button {
 .cw-segment button.active {
   opacity: 1;
   font-weight: 700;
-  background: var(--cw-text);
-  color: var(--cw-inverse);
+  background: var(--nectar-highlight, var(--cw-text));
+  color: var(--nectar-on-highlight, var(--cw-inverse));
 }
 
 .cw-nav {
@@ -492,8 +492,8 @@ button {
 }
 
 .cw-daynum.today {
-  background: var(--cw-text);
-  color: var(--cw-inverse);
+  background: var(--nectar-highlight, var(--cw-text));
+  color: var(--nectar-on-highlight, var(--cw-inverse));
   font-weight: 700;
 }
 

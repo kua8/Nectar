@@ -101,7 +101,7 @@ body,
 
 .update-progress-fill {
     height: 100%;
-    background: var(--nectar-text, rgba(255, 255, 255, 0.9));
+    background: var(--nectar-highlight, var(--nectar-text, rgba(255, 255, 255, 0.9)));
     border-radius: 2px;
     transition: width 0.3s ease;
 }
@@ -214,7 +214,7 @@ body,
   bottom: 0;
   left: 0;
   width: 100%;
-  background: var(--nectar-text, white);
+  background: var(--nectar-highlight, var(--nectar-text, white));
   border-radius: 20px;
 }
 
@@ -368,7 +368,7 @@ body,
   bottom: 0;
   left: 0;
   width: 100%;
-  background: var(--nectar-text, white);
+  background: var(--nectar-highlight, var(--nectar-text, white));
   border-radius: 20px;
   pointer-events: none;
 }
@@ -535,7 +535,7 @@ body,
     bottom: 0;
     left: 0;
     width: 100%;
-    background: var(--nectar-text, white);
+    background: var(--nectar-highlight, var(--nectar-text, white));
     border-radius: 20px;
 }
 

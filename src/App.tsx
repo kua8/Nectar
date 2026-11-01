@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import type { UpdateCheckResult } from "./updater";
 import "./App.css";
+import "./surfaces.css";
 import { initTheme } from "./theme";
 import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, VolumeLowIcon, VolumeHighIcon, MusicNoteIcon } from "./icons";
 import { CompactMediaPlayer } from "./CompactMediaPlayer";
@@ -38,6 +39,10 @@ import {
   HardDrive,
   ArrowUpDown,
 } from "lucide-react";
+
+// One critically damped spring for the notch's width, height and corners, so the shape settles
+// together without overshooting or wobbling.
+const SHELL_SPRING = { type: "spring", stiffness: 400, damping: 40 } as const;
 
 // Timer chime, synthesized with Web Audio so there's no asset. The context is made on the
 // Start click so autoplay lets it play when the timer ends.
@@ -222,17 +227,28 @@ export const Visualizer = memo(function Visualizer({ isPlaying, bars = 5, height
       return;
     }
 
+    // Frames arrive in bursts faster than the screen refreshes; keep the newest and render it
+    // once per frame instead of re-rendering (and restarting the bar springs) for every event.
+    let latest: number[] | null = null;
+    let frame = 0;
     const unlisten = listen<{ frequencies: number[] }>("audio-visualization", (event) => {
       // If we receive fewer frequencies than bars, repeat or interpolate
       // If more, slice
       let data = event.payload.frequencies;
       if (data.length > bars) data = data.slice(0, bars);
       while (data.length < bars) data.push(0.18);
-      setAudioData(data);
+      latest = data;
+      if (!frame) {
+        frame = requestAnimationFrame(() => {
+          frame = 0;
+          if (latest) setAudioData(latest);
+        });
+      }
     });
 
     return () => {
       unlisten.then(fn => fn());
+      cancelAnimationFrame(frame);
     };
   }, [isPlaying, bars]);
 
@@ -1806,7 +1822,6 @@ function App() {
           borderTopRightRadius: isImpacted ? 0 : 18,
           borderBottomLeftRadius: isCalendarMode ? 28 : 18,
           borderBottomRightRadius: isCalendarMode ? 28 : 18,
-          filter: "blur(0px)",
           pointerEvents: 'auto'
         }}
         onClick={(e) => {
@@ -1832,14 +1847,14 @@ function App() {
         }}
         style={{ originY: 0 }}
         transition={{
-          width: { type: "spring", stiffness: 400, damping: 31 },
-          height: { type: "spring", stiffness: 450, damping: 29 },
+          width: SHELL_SPRING,
+          height: SHELL_SPRING,
           y: { type: "spring", stiffness: 550, damping: 45, mass: 0.8, restDelta: 0.001 },
           opacity: { duration: 0.2 },
-          borderTopLeftRadius: { type: "spring", stiffness: 1000, damping: 40 },
-          borderTopRightRadius: { type: "spring", stiffness: 1000, damping: 40 },
-          borderBottomLeftRadius: { type: "spring", stiffness: 1000, damping: 40 },
-          borderBottomRightRadius: { type: "spring", stiffness: 1000, damping: 40 },
+          borderTopLeftRadius: SHELL_SPRING,
+          borderTopRightRadius: SHELL_SPRING,
+          borderBottomLeftRadius: SHELL_SPRING,
+          borderBottomRightRadius: SHELL_SPRING,
           default: { type: "spring", stiffness: 500, damping: 30, mass: 1 }
         }}
       >
@@ -2305,7 +2320,7 @@ function App() {
                     onClick={e => e.stopPropagation()}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    exit={{ opacity: 0, filter: "blur(4px)", transition: { duration: 0.1 } }}
+                    exit={{ opacity: 0, transition: { duration: 0.1 } }}
                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                   >
                     {showConnections && (
@@ -2551,7 +2566,7 @@ function App() {
                     onClick={e => e.stopPropagation()} /* Block mode switches when clicking inside */
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    exit={{ opacity: 0, filter: "blur(4px)", transition: { duration: 0.1 } }}
+                    exit={{ opacity: 0, transition: { duration: 0.1 } }}
                     transition={{ type: "spring", stiffness: 400, damping: 30 }}
                   >
                     {settingsCalendarEnabled && (

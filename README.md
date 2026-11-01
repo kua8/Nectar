@@ -39,7 +39,7 @@ Nectar is a fork of [Bloom](https://github.com/SehajveerSingh2005/bloom) by Seha
 - **A notch that does things.** Music, quick controls, system stats, and a calendar in one spring-animated island at the top of your screen.
 - **A dock that replaces your taskbar.** It mirrors your real taskbar (same pinned apps, same order, real icons and names) and hides the native one.
 - **Native where it counts.** The system tray opens the actual Windows flyout, and Quit ends an app the way Task Manager's End task does.
-- **Yours to shape.** Themes, three visibility modes, per-monitor placement, and every option in a plain `settings.json` you can edit live.
+- **Yours to shape.** Solid, Frosted Glass, Liquid Glass and Material You styles, accent colors and presets, three visibility modes, per-monitor placement, and every option in a plain `settings.json` you can edit live.
 - **Light on the system.** Audio capture, cursor tracking, and thumbnail work pause themselves when nothing needs them.
 
 ## The Notch
