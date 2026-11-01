@@ -878,6 +878,21 @@ const Dock = memo(function Dock() {
     handleAppClickRef.current = handleAppClick;
   });
 
+  // Which launcher the search icon couldn't open (it fell back to Windows Search), shown for a few seconds
+  const [searchNote, setSearchNote] = useState<string | null>(null);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const unlisten = getCurrentWebviewWindow().listen<string>("dock-search-note", (event) => {
+      setSearchNote(event.payload);
+      clearTimeout(timer);
+      timer = setTimeout(() => setSearchNote(null), 4500);
+    });
+    return () => {
+      clearTimeout(timer);
+      unlisten.then(f => f());
+    };
+  }, []);
+
   useEffect(() => {
     // Backend claims Win+1-9 while the taskbar is hidden and tells us the slot, same as clicking that icon.
     const unlisten = getCurrentWebviewWindow().listen<number>("dock-win-number", (event) => {
@@ -1173,7 +1188,9 @@ const Dock = memo(function Dock() {
                   onMouseEnter={() => setHoveredApp('search')}
                   onMouseLeave={() => { setHoveredApp(null); setPressedApp(null); }}
                 >
-                  {(!dockPreviewEnabled || (dockPreviewEnabled && hoveredApp === 'search')) && (
+                  {searchNote ? (
+                    <div className="tooltip tooltip-note">{t(`dock.searchNote.${searchNote}`)}</div>
+                  ) : (!dockPreviewEnabled || (dockPreviewEnabled && hoveredApp === 'search')) && (
                     <div className="tooltip">{t("dockmenu.search")}</div>
                   )}
                   <motion.div

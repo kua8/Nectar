@@ -11,18 +11,33 @@ const CMDPAL_SHOW_EVENT: &str = "Local\\PowerToysCmdPal-ShowEvent-62336fcd-8611-
 const POWER_LAUNCHER_SHARED_EVENT: &str = "Local\\PowerToysRunInvokeEvent-30f26ad7-d36d-4c0e-ab02-68bb5ff3c4ab";
 const RAYCAST_DEFAULT_SHORTCUT: &str = "Alt+Space";
 
-/// Opens the configured launcher. Falls back to Windows Search when the chosen one isn't
-/// running (its event doesn't exist) or the shortcut can't be read.
-pub fn open_search(provider: &str, shortcut: Option<&str>) {
-    let opened = match provider {
-        "cmdpal" => signal_event(CMDPAL_SHOW_EVENT),
-        "ptrun" => signal_event(POWER_LAUNCHER_SHARED_EVENT),
-        "raycast" => send_shortcut(shortcut.filter(|s| !s.trim().is_empty()).unwrap_or(RAYCAST_DEFAULT_SHORTCUT)),
-        "shortcut" => shortcut.map(send_shortcut).unwrap_or(false),
-        _ => false,
+/// Opens the configured launcher. When the chosen one can't be opened (a PowerToys launcher
+/// that isn't running, or a shortcut that can't be read) it opens Windows Search instead and
+/// returns which one failed, so the dock can say why rather than seem to ignore the setting.
+pub fn open_search(provider: &str, shortcut: Option<&str>) -> Option<&'static str> {
+    // The click went to Nectar, so only Nectar may bring a window to the front right now. Hand
+    // that on, or the launcher can open behind the active window or without keyboard focus.
+    allow_foreground();
+    let failed = match provider {
+        "cmdpal" => (!signal_event(CMDPAL_SHOW_EVENT)).then_some("cmdpal"),
+        "ptrun" => (!signal_event(POWER_LAUNCHER_SHARED_EVENT)).then_some("ptrun"),
+        "raycast" => (!send_shortcut(shortcut.filter(|s| !s.trim().is_empty()).unwrap_or(RAYCAST_DEFAULT_SHORTCUT))).then_some("raycast"),
+        "shortcut" => (!shortcut.is_some_and(send_shortcut)).then_some("shortcut"),
+        _ => {
+            send_shortcut("Win+S");
+            None
+        }
     };
-    if !opened {
+    if failed.is_some() {
         send_shortcut("Win+S");
+    }
+    failed
+}
+
+fn allow_foreground() {
+    use windows::Win32::UI::WindowsAndMessaging::{AllowSetForegroundWindow, ASFW_ANY};
+    unsafe {
+        let _ = AllowSetForegroundWindow(ASFW_ANY);
     }
 }
 
