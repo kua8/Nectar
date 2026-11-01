@@ -1009,6 +1009,22 @@ input:checked + .slider:before {
   min-height: 24px;
 }
 
+.widget-config--control-center .widget-config-zone {
+  flex-wrap: wrap;
+}
+
+.widget-config--control-center .widget-config-side {
+  width: auto;
+  flex: 0 0 auto;
+  max-width: 35%;
+  overflow-wrap: anywhere;
+}
+
+.widget-config--control-center .widget-config-chips {
+  min-width: 0;
+  flex: 1 1 180px;
+}
+
 .widget-config-empty {
   font-size: 11px;
   color: var(--nectar-text-muted, rgba(255, 255, 255, 0.15));
