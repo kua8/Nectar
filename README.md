@@ -22,6 +22,14 @@
 
 <img src="docs/screenshots/desktop.webp" width="860" alt="Nectar's notch and dock on a Windows desktop" />
 
+<br /><br />
+
+<a href="docs/nectar-trailer-glass.mp4">
+  <img src="docs/trailer-preview.png" width="860" alt="Watch Nectar in action — 40-second trailer" />
+</a>
+
+[**▶ Watch Nectar in action**](docs/nectar-trailer-glass.mp4) · 40 seconds
+
 </div>
 
 <br />
