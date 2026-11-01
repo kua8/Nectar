@@ -9,8 +9,8 @@ use windows::Win32::UI::Accessibility::{
     UIA_InvokePatternId,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    FindWindowA, GetClassNameA, GetCursorPos, GetForegroundWindow, GetWindowLongA, GetWindowRect, IsWindowVisible, SetForegroundWindow,
-    SetLayeredWindowAttributes, SetWindowLongA, SetWindowPos, ShowWindow, GWL_EXSTYLE, HWND_TOPMOST, LWA_ALPHA,
+    FindWindowA, GetAncestor, GetClassNameA, GetCursorPos, GetForegroundWindow, GetWindowLongA, GetWindowRect, GetWindowThreadProcessId, IsWindowVisible, SetForegroundWindow,
+    SetLayeredWindowAttributes, SetWindowLongA, SetWindowPos, ShowWindow, GA_ROOT, GWL_EXSTYLE, HWND_TOPMOST, LWA_ALPHA,
     SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW, SW_HIDE, SW_SHOWNA, WS_EX_LAYERED, WS_EX_TRANSPARENT,
 };
 use windows::core::Interface;
@@ -24,6 +24,29 @@ fn automation() -> windows::core::Result<IUIAutomation> {
 
 fn find_window(class: &std::ffi::CStr) -> windows::core::Result<HWND> {
     unsafe { FindWindowA(windows::core::PCSTR(class.as_ptr() as *const u8), windows::core::PCSTR::null()) }
+}
+
+fn foreground_description() -> String {
+    let fg = unsafe { GetForegroundWindow() };
+    if fg.0.is_null() {
+        return "none".into();
+    }
+    let mut pid = 0u32;
+    unsafe { GetWindowThreadProcessId(fg, Some(&mut pid)) };
+    format!("{} (pid {pid})", class_name(fg))
+}
+
+fn flyout_owns_focus() -> bool {
+    let fg = unsafe { GetForegroundWindow() };
+    if fg.0.is_null() {
+        return true;
+    }
+    let root = unsafe { GetAncestor(fg, GA_ROOT) };
+    let root = if root.0.is_null() { fg } else { root };
+    matches!(
+        class_name(root).as_str(),
+        "Shell_TrayWnd" | "Shell_SecondaryTrayWnd" | "TopLevelWindowForOverflowXamlIsland" | "NotifyIconOverflowWindow"
+    )
 }
 
 fn find_overflow_window() -> Option<HWND> {
@@ -248,12 +271,23 @@ pub fn open_native_tray(anchor: Option<(i32, i32)>) {
         FLYOUT_OPEN.store(true, Ordering::SeqCst);
         crate::diagnostics::log("tray: flyout opened and placed");
         std::thread::sleep(std::time::Duration::from_millis(200));
+        let mut last_fg = String::new();
         for _ in 0..2400 {
+            let fg = foreground_description();
+            if fg != last_fg {
+                crate::diagnostics::log(&format!("tray: flyout open, foreground is now {fg}"));
+                last_fg = fg;
+            }
             match find_overflow_window().filter(|&w| unsafe { IsWindowVisible(w) }.as_bool()) {
                 Some(flyout) => unsafe {
-                    let _ = SetWindowPos(flyout, Some(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                    if flyout_owns_focus() {
+                        let _ = SetWindowPos(flyout, Some(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                    }
                 },
-                None => break,
+                None => {
+                    crate::diagnostics::log("tray: flyout closed");
+                    break;
+                }
             }
             std::thread::sleep(std::time::Duration::from_millis(150));
         }
