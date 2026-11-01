@@ -1437,7 +1437,13 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
 
 
 
-fn set_physical_monitors_brightness(brightness: u32) {
+static DDC_FOUND: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+static DDC_APPLIED: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+/// Returns how many external monitors were found and how many took the new value.
+fn set_physical_monitors_brightness(brightness: u32) -> (u32, u32) {
+    DDC_FOUND.store(0, Ordering::Relaxed);
+    DDC_APPLIED.store(0, Ordering::Relaxed);
     unsafe {
         use windows::Win32::Graphics::Gdi::{EnumDisplayMonitors, HDC, HMONITOR};
         use windows::Win32::Foundation::{RECT, LPARAM};
@@ -1481,6 +1487,18 @@ fn set_physical_monitors_brightness(brightness: u32) {
                     pdwCurrentBrightness: *mut u32,
                     pdwMaximumBrightness: *mut u32,
                 ) -> BOOL;
+                fn GetVCPFeatureAndVCPFeatureReply(
+                    hMonitor: usize,
+                    bVCPCode: u8,
+                    pvct: *mut u32,
+                    pdwCurrentValue: *mut u32,
+                    pdwMaximumValue: *mut u32,
+                ) -> BOOL;
+                fn SetVCPFeature(
+                    hMonitor: usize,
+                    bVCPCode: u8,
+                    dwNewValue: u32,
+                ) -> BOOL;
             }
 
             let mut count = 0u32;
@@ -1488,21 +1506,39 @@ fn set_physical_monitors_brightness(brightness: u32) {
                 let mut monitors = vec![std::mem::zeroed::<PHYSICAL_MONITOR>(); count as usize];
                 if GetPhysicalMonitorsFromHMONITOR(hmonitor, count, monitors.as_mut_ptr()).as_bool() {
                     for mon in &monitors {
-                        if mon.h_physical_monitor == 0 {
+                        // 0 is a valid handle here, the first monitor gets it.
+                        let handle = mon.h_physical_monitor;
+                        DDC_FOUND.fetch_add(1, Ordering::Relaxed);
+                        // VCP 0x10 is brightness. Unlike the high-level call it needs no capabilities string, which many DisplayPort monitors lack.
+                        let (mut kind, mut cur, mut vcp_max) = (0u32, 0u32, 0u32);
+                        if !GetVCPFeatureAndVCPFeatureReply(handle, 0x10, &mut kind, &mut cur, &mut vcp_max).as_bool() || vcp_max == 0 {
+                            vcp_max = 100;
+                        }
+                        let target = vcp_max * brightness / 100;
+                        let mut done = false;
+                        for attempt in 0..3 {
+                            if SetVCPFeature(handle, 0x10, target).as_bool() {
+                                done = true;
+                                break;
+                            }
+                            if attempt < 2 {
+                                std::thread::sleep(std::time::Duration::from_millis(60));
+                            }
+                        }
+                        if done {
+                            DDC_APPLIED.fetch_add(1, Ordering::Relaxed);
                             continue;
                         }
-                        let (mut min, mut cur, mut max) = (0u32, 0u32, 0u32);
-                        if !GetMonitorBrightness(mon.h_physical_monitor, &mut min, &mut cur, &mut max).as_bool() || max <= min {
-                            let code = windows::Win32::Foundation::GetLastError().0;
-                            let name = String::from_utf16_lossy(&mon.sz_physical_monitor_description).trim_end_matches('\0').to_string();
-                            crate::diagnostics::log(&format!("brightness: monitor \"{name}\" does not report a DDC/CI range, error {code}"));
+                        let (mut min, mut now, mut max) = (0u32, 0u32, 0u32);
+                        if GetMonitorBrightness(handle, &mut min, &mut now, &mut max).as_bool() && max > min
+                            && SetMonitorBrightness(handle, min + (max - min) * brightness / 100).as_bool()
+                        {
+                            DDC_APPLIED.fetch_add(1, Ordering::Relaxed);
                             continue;
                         }
-                        let target = min + (max - min) * brightness / 100;
-                        if !SetMonitorBrightness(mon.h_physical_monitor, target).as_bool() {
-                            let code = windows::Win32::Foundation::GetLastError().0;
-                            crate::diagnostics::log(&format!("brightness: setting {target} (range {min}-{max}) failed, error {code}"));
-                        }
+                        let code = windows::Win32::Foundation::GetLastError().0;
+                        let name = String::from_utf16_lossy(&mon.sz_physical_monitor_description).trim_end_matches('\0').to_string();
+                        crate::diagnostics::log(&format!("brightness: monitor \"{name}\" did not accept a brightness change over DDC/CI, error {code}"));
                     }
                     let _ = DestroyPhysicalMonitors(count, monitors.as_mut_ptr());
                 }
@@ -1515,6 +1551,21 @@ fn set_physical_monitors_brightness(brightness: u32) {
             Some(monitor_enum_proc),
             LPARAM(brightness as isize),
         );
+    }
+    (DDC_FOUND.load(Ordering::Relaxed), DDC_APPLIED.load(Ordering::Relaxed))
+}
+
+/// Keeps external monitors working when the laptop WMI setup fails.
+fn external_brightness_only(rx: std::sync::mpsc::Receiver<u32>) {
+    crate::diagnostics::log("brightness: WMI unavailable, controlling external monitors only");
+    while let Ok(mut brightness) = rx.recv() {
+        while let Ok(newer) = rx.try_recv() {
+            brightness = newer;
+        }
+        let (found, applied) = set_physical_monitors_brightness(brightness.min(100));
+        if found > 0 && applied == 0 {
+            crate::diagnostics::log(&format!("brightness: {found} external monitor(s) found, none accepted {brightness}"));
+        }
     }
 }
 
@@ -1536,6 +1587,7 @@ pub fn setup_brightness_worker() {
             Ok(l) => l,
             Err(_) => {
                 let _ = CoUninitialize();
+                external_brightness_only(rx);
                 return;
             }
         };
@@ -1545,6 +1597,7 @@ pub fn setup_brightness_worker() {
             Ok(s) => s,
             Err(_) => {
                 let _ = CoUninitialize();
+                external_brightness_only(rx);
                 return;
             }
         };
@@ -1622,7 +1675,10 @@ pub fn setup_brightness_worker() {
             }
 
             // 2. Desktop external monitor via Physical Monitor API (DXVA2 DDC/CI)
-            set_physical_monitors_brightness(brightness);
+            let (found, applied) = set_physical_monitors_brightness(brightness);
+            if found > 0 && applied == 0 {
+                crate::diagnostics::log(&format!("brightness: {found} external monitor(s) found, none accepted {brightness}"));
+            }
 
 
         }
