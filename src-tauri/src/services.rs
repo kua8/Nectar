@@ -1090,6 +1090,7 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
         let mut last_visible = true;
         let mut last_dock_overlap: Option<bool> = None;
         let mut last_dock_fullscreen: Option<bool> = None;
+        let mut last_notch_fullscreen: Option<bool> = None;
         let mut last_secondary_dock_fullscreen = std::collections::HashMap::<String, (bool, Instant)>::new();
         let mut last_notch_overlap: Option<bool> = None;
         let mut last_dock_maximized: Option<bool> = None;
@@ -1304,6 +1305,12 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                     let _ = handle_visibility.emit_to("dock", "dock-fullscreen", fullscreen_on_dock);
                     last_dock_fullscreen = Some(fullscreen_on_dock);
                 }
+                let fullscreen_on_notch = current_is_fs && fg_on("main");
+                crate::state::set_flag(crate::state::notch_fullscreen(), "main", fullscreen_on_notch);
+                if Some(fullscreen_on_notch) != last_notch_fullscreen || last_emit.elapsed() >= Duration::from_secs(3) {
+                    let _ = handle_visibility.emit_to("main", "notch-fullscreen", fullscreen_on_notch);
+                    last_notch_fullscreen = Some(fullscreen_on_notch);
+                }
 
                 if Some(effective_dock_overlap) != last_dock_overlap || last_emit.elapsed() >= Duration::from_secs(3) {
                     let _ = handle_visibility.emit_to("dock", "dock-overlap", effective_dock_overlap);
@@ -1324,12 +1331,16 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                     }
                     let Ok(w_hwnd) = win.hwnd() else { continue };
                     let Some((mx, my, _mw, _mh)) = monitor_rect_for_hwnd(w_hwnd) else { continue };
-                    if is_dock {
+                    {
                         let fullscreen_here = current_is_fs && fg_info.is_some_and(|(screen, _, _)| screen.left == mx && screen.top == my);
+                        if !is_dock {
+                            crate::state::set_flag(crate::state::notch_fullscreen(), &label, fullscreen_here);
+                        }
                         let needs_update = last_secondary_dock_fullscreen.get(&label)
                             .is_none_or(|(previous, sent_at)| *previous != fullscreen_here || sent_at.elapsed() >= Duration::from_secs(3));
                         if needs_update {
-                            let _ = handle_visibility.emit_to(label.as_str(), "dock-fullscreen", fullscreen_here);
+                            let event = if is_dock { "dock-fullscreen" } else { "notch-fullscreen" };
+                            let _ = handle_visibility.emit_to(label.as_str(), event, fullscreen_here);
                             last_secondary_dock_fullscreen.insert(label.clone(), (fullscreen_here, now));
                         }
                     }
@@ -1897,6 +1908,12 @@ fn in_show_desktop_corner(x: i32, y: i32) -> bool {
     x >= right - CORNER && x < right && y >= bottom - CORNER && y < bottom
 }
 
+/// Smart and Peek notches stay hidden while a fullscreen window covers their monitor.
+fn notch_suppressed(app_handle: &AppHandle, label: &str) -> bool {
+    crate::state::get_flag(crate::state::notch_fullscreen(), label)
+        && crate::monitors::resolve_mode_for_label(app_handle, crate::types::WindowKind::Notch, label) != "fixed"
+}
+
 fn dock_edge_hover_allowed(fullscreen_on_dock: bool, at_bottom_edge: bool, dock_hovered: bool) -> bool {
     !fullscreen_on_dock && (at_bottom_edge || dock_hovered)
 }
@@ -2096,13 +2113,17 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
             {
                 if let Some(main_win) = app_handle.get_webview_window("main") {
                     if main_win.is_visible().unwrap_or(false) {
-                        let in_notch_hover = crate::state::get_flag(crate::state::notch_hovered(), "main");
+                        let notch_fs = notch_suppressed(app_handle, "main");
+                        let in_notch_hover = !notch_fs && crate::state::get_flag(crate::state::notch_hovered(), "main");
                         let mut is_notch_hovered = false;
                         let scale = main_win.scale_factor().unwrap_or(1.0);
                         let in_top_band = cursor.y <= (notch_mon_y + (8.0 * scale) as i32) &&
                                           cursor.x >= notch_mon_x && cursor.x <= (notch_mon_x + notch_mon_w);
-                        let at_top_edge = top_edge_armed(app_handle, "main", in_top_band, now);
+                        let at_top_edge = top_edge_armed(app_handle, "main", in_top_band && !notch_fs, now);
 
+                        if notch_fs {
+                            MH_TOPBAR_EXPIRY_MS.store(0, Ordering::Relaxed);
+                        }
                         if at_top_edge || in_notch_hover {
                             is_notch_hovered = true;
                             MH_TOPBAR_EXPIRY_MS.store(now + 500, Ordering::Relaxed);
@@ -2177,7 +2198,7 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
                             scale, dbg_box, is_click_interactive, at_top_edge, MH_LAST_MAIN_IGNORE.load(Ordering::Relaxed),
                         ));
 
-                        let final_ignore = !is_click_interactive && !MENU_IS_OPEN.load(Ordering::Relaxed);
+                        let final_ignore = notch_fs || (!is_click_interactive && !MENU_IS_OPEN.load(Ordering::Relaxed));
                         let prev_ignore = MH_LAST_MAIN_IGNORE.load(Ordering::Relaxed);
                         let new_ignore = if final_ignore { 1 } else { 0 };
                         if prev_ignore != new_ignore {
@@ -2469,12 +2490,16 @@ fn hit_test_extra_notch_windows(app_handle: &AppHandle, cursor: windows::Win32::
         let Some((mon_x, mon_y, mon_w, _mon_h)) = monitor_rect_for_hwnd(hwnd) else { continue };
 
         let scale = main_win.scale_factor().unwrap_or(1.0);
-        let in_notch_hover = crate::state::get_flag(crate::state::notch_hovered(), &label);
+        let notch_fs = notch_suppressed(app_handle, &label);
+        let in_notch_hover = !notch_fs && crate::state::get_flag(crate::state::notch_hovered(), &label);
         let in_top_band = cursor.y <= (mon_y + (8.0 * scale) as i32) &&
                           cursor.x >= mon_x && cursor.x <= (mon_x + mon_w);
-        let at_top_edge = top_edge_armed(app_handle, &label, in_top_band, now);
+        let at_top_edge = top_edge_armed(app_handle, &label, in_top_band && !notch_fs, now);
 
         let mut is_notch_hovered = false;
+        if notch_fs {
+            crate::state::set_i64(crate::state::notch_extra_expiry_ms(), &label, 0);
+        }
         if at_top_edge || in_notch_hover {
             is_notch_hovered = true;
             crate::state::set_i64(crate::state::notch_extra_expiry_ms(), &label, now + 500);
@@ -2526,7 +2551,7 @@ fn hit_test_extra_notch_windows(app_handle: &AppHandle, cursor: windows::Win32::
             crate::state::set_i32(crate::state::notch_extra_last_edge_hover(), &label, new_hover);
         }
 
-        let final_ignore = !is_click_interactive && !MENU_IS_OPEN.load(Ordering::Relaxed);
+        let final_ignore = notch_fs || (!is_click_interactive && !MENU_IS_OPEN.load(Ordering::Relaxed));
         let prev_ignore = crate::state::get_i32(crate::state::notch_extra_last_ignore(), &label, -1);
         let new_ignore = if final_ignore { 1 } else { 0 };
         if prev_ignore != new_ignore {
