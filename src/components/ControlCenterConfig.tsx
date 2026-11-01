@@ -143,7 +143,7 @@ export function ControlCenterConfig({ value, onChange, onReset, customized }: Pr
 
   return (
     <DndContext sensors={sensors} collisionDetection={rectIntersection} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-      <div className="widget-config">
+      <div className="widget-config widget-config--control-center">
         {KINDS.map((kind) => (
           <Zone key={kind} kind={kind} items={layout[kind]} onRemove={remove} />
         ))}
