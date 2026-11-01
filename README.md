@@ -1,143 +1,152 @@
 <div align="center">
 
-<img src="docs/logo.png" width="160" alt="Nectar logo" />
+<img src="docs/logo.png" width="128" alt="Nectar logo" />
 
 <br />
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/wordmark-dark.png" />
-  <img src="docs/wordmark-light.png" height="48" alt="Nectar" />
+  <img src="docs/wordmark-light.png" height="44" alt="Nectar" />
 </picture>
 
-**A notch and a dock for Windows: physics-animated, reactive, and built to replace your taskbar.**
-
-<br />
+<p><strong>A notch and a dock for Windows.<br />Physics-animated, reactive, and built to replace your taskbar.</strong></p>
 
 [![Latest release](https://shieldcn.dev/badge/release-v1.7.1.svg?logo=lu:Tag)](https://github.com/kua8/Nectar/releases/latest)
 [![Downloads](https://badges.kua8.lol/downloads.svg)](https://github.com/kua8/Nectar/releases)
 [![License](https://shieldcn.dev/github/license/kua8/Nectar.svg?logo=lu:Scale)](LICENSE)
 [![Platform](https://shieldcn.dev/badge/platform-Windows.svg?logo=ri:FaWindows)](https://www.microsoft.com/windows)
 
-[**Download**](https://github.com/kua8/Nectar/releases/latest) &nbsp;·&nbsp; [Features](#features) &nbsp;·&nbsp; [Multiple monitors](#multiple-monitors) &nbsp;·&nbsp; [Settings](SETTINGS.md) &nbsp;·&nbsp; [Build from source](#build-from-source)
+[**Download**](https://github.com/kua8/Nectar/releases/latest) &nbsp;·&nbsp; [Features](#features) &nbsp;·&nbsp; [Install](#install) &nbsp;·&nbsp; [Settings](SETTINGS.md) &nbsp;·&nbsp; [Report a bug](https://github.com/kua8/Nectar/issues/new/choose)
+
+<br />
+
+<img src="docs/screenshots/desktop.webp" width="860" alt="Nectar's notch and dock on a Windows desktop" />
+
+</div>
 
 <br />
 
 > **Disclaimer:** I'm a solo dev and I really DID NOT expect this sudden traction for Nectar. I really appreciate the recent support, and I'm trying my best to release fixes as quickly as possible to keep you all happy. But fixing one issue often causes another one. So moving forward I'll do weekly releases with stable builds, plus a pre-release for smaller fixes, and a toggle to decide which version of Nectar you run. This gives me time to search through all the bugs, find the most critical ones, and also have a private life. Thank you for understanding.
 
-<br />
-
-<img src="docs/screenshots/desktop.webp" width="820" alt="Nectar's notch and dock on a Windows desktop" />
-
-</div>
-
-<br />
-
-Nectar is a fork of [Bloom](https://github.com/SehajveerSingh2005/bloom) by Sehajveer Singh, and the concept and the codebase it grew from are theirs. It is rebranded end to end and maintained independently, with its own fixes and direction.
-
 ## Features
 
-- **A notch that does things.** Music, quick controls, system stats, and a calendar in one spring-animated island at the top of your screen.
-- **A dock that replaces your taskbar.** It mirrors your real taskbar (same pinned apps, same order, real icons and names) and hides the native one.
-- **Native where it counts.** The system tray opens the actual Windows flyout, and Quit ends an app the way Task Manager's End task does.
-- **Yours to shape.** Themes, three visibility modes, per-monitor placement, and every option in a plain `settings.json` you can edit live.
-- **Light on the system.** Audio capture, cursor tracking, and thumbnail work pause themselves when nothing needs them.
-
-## The Notch
-
-A notch at the top of your screen that adapts to what you're doing. Scroll or swipe to change modes, or pin it in place like a hardware notch.
+| What you get | How |
+| --- | --- |
+| **A notch that does things** | Music, a Control Center you arrange yourself, status, a calendar and a file shelf in one spring-animated island. |
+| **A dock that replaces your taskbar** | Mirrors your real taskbar, same pinned apps and order, with real icons and names. |
+| **Native where it counts** | The tray opens the real Windows flyout, and Quit ends an app like Task Manager's End task. |
+| **Out of your way** | Fixed, Smart or Peek modes, and both stay hidden over fullscreen games. |
+| **Made for your setup** | Every monitor, one monitor, or a specific one. English and Turkish. Every option lives in a plain `settings.json`. |
+| **Light on the system** | Audio capture, cursor tracking and thumbnail work pause themselves when nothing needs them. |
 
 <div align="center">
-<img src="docs/screenshots/island.png" width="420" alt="The Nectar notch showing the time and now-playing artwork" />
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/island.png" height="130" alt="The Nectar notch" /></td>
+    <td align="center"><img src="docs/screenshots/dock.png" height="130" alt="The Nectar dock" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>The notch</sub></td>
+    <td align="center"><sub>The dock</sub></td>
+  </tr>
+</table>
 </div>
-
-<br />
-
-| Mode | What it does |
-| --- | --- |
-| **Music** | Album art, track info, playback controls, and a visualizer that reacts to five frequency bands. |
-| **Command Center** | Wi-Fi, Bluetooth, Do Not Disturb, volume, and brightness without opening Windows Settings. |
-| **Status** | Battery (hidden automatically on desktops without one) and weather, in a layout you choose. |
-| **Calendar** | A month view with a built-in Pomodoro timer. |
-
-Turn on **Dual Clock** (Settings › Notch) to show a second time zone next to the time, for a city you search for.
-
-Width, height, corner radius, and position each animate on their own spring, so every transition feels physical.
-
-**Visibility modes** (Settings › Notch):
-
-| Mode | Behavior |
-| --- | --- |
-| **Fixed** | Always visible, even over fullscreen apps, like a real hardware notch. |
-| **Smart** | Hides when another window overlaps it and reveals on hover. |
-| **Peek** | Hidden until the cursor reaches the top edge, or a media event or notification arrives. |
-
-In Smart and Peek the notch stays fully clickable when it's revealed. Only a thin strip at the very edge of the screen stays click-through, so it never swallows input meant for a screenshot tool or a game. The notch never reserves desktop space, so it can't leave a gap above maximized windows.
-
-## The Dock
-
-A taskbar that moves. Drag icons to reorder, hover for window previews, and right-click for a context menu that always opens above the dock.
-
-<div align="center">
-<img src="docs/screenshots/dock.png" width="520" alt="The Nectar dock with pinned apps" />
-</div>
-
-<br />
-
-- **Your taskbar, mirrored.** On first launch Nectar imports the apps pinned to your Windows taskbar, in the same order, including File Explorer, Discord, and Microsoft Store apps.
-- **Real icons and names.** Windows Settings shows its gear and Task Manager is called "Task Manager", not `taskmgr`.
-- **Pinned and running, separated.** A divider marks the split by default. Turn on **Mix Pinned & Running** to drag any icon anywhere.
-- **Quit means quit.** Right-click › Quit ends the app like End task in Task Manager.
-- **Search built in.** A search icon beside Start opens Windows Search.
-- **Native tray.** The tray button opens the real Windows hidden-icons flyout under the notch.
-
-Dock visibility uses the same **Fixed**, **Smart**, and **Peek** modes as the notch. Fixed reserves screen space like a normal taskbar, Smart hides when a window overlaps it, and Peek stays out of the way until you approach the bottom edge.
-
-## Multiple monitors
-
-The dock and the notch each have a **Show On** setting, chosen separately in Settings:
-
-| Show On | Result |
-| --- | --- |
-| **Primary Monitor** | Shown on your primary display only. This is the default. |
-| **All Monitors** | Every connected display gets its own copy. |
-| **Specific Monitor** | Pinned to one display you choose from a list. |
-
-Because the two are independent, the same app can look very different from one machine to the next:
-
-- **Dock and notch on every monitor.** Each screen looks the same, and each dock reserves its own space at the bottom.
-- **Dock on the primary only.** The other screens have no taskbar at all, since the Windows taskbar is hidden on every monitor while Nectar's dock is on. Maximized windows there use the full screen.
-- **Notch on one screen, dock on another.** Works fine, and each one follows its own visibility mode.
-- **Dock turned off.** The native Windows taskbar comes back on every monitor.
-
-Extra monitors get their own windows, so **All Monitors** uses somewhat more CPU and memory than a single display. If you're on a low-power machine, keep **Show On** on one monitor.
-
-## Under the hood
-
-The backend is Rust and talks straight to the Windows shell: global input hooks, WASAPI for real-time system audio, COM for media session control, and WMI for hardware monitoring. The interface is React, animated with springs.
-
-Every setting lives in one plain `settings.json` that Nectar watches and applies as you save, so you can script it or keep it in your dotfiles. [SETTINGS.md](SETTINGS.md) has the full reference. **Settings › About › Reset to Defaults** resets everything.
 
 ## Install
 
 1. Download the installer from the [latest release](https://github.com/kua8/Nectar/releases/latest).
 2. Choose **Just me** or **All users**. An all-users install asks for administrator permission once.
-3. Nectar starts with a short splash animation, then the notch and dock appear together.
+3. Nectar starts with a short splash, then the notch and dock appear together.
 
-Only download Nectar from the [releases page](https://github.com/kua8/Nectar/releases) of this repository. Each release includes a `SHA256SUMS.txt` file. To check your download, run this in PowerShell and compare the result with the matching line in that file:
+Nectar updates itself: a green dot on the notch means an update is ready, and **Auto Update** in **Settings › About** installs it for you. Turn on **Get pre-releases** there to receive early builds before the weekly release. **Uninstall** from Windows Settings › Apps or from **Settings › About**, either puts your taskbar back.
+
+<details>
+<summary>Verify your download</summary>
+
+<br />
+
+Only download Nectar from the [releases page](https://github.com/kua8/Nectar/releases) of this repository. Each release has a `SHA256SUMS.txt`. Compare the output of this command with the matching line:
 
 ```powershell
 Get-FileHash .\Nectar-Setup-<version>.exe -Algorithm SHA256
 ```
 
-Nectar updates itself: a green dot on the notch means an update is ready, and you can turn on **Auto Update** in **Settings › About**. **Launch at Login** is in **Settings › General**.
+</details>
 
-**Uninstall** from Windows Settings › Apps, or from **Settings › About** inside Nectar. Both remove the app and put your native taskbar back.
+## Usage
 
-If Nectar is ever force-closed, it restores the Windows taskbar the next time it starts.
+**Notch panels.** Scroll or swipe on the notch to change panel.
+
+| Panel | What it does |
+| --- | --- |
+| **Music** | Album art, track info, playback controls, a visualizer, and a switch between several playing apps. |
+| **Control Center** | Wi-Fi, Bluetooth, Do Not Disturb, volume and brightness. Drag tiles, buttons and sliders into your own layout. |
+| **Status** | Battery (hidden on desktops without one) and weather, in a layout you choose. |
+| **Calendar** | Day, week, month and agenda views, a timer, a stopwatch and Pomodoro. |
+| **Shelf** | Drop files or text on the notch and drag them out later. |
+
+**Visibility modes.** The notch and the dock each have their own.
+
+| Mode | Behavior |
+| --- | --- |
+| **Fixed** | Always visible. The dock reserves screen space like a normal taskbar. |
+| **Smart** | Hides when another window overlaps it and reveals on hover. |
+| **Peek** | Hidden until the cursor reaches the screen edge, or a media event arrives. |
+
+In Smart and Peek both stay hidden, and click-through, while a fullscreen app is in front.
+
+**Multiple monitors.** Under **Show On**, pick **Primary Monitor** (the default), **All Monitors** or a **Specific Monitor** for the dock and the notch separately. Each extra monitor gets its own windows, so **All Monitors** uses more memory than a single display.
+
+## Troubleshooting
+
+<details>
+<summary><b>The dock shows over my game</b></summary>
+
+<br />
+
+Nectar hides the dock and notch over a fullscreen window that covers the whole monitor, in Smart and Peek. Fixed mode stays visible by design. If something still appears, open an issue with the game and its display mode (fullscreen, borderless or windowed).
+
+</details>
+
+<details>
+<summary><b>The Windows taskbar did not come back</b></summary>
+
+<br />
+
+Start Nectar again, it restores the taskbar on launch even after a crash. Uninstalling from Windows Settings › Apps or from **Settings › About** brings it back too.
+
+</details>
+
+<details>
+<summary><b>Nectar uses a lot of memory</b></summary>
+
+<br />
+
+Every window runs in its own WebView2 process, so each monitor adds a notch and a dock. Set **Show On** to one monitor to cut it down.
+
+</details>
+
+<details>
+<summary><b>Brightness does not change on my external monitor</b></summary>
+
+<br />
+
+External monitors are controlled over DDC/CI. Turn DDC/CI on in the monitor's own menu, and connect it directly if you use a dock or adapter, since some do not pass it on.
+
+</details>
+
+<details>
+<summary><b>Something else is broken</b></summary>
+
+<br />
+
+Open **Settings › About › Copy Diagnostics** and paste the result into a [bug report](https://github.com/kua8/Nectar/issues/new/choose). It includes your versions, monitors and recent log.
+
+</details>
 
 ## Build from source
 
-You'll need [Rust](https://rustup.rs/) and [Bun](https://bun.sh/).
+You need [Rust](https://rustup.rs/) and [Bun](https://bun.sh/) on Windows.
 
 ```bash
 git clone https://github.com/kua8/Nectar.git
@@ -146,12 +155,38 @@ bun install
 bun run tauri dev
 ```
 
-To produce a release build, run `bun run tauri build`.
+`bun run tauri build` makes a release build. Before a pull request, read [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Contributing
+## Roadmap
 
-Found a bug or have an idea? [Open an issue](https://github.com/kua8/Nectar/issues) or send a pull request. Say which Windows version and monitor setup you're on if it's a display bug, since that is often what decides it.
+These are ideas under consideration, not promises.
+
+- [ ] Background tray programs (antivirus, VPN) in the notch
+- [ ] Lower memory use, with Settings loaded on demand
+- [ ] Code signing for the installer
+- [x] Stable and pre-release update channels
+- [x] Multiple media sessions, Task Manager in the dock menu, show desktop corner
+
+See the [open issues](https://github.com/kua8/Nectar/issues) for requests and known bugs.
+
+## Built with
+
+[![Tauri](https://img.shields.io/badge/Tauri-24C8D8?style=for-the-badge&logo=tauri&logoColor=white)](https://tauri.app/)
+[![Rust](https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
+
+## Support
+
+Nectar is free and open source. If it makes your desktop nicer, you can support its development.
+
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/kua8)
 
 ## License
 
 Nectar is open source under the [GPLv3](LICENSE).
+
+## Credits
+
+Nectar began as a fork of [Bloom](https://github.com/SehajveerSingh2005/bloom) by Sehajveer Singh, and the original concept and the codebase it grew from are theirs. Nectar has since been rebuilt and is maintained independently, with its own features, fixes and direction. Thanks to everyone listed on the [contributors page](https://github.com/kua8/Nectar/graphs/contributors).
