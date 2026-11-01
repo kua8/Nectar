@@ -1475,6 +1475,12 @@ fn set_physical_monitors_brightness(brightness: u32) {
                     hMonitor: usize,
                     dwNewBrightness: u32,
                 ) -> BOOL;
+                fn GetMonitorBrightness(
+                    hMonitor: usize,
+                    pdwMinimumBrightness: *mut u32,
+                    pdwCurrentBrightness: *mut u32,
+                    pdwMaximumBrightness: *mut u32,
+                ) -> BOOL;
             }
 
             let mut count = 0u32;
@@ -1482,8 +1488,20 @@ fn set_physical_monitors_brightness(brightness: u32) {
                 let mut monitors = vec![std::mem::zeroed::<PHYSICAL_MONITOR>(); count as usize];
                 if GetPhysicalMonitorsFromHMONITOR(hmonitor, count, monitors.as_mut_ptr()).as_bool() {
                     for mon in &monitors {
-                        if mon.h_physical_monitor != 0 {
-                            let _ = SetMonitorBrightness(mon.h_physical_monitor, brightness);
+                        if mon.h_physical_monitor == 0 {
+                            continue;
+                        }
+                        let (mut min, mut cur, mut max) = (0u32, 0u32, 0u32);
+                        if !GetMonitorBrightness(mon.h_physical_monitor, &mut min, &mut cur, &mut max).as_bool() || max <= min {
+                            let code = windows::Win32::Foundation::GetLastError().0;
+                            let name = String::from_utf16_lossy(&mon.sz_physical_monitor_description).trim_end_matches('\0').to_string();
+                            crate::diagnostics::log(&format!("brightness: monitor \"{name}\" does not report a DDC/CI range, error {code}"));
+                            continue;
+                        }
+                        let target = min + (max - min) * brightness / 100;
+                        if !SetMonitorBrightness(mon.h_physical_monitor, target).as_bool() {
+                            let code = windows::Win32::Foundation::GetLastError().0;
+                            crate::diagnostics::log(&format!("brightness: setting {target} (range {min}-{max}) failed, error {code}"));
                         }
                     }
                     let _ = DestroyPhysicalMonitors(count, monitors.as_mut_ptr());
