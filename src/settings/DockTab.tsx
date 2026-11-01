@@ -152,7 +152,11 @@ export function DockTab({
         {dockEnabled && (
           <>
             {!showPerMonitor && (
-              <SettingRow icon={dockMode === "fixed" ? EyeOff : Eye} label={t("dock.behavior")} desc={t("dock.behavior.desc")}>
+              <SettingRow
+                icon={dockMode === "fixed" ? EyeOff : Eye}
+                label={t("dock.behavior")}
+                desc={t(`dock.behavior.${dockMode}.desc`)}
+              >
                 <Dropdown
                   value={dockMode}
                   onChange={setDockModeValue}
