@@ -1650,6 +1650,8 @@ function App() {
   };
 
   const isCalendarMode = nectarMode === 'calendar';
+  // Calendar and command center are big, dense panels; glass styles thicken the fill for them
+  const isPanelOpen = isHovered && (isCalendarMode || nectarMode === 'command-center');
 
   // Close compact media player expansions when notch is unhovered or mode changes
   useEffect(() => {
@@ -1686,7 +1688,7 @@ function App() {
       <div style={{ zoom: scale, width: '100%', display: 'flex', justifyContent: 'center' }}>
         <motion.div
           ref={nectarRef}
-          className={`nectar ${isHovered ? 'expanded' : ''} ${isImpacted ? 'is-impacted' : ''}`}
+          className={`nectar ${isHovered ? 'expanded' : ''} ${isImpacted ? 'is-impacted' : ''} ${isPanelOpen ? 'panel-open' : ''}`}
           onMouseEnter={() => setIsNotchHovered(true)}
         onMouseLeave={() => setIsNotchHovered(false)}
         onWheel={handleWheel}

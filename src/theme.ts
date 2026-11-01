@@ -143,13 +143,14 @@ function isHex(color: string | null): color is string {
 const hsla = (h: number, s: number, l: number, a = 1) => `hsla(${h}, ${s}%, ${l}%, ${a})`;
 
 // Material You style tonal palette: tinted surfaces and a pastel (dark) or deep (light) primary.
-function applyMaterialPalette(root: HTMLElement, seed: string, light: boolean, op: number, opExpanded: number) {
+function applyMaterialPalette(root: HTMLElement, seed: string, light: boolean, op: number, opExpanded: number, opPanel: number) {
   const { h, s } = hexToHsl(seed);
   const tint = Math.min(s, 60);
   const set = (name: string, value: string) => root.style.setProperty(name, value);
   if (light) {
     set("--nectar-bg", hsla(h, tint * 0.6, 95, op));
     set("--nectar-bg-expanded", hsla(h, tint * 0.55, 92, opExpanded));
+    set("--nectar-bg-panel", hsla(h, tint * 0.55, 92, opPanel));
     set("--nectar-text", hsla(h, 18, 12));
     set("--nectar-text-muted", hsla(h, 12, 28, 0.75));
     set("--nectar-border", hsla(h, 15, 30, 0.16));
@@ -159,6 +160,7 @@ function applyMaterialPalette(root: HTMLElement, seed: string, light: boolean, o
   } else {
     set("--nectar-bg", hsla(h, tint * 0.35, 9, op));
     set("--nectar-bg-expanded", hsla(h, tint * 0.35, 12, opExpanded));
+    set("--nectar-bg-panel", hsla(h, tint * 0.35, 12, opPanel));
     set("--nectar-text", hsla(h, 25, 92));
     set("--nectar-text-muted", hsla(h, 14, 78, 0.8));
     set("--nectar-border", hsla(h, 18, 70, 0.16));
@@ -173,7 +175,11 @@ let accentGeneration = 0;
 
 // Highlights (active pills, toggles, sliders, today) are monochrome unless an accent is chosen.
 // Material You always has one: it uses the accent, or the Windows accent, as its seed.
-async function applyAccent(root: HTMLElement, material: { op: number; opExpanded: number; fallback: string } | null) {
+async function applyAccent(
+  root: HTMLElement,
+  surface: string,
+  material: { op: number; opExpanded: number; opPanel: number; fallback: string } | null
+) {
   const generation = ++accentGeneration;
   const accentMode = localStorage.getItem("nectar-theme-accent") || "mono";
   let color: string | null = null;
@@ -185,12 +191,14 @@ async function applyAccent(root: HTMLElement, material: { op: number; opExpanded
   }
   if (material) {
     const light = root.classList.contains("light-mode");
-    applyMaterialPalette(root, isHex(color) ? color : material.fallback, light, material.op, material.opExpanded);
+    applyMaterialPalette(root, isHex(color) ? color : material.fallback, light, material.op, material.opExpanded, material.opPanel);
     return;
   }
   if (!isHex(color)) {
+    // Monochrome: highlights use the text color, and text on them uses the opaque surface color
+    // (the translucent background would turn it grey on glass).
     root.style.removeProperty("--nectar-highlight");
-    root.style.removeProperty("--nectar-on-highlight");
+    root.style.setProperty("--nectar-on-highlight", surface);
     return;
   }
   root.style.setProperty("--nectar-accent", color);
@@ -229,10 +237,15 @@ export async function applyTheme(
 
   const op = opacity;
   const opExpanded = Math.min(1.0, opacity + 0.12);
+  // Large panels (calendar, command center) need a denser fill than the pill to stay readable on glass.
+  const opPanel = Math.max(opExpanded, 0.82);
+  let surface = '#000000';
 
   if (mode === 'light') {
+    surface = '#f5f5f7';
     root.style.setProperty('--nectar-bg', `rgba(255, 255, 255, ${op})`);
     root.style.setProperty('--nectar-bg-expanded', `rgba(245, 245, 247, ${opExpanded})`);
+    root.style.setProperty('--nectar-bg-panel', `rgba(245, 245, 247, ${opPanel})`);
     root.style.setProperty('--nectar-text', '#1c1c1e');
     root.style.setProperty('--nectar-text-muted', 'rgba(28, 28, 30, 0.65)');
     root.style.setProperty('--nectar-border', 'rgba(0, 0, 0, 0.12)');
@@ -249,9 +262,11 @@ export async function applyTheme(
     hsl.l = brightness * 100;
     const finalBgColor = hslToHex(hsl.h, hsl.s, hsl.l);
     const isLight = brightness > 0.55;
+    surface = finalBgColor;
 
     root.style.setProperty('--nectar-bg', hexToRgba(finalBgColor, op));
     root.style.setProperty('--nectar-bg-expanded', hexToRgba(finalBgColor, opExpanded));
+    root.style.setProperty('--nectar-bg-panel', hexToRgba(finalBgColor, opPanel));
     root.style.setProperty('--nectar-text', isLight ? '#1c1c1e' : '#ffffff');
     root.style.setProperty('--nectar-text-muted', isLight ? 'rgba(28, 28, 30, 0.65)' : 'rgba(255, 255, 255, 0.65)');
     root.style.setProperty('--nectar-border', isLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.12)');
@@ -275,9 +290,11 @@ export async function applyTheme(
       hsl.l = brightness * 100;
       const finalBgColor = hslToHex(hsl.h, hsl.s, hsl.l);
       const isLight = brightness > 0.55;
+      surface = finalBgColor;
 
       root.style.setProperty('--nectar-bg', hexToRgba(finalBgColor, op));
       root.style.setProperty('--nectar-bg-expanded', hexToRgba(finalBgColor, opExpanded));
+      root.style.setProperty('--nectar-bg-panel', hexToRgba(finalBgColor, opPanel));
       root.style.setProperty('--nectar-text', isLight ? '#1c1c1e' : '#ffffff');
       root.style.setProperty('--nectar-text-muted', isLight ? 'rgba(28, 28, 30, 0.65)' : 'rgba(255, 255, 255, 0.65)');
       root.style.setProperty('--nectar-border', isLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.12)');
@@ -301,6 +318,7 @@ export async function applyTheme(
     // default/dark
     root.style.setProperty('--nectar-bg', `rgba(0, 0, 0, ${op})`);
     root.style.setProperty('--nectar-bg-expanded', `rgba(0, 0, 0, ${opExpanded})`);
+    root.style.setProperty('--nectar-bg-panel', `rgba(0, 0, 0, ${opPanel})`);
     root.style.setProperty('--nectar-text', '#ffffff');
     root.style.setProperty('--nectar-text-muted', 'rgba(255, 255, 255, 0.6)');
     root.style.setProperty('--nectar-border', 'rgba(255, 255, 255, 0.1)');
@@ -313,7 +331,11 @@ export async function applyTheme(
     root.classList.remove('theme-light', 'theme-custom', 'theme-adaptive');
   }
 
-  await applyAccent(root, style === "material" ? { op, opExpanded, fallback: isHex(customColor) ? customColor : DEFAULT_ACCENT_COLOR } : null);
+  await applyAccent(
+    root,
+    surface,
+    style === "material" ? { op, opExpanded, opPanel, fallback: isHex(customColor) ? customColor : DEFAULT_ACCENT_COLOR } : null
+  );
 }
 
 export function initTheme() {
