@@ -5,7 +5,7 @@ import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { getVersion } from "@tauri-apps/api/app";
 import type { UpdateCheckResult } from "../updater";
 import { useSettingsSync } from "../hooks/useSettingsSync";
-import { hexToHsl } from "../theme";
+import { hexToHsl, DEFAULT_ACCENT_COLOR, STYLE_OPACITY, type ThemePreset } from "../theme";
 import { DEFAULT_DUAL_CLOCK_ZONE } from "../dualClock";
 import type { WidgetConfig, MonitorInfo, MonitorMode } from "./types";
 
@@ -159,6 +159,11 @@ export function useSettings() {
     const val = localStorage.getItem("nectar-theme-brightness");
     return val !== null ? parseFloat(val) : 0.15;
   });
+  const [themeStyle, setThemeStyle] = useState(() => localStorage.getItem("nectar-theme-style") || "solid");
+  const [themeAccent, setThemeAccent] = useState(() => localStorage.getItem("nectar-theme-accent") || "mono");
+  const [themeAccentColor, setThemeAccentColor] = useState(
+    () => localStorage.getItem("nectar-theme-accent-color") || DEFAULT_ACCENT_COLOR
+  );
   const [exportStatus, setExportStatus] = useState<"idle" | "exporting" | "success" | "error">("idle");
   const [importStatus, setImportStatus] = useState<"idle" | "importing" | "success" | "error">("idle");
   const [resetStatus, setResetStatus] = useState<"idle" | "confirm" | "resetting">("idle");
@@ -242,6 +247,9 @@ export function useSettings() {
       apply(getVal("nectar-theme-opacity"), setThemeOpacity, parseFloat);
       apply(getVal("nectar-theme-saturation"), setThemeSaturation, parseFloat);
       apply(getVal("nectar-theme-brightness"), setThemeBrightness, parseFloat);
+      apply(getVal("nectar-theme-style"), setThemeStyle, (v) => v);
+      apply(getVal("nectar-theme-accent"), setThemeAccent, (v) => v);
+      apply(getVal("nectar-theme-accent-color"), setThemeAccentColor, (v) => v);
 
       const widgetsVal = getVal("nectar-status-widgets");
       if (widgetsVal) {
@@ -337,6 +345,9 @@ export function useSettings() {
     "nectar-theme-opacity": setThemeOpacity,
     "nectar-theme-saturation": setThemeSaturation,
     "nectar-theme-brightness": setThemeBrightness,
+    "nectar-theme-style": (v) => setThemeStyle(String(v)),
+    "nectar-theme-accent": (v) => setThemeAccent(String(v)),
+    "nectar-theme-accent-color": (v) => setThemeAccentColor(String(v)),
     "nectar-weather-city": (v) => setCityName(v || ""),
   });
 
@@ -783,6 +794,42 @@ export function useSettings() {
     saveSetting("nectar-theme-brightness", String(value));
   };
 
+  const handleThemeStyleChange = (style: string) => {
+    setThemeStyle(style);
+    saveSetting("nectar-theme-style", style);
+    // Each style is tuned for an opacity; the slider can still change it afterwards.
+    const opacity = STYLE_OPACITY[style];
+    if (opacity !== undefined) {
+      setThemeOpacity(opacity);
+      saveSetting("nectar-theme-opacity", String(opacity));
+    }
+  };
+
+  const handleAccentChange = (accent: string) => {
+    setThemeAccent(accent);
+    saveSetting("nectar-theme-accent", accent);
+  };
+
+  const handleAccentColorChange = (color: string) => {
+    setThemeAccentColor(color);
+    saveSetting("nectar-theme-accent-color", color);
+  };
+
+  const applyThemePreset = (preset: ThemePreset) => {
+    setThemeMode("custom");
+    setThemeColor(preset.color);
+    setThemeSaturation(preset.saturation);
+    setThemeBrightness(preset.brightness);
+    setThemeAccent("custom");
+    setThemeAccentColor(preset.color);
+    saveSetting("nectar-theme-mode", "custom");
+    saveSetting("nectar-theme-color", preset.color);
+    saveSetting("nectar-theme-saturation", String(preset.saturation));
+    saveSetting("nectar-theme-brightness", String(preset.brightness));
+    saveSetting("nectar-theme-accent", "custom");
+    saveSetting("nectar-theme-accent-color", preset.color);
+  };
+
   // ── City search ──
   const selectCity = async (city: {
     name: string;
@@ -933,6 +980,13 @@ export function useSettings() {
     handleSaturationChange,
     themeBrightness,
     handleBrightnessChange,
+    themeStyle,
+    handleThemeStyleChange,
+    themeAccent,
+    handleAccentChange,
+    themeAccentColor,
+    handleAccentColorChange,
+    applyThemePreset,
 
     // Notch
     notchMode,

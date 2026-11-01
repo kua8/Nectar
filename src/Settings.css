@@ -355,8 +355,8 @@ body {
 }
 
 input:checked + .slider {
-  background-color: #34c759;
-  border-color: #34c759;
+  background-color: var(--nectar-highlight, #34c759);
+  border-color: var(--nectar-highlight, #34c759);
 }
 
 input:checked + .slider:before {
@@ -1302,4 +1302,132 @@ input:checked + .slider:before {
 
 .caldav-providers {
   align-self: flex-start;
+}
+
+/* Style picker (Appearance › Style): each tile shows a mini notch over a wallpaper */
+.style-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 0 14px 12px 54px;
+}
+
+.style-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 5px;
+  border-radius: 10px;
+  background: none;
+  border: 1px solid transparent;
+  color: var(--nectar-text-muted, rgba(255, 255, 255, 0.6));
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.style-tile:hover {
+  background: var(--nectar-group-bg, rgba(255, 255, 255, 0.04));
+}
+
+.style-tile.active {
+  border-color: var(--nectar-highlight, var(--nectar-accent, #007aff));
+  color: var(--nectar-text, #fff);
+}
+
+.style-tile-preview {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  height: 46px;
+  border-radius: 7px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 30% 30%, #ffd166 0 9px, transparent 10px),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.35) 0 3px, transparent 3px 9px),
+    linear-gradient(135deg, #ff8a80 0%, #7c83fd 55%, #36d1dc 100%);
+}
+
+.style-tile-pill {
+  width: 62%;
+  height: 18px;
+  border-radius: 0 0 9px 9px;
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.style-preview-frosted .style-tile-pill {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1)),
+    rgba(20, 20, 24, 0.5);
+  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.3), 0 3px 8px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(4px);
+}
+
+.style-preview-liquid .style-tile-pill {
+  background:
+    radial-gradient(120% 140% at 50% 115%, rgba(255, 255, 255, 0.3), transparent 55%),
+    rgba(0, 0, 0, 0.28);
+  box-shadow:
+    inset 0 -1px 1px rgba(255, 255, 255, 0.6),
+    inset 1px 0 1px rgba(255, 255, 255, 0.25),
+    inset -1px 0 1px rgba(255, 255, 255, 0.25),
+    0 3px 8px rgba(0, 0, 0, 0.25);
+}
+
+.style-preview-material .style-tile-pill {
+  background: color-mix(in srgb, var(--nectar-accent, #007aff) 22%, #15171c);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nectar-accent, #007aff) 30%, transparent);
+}
+
+.style-preview-material .style-tile-pill::after {
+  content: "";
+  display: block;
+  width: 10px;
+  height: 4px;
+  margin: 7px auto 0;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--nectar-accent, #007aff) 55%, white);
+}
+
+.style-tile-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Theme presets */
+.preset-swatches {
+  display: flex;
+  gap: 7px;
+}
+
+.preset-swatch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--nectar-border, rgba(255, 255, 255, 0.12));
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.preset-swatch span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.preset-swatch:hover {
+  transform: scale(1.1);
+}
+
+.preset-swatch.active {
+  outline: 2px solid var(--nectar-highlight, var(--nectar-text, #fff));
+  outline-offset: 2px;
 }

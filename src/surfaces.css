@@ -1,0 +1,91 @@
+/* Surface styles from Settings › Appearance › Style, applied as a class on <html> by theme.ts.
+   The notch, dock and overlays sit in transparent windows, so nothing behind them can be blurred;
+   the glass looks come from haze, grain, rims and sheen over the theme fill. Solid is the plain fill. */
+
+:root {
+    --surface-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.62 0 0 0 0 0.62 0 0 0 0 0.62 0.26 0 0 0 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── Frosted glass: milky haze and fine grain ── */
+
+.style-frosted .nectar,
+.style-frosted .dock,
+.style-frosted .volume-notch,
+.style-frosted .brightness-notch {
+    background-image:
+        var(--surface-grain),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.17), rgba(255, 255, 255, 0.1));
+    box-shadow:
+        inset 0 0 0 0.5px rgba(255, 255, 255, 0.18),
+        0 8px 24px rgba(0, 0, 0, 0.22);
+}
+
+.style-frosted.light-mode .nectar,
+.style-frosted.light-mode .dock,
+.style-frosted.light-mode .volume-notch,
+.style-frosted.light-mode .brightness-notch {
+    background-image:
+        var(--surface-grain),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.22));
+    box-shadow:
+        inset 0 0 0 0.5px rgba(255, 255, 255, 0.6),
+        0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+/* ── Liquid glass: clear body, bright specular rims, sheen and depth ── */
+
+.style-liquid .nectar,
+.style-liquid .dock,
+.style-liquid .volume-notch,
+.style-liquid .brightness-notch {
+    background-image:
+        radial-gradient(120% 140% at 50% 115%, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 55%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0) 45%);
+    box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.3),
+        inset 0 -1px 1.5px rgba(255, 255, 255, 0.42),
+        inset 1px 0 1px rgba(255, 255, 255, 0.16),
+        inset -1px 0 1px rgba(255, 255, 255, 0.16),
+        inset 0 0 16px rgba(255, 255, 255, 0.1),
+        0 10px 30px rgba(0, 0, 0, 0.3);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* The notch hangs from the top edge, so its lower lip catches the light instead */
+.style-liquid .nectar {
+    box-shadow:
+        inset 0 -1px 1.5px rgba(255, 255, 255, 0.45),
+        inset 1px 0 1px rgba(255, 255, 255, 0.16),
+        inset -1px 0 1px rgba(255, 255, 255, 0.16),
+        inset 0 -6px 16px rgba(255, 255, 255, 0.08),
+        0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+/* The dock sits on the bottom edge, so light comes in from above */
+.style-liquid .dock {
+    background-image:
+        radial-gradient(120% 140% at 50% -15%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 55%),
+        linear-gradient(0deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0) 45%);
+    box-shadow:
+        inset 0 1px 1.5px rgba(255, 255, 255, 0.45),
+        inset 1px 0 1px rgba(255, 255, 255, 0.16),
+        inset -1px 0 1px rgba(255, 255, 255, 0.16),
+        inset 0 6px 16px rgba(255, 255, 255, 0.08),
+        0 -6px 30px rgba(0, 0, 0, 0.25);
+}
+
+.style-liquid.light-mode .nectar,
+.style-liquid.light-mode .dock,
+.style-liquid.light-mode .volume-notch,
+.style-liquid.light-mode .brightness-notch {
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.55);
+}
+
+/* ── Material You: the tonal palette comes from theme.ts; surfaces get a soft tonal outline ── */
+
+.style-material .nectar,
+.style-material .dock,
+.style-material .volume-notch,
+.style-material .brightness-notch {
+    box-shadow: inset 0 0 0 1px var(--nectar-border, rgba(255, 255, 255, 0.12));
+}

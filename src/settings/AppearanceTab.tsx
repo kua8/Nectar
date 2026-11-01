@@ -1,6 +1,18 @@
-import { Palette, Droplet, Contrast, Droplets, Sun, Square, Maximize2 } from "lucide-react";
+import { Palette, Droplet, Contrast, Droplets, Sun, Square, Maximize2, Layers, SwatchBook, Highlighter } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { Dropdown } from "./Dropdown";
+import { THEME_PRESETS, hexToHsl, hslToHex, type ThemePreset } from "../theme";
+
+const STYLE_OPTIONS = [
+  { value: "solid", label: "Solid" },
+  { value: "frosted", label: "Frosted Glass" },
+  { value: "liquid", label: "Liquid Glass" },
+  { value: "material", label: "Material You" },
+];
+
+function presetBackground(preset: ThemePreset): string {
+  return hslToHex(hexToHsl(preset.color).h, preset.saturation * 100, preset.brightness * 100);
+}
 
 interface AppearanceTabProps {
   themeMode: string;
@@ -17,6 +29,13 @@ interface AppearanceTabProps {
   toggleCorners: () => void;
   scale: number;
   handleScaleChange: (val: number) => void;
+  themeStyle: string;
+  handleThemeStyleChange: (style: string) => void;
+  themeAccent: string;
+  handleAccentChange: (accent: string) => void;
+  themeAccentColor: string;
+  handleAccentColorChange: (color: string) => void;
+  applyThemePreset: (preset: ThemePreset) => void;
 }
 
 export function AppearanceTab({
@@ -34,19 +53,54 @@ export function AppearanceTab({
   toggleCorners,
   scale,
   handleScaleChange,
+  themeStyle,
+  handleThemeStyleChange,
+  themeAccent,
+  handleAccentChange,
+  themeAccentColor,
+  handleAccentColorChange,
+  applyThemePreset,
 }: AppearanceTabProps) {
+  const isMaterial = themeStyle === "material";
   const showCustomColor = themeMode === "custom";
-  const showAdvancedSliders = themeMode === "custom" || themeMode === "adaptive";
+  // Material You builds the whole palette from the accent, so these don't apply there.
+  const showAdvancedSliders = !isMaterial && (themeMode === "custom" || themeMode === "adaptive");
+  const isActivePreset = (preset: ThemePreset) =>
+    themeMode === "custom" &&
+    themeColor.toLowerCase() === preset.color.toLowerCase() &&
+    Math.abs(themeSaturation - preset.saturation) < 0.01 &&
+    Math.abs(themeBrightness - preset.brightness) < 0.01;
 
   return (
     <>
       <div className="setting-group-label">Theme</div>
       <div className="setting-group">
+        <SettingRow icon={Layers} label="Style" desc="How the notch, dock and overlays are drawn" divider={false} />
+        <div className="style-tiles" role="radiogroup" aria-label="Style">
+          {STYLE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              role="radio"
+              aria-checked={themeStyle === opt.value}
+              className={`style-tile${themeStyle === opt.value ? " active" : ""}`}
+              onClick={() => handleThemeStyleChange(opt.value)}
+            >
+              <span className={`style-tile-preview style-preview-${opt.value}`}>
+                <span className="style-tile-pill" />
+              </span>
+              <span className="style-tile-label">{opt.label}</span>
+            </button>
+          ))}
+        </div>
+        <div className="setting-divider" />
+
         <SettingRow icon={Palette} label="Theme Mode" desc="Configure visual styling">
           <Dropdown
             value={themeMode}
             onChange={handleThemeModeChange}
             options={[
+              { value: "auto", label: "Auto (Match Windows)" },
               { value: "dark", label: "Dark (Translucent)" },
               { value: "light", label: "Light (Translucent)" },
               { value: "custom", label: "Custom Color" },
@@ -54,6 +108,55 @@ export function AppearanceTab({
             ]}
           />
         </SettingRow>
+
+        <SettingRow icon={SwatchBook} label="Presets" desc="One-click color themes">
+          <div className="preset-swatches">
+            {THEME_PRESETS.map((preset) => (
+              <button
+                key={preset.name}
+                type="button"
+                className={`preset-swatch${isActivePreset(preset) ? " active" : ""}`}
+                style={{ background: presetBackground(preset) }}
+                onClick={() => applyThemePreset(preset)}
+                title={preset.name}
+                aria-label={`${preset.name} preset`}
+              >
+                <span style={{ background: preset.color }} />
+              </button>
+            ))}
+          </div>
+        </SettingRow>
+
+        <SettingRow
+          icon={Highlighter}
+          label="Accent Color"
+          desc={isMaterial ? "Seed for the Material You palette" : "Toggles, active buttons, sliders and today"}
+        >
+          {/* Material You always needs a seed, so Monochrome reads as the Windows accent there */}
+          <Dropdown
+            value={isMaterial && themeAccent === "mono" ? "system" : themeAccent}
+            onChange={handleAccentChange}
+            options={[
+              ...(isMaterial ? [] : [{ value: "mono", label: "Monochrome" }]),
+              { value: "system", label: "Windows Accent" },
+              { value: "custom", label: "Custom" },
+            ]}
+          />
+        </SettingRow>
+
+        {themeAccent === "custom" && (
+          <SettingRow icon={Droplet} label="Custom Accent" desc="Pick the highlight color">
+            <div className="color-picker-row">
+              <input
+                type="color"
+                value={themeAccentColor}
+                onChange={(e) => handleAccentColorChange(e.target.value)}
+                className="color-picker-input"
+              />
+              <span className="color-picker-label">{themeAccentColor.toUpperCase()}</span>
+            </div>
+          </SettingRow>
+        )}
 
         {showCustomColor && (
           <SettingRow icon={Droplet} label="Custom Theme Color" desc="Choose layout background color">

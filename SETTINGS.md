@@ -137,11 +137,14 @@ Removing a link or disconnecting the account deletes its stored secret and cache
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `nectar-theme-mode` | `"dark"` / `"light"` / `"custom"` / `"adaptive"` | `"dark"` | Theme mode. **dark** = dark translucent. **light** = light translucent. **custom** = user-picked color. **adaptive** = follows Windows system accent color. |
+| `nectar-theme-mode` | `"auto"` / `"dark"` / `"light"` / `"custom"` / `"adaptive"` | `"dark"` | Theme mode. **auto** = dark or light, following the Windows app mode. **dark** = dark translucent. **light** = light translucent. **custom** = user-picked color. **adaptive** = follows Windows system accent color. The Presets in Settings › Appearance set `custom` mode with a matching color, saturation, brightness and accent. |
 | `nectar-theme-color` | hex string | `"#007aff"` | Custom theme color (used in `custom` and `adaptive` modes). |
 | `nectar-theme-opacity` | float string | `"0.80"` | Background opacity (0.1 to 1.0). |
 | `nectar-theme-saturation` | float string | `"0.50"` | Color saturation for custom/adaptive themes (0.0 to 1.0). |
 | `nectar-theme-brightness` | float string | `"0.15"` | Background brightness for custom/adaptive themes (0.0 to 1.0). |
+| `nectar-theme-style` | `"solid"` / `"frosted"` / `"liquid"` / `"material"` | `"solid"` | How the notch, dock and volume/brightness overlays are drawn. **solid** = plain fill. **frosted** = milky haze with fine grain. **liquid** = clear glass with bright rims and a sheen. **material** = Material You tonal palette built from the accent color (the Windows accent when the accent is `mono`). Picking a style in Settings also sets `nectar-theme-opacity` to the value it is tuned for (0.8, 0.6, 0.45, 0.96). The overlay windows are transparent, so the glass styles can't blur what is behind them. |
+| `nectar-theme-accent` | `"mono"` / `"system"` / `"custom"` | `"mono"` | Color for toggles, active buttons, sliders, progress bars and today's date. **mono** = the text color (the classic look). **system** = Windows accent. **custom** = `nectar-theme-accent-color`. |
+| `nectar-theme-accent-color` | hex string | `"#0a84ff"` | Accent used when `nectar-theme-accent` is `custom`. |
 | `nectar-corners-enabled` | `"true"` / `"false"` | `"false"` | Render rounded screen corner overlays on top edges. |
 
 ### Status Widgets
@@ -233,4 +236,4 @@ with open(path, 'w') as f: json.dump(settings, f)
 - The `useSettingsSync` hook auto-converts `"true"` / `"false"` strings to booleans.
 - `auto-hide` mode values in `nectar-dock-mode` and `nectar-notch-mode` are legacy aliases for `smart` — they are mapped automatically.
 - Changing `nectar-scale` triggers AppBar re-registration to adjust reserved screen space.
-- Theme changes (`nectar-theme-*`) are applied by reading all theme values from `localStorage` and calling `applyTheme()` — the theme system depends on all five theme keys being in sync.
+- Theme changes (`nectar-theme-*`) are applied by reading all theme values from `localStorage` and calling `applyTheme()` — the theme system depends on all the theme keys being in sync.

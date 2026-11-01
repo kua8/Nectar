@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import './Dock.css';
+import './surfaces.css';
 import { initTheme } from './theme';
 import { useSettingsSync } from './hooks/useSettingsSync';
 
@@ -106,9 +107,18 @@ const ITEM_ENTRY_TRANSITION = {
   opacity: { duration: 0.15, delay: 0.15 },
   scale: { type: 'spring' as const, stiffness: 400, damping: 25, delay: 0.15 }
 };
+const DOCK_SPRING = { type: "spring", stiffness: 250, damping: 28, mass: 0.8 } as const;
 const ITEM_INITIAL = { opacity: 0, scale: 0 };
 const ITEM_ANIMATE = { opacity: 1, scale: 1 };
 const ITEM_EXIT = { opacity: 0, scale: 0 };
+// Without an explicit transition framer-motion's default spring makes the hover lift bounce.
+const ICON_SPRING = { type: "spring", stiffness: 500, damping: 38 } as const;
+const iconVariants = {
+  idle: { y: 0, scale: 1, transition: ICON_SPRING },
+  hover: { y: -5, scale: 1.1, transition: ICON_SPRING },
+  drag: { y: -10, scale: 1.1, opacity: 0.8, transition: ICON_SPRING },
+  tap: { scale: 0.95, transition: ICON_SPRING }
+};
 
 function SearchIcon() {
   return (
@@ -944,13 +954,6 @@ const Dock = memo(function Dock() {
     };
   }, [hoveredApp, isDragging, dockItems]);
 
-  const iconVariants = {
-    idle: { y: 0, scale: 1 },
-    hover: { y: -5, scale: 1.1 },
-    drag: { y: -10, scale: 1.1, opacity: 0.8 },
-    tap: { scale: 0.95 }
-  };
-
   const renderShortcut = (id: string, label: string, delay: number, onClick: () => void, icon: React.ReactNode) => (
     <motion.div
       key={id}
@@ -999,13 +1002,14 @@ const Dock = memo(function Dock() {
         }}
         transition={{
           y: { type: "spring", stiffness: 400, damping: 35, mass: 0.8 },
-          width: { type: "spring", stiffness: 250, damping: 22, mass: 0.8 },
-          height: { type: "spring", stiffness: 250, damping: 22, mass: 0.8 },
-          layout: isDragging ? { duration: 0 } : { type: "spring", stiffness: 300, damping: 25 },
-          borderTopLeftRadius: { type: "spring", stiffness: 500, damping: 30 },
-          borderTopRightRadius: { type: "spring", stiffness: 500, damping: 30 },
-          borderBottomLeftRadius: { type: "spring", stiffness: 500, damping: 30 },
-          borderBottomRightRadius: { type: "spring", stiffness: 500, damping: 30 },
+          // Critically damped so the dock grows and settles without wobbling
+          width: DOCK_SPRING,
+          height: DOCK_SPRING,
+          layout: isDragging ? { duration: 0 } : { type: "spring", stiffness: 300, damping: 35 },
+          borderTopLeftRadius: DOCK_SPRING,
+          borderTopRightRadius: DOCK_SPRING,
+          borderBottomLeftRadius: DOCK_SPRING,
+          borderBottomRightRadius: DOCK_SPRING,
           opacity: { type: "tween", duration: 0.2 },
           scale: { duration: 0 },
         }}
