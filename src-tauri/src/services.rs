@@ -1848,13 +1848,22 @@ fn setup_volume_mixer_watchdog(app_handle: AppHandle) {
         if SHUTTING_DOWN.load(Ordering::Relaxed) {
             continue;
         }
-        let Some((rx, ry, rw, rh)) = volume_mixer_physical_rect_for(&app_handle) else {
-            continue;
-        };
         let mut pt = windows::Win32::Foundation::POINT::default();
         if unsafe { windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut pt) }.is_err() {
             continue;
         }
+        // The hook goes silent over elevated windows (Task Manager), so a stale click-through state would block them.
+        if pt.x != MOUSE_X.load(Ordering::Relaxed) || pt.y != MOUSE_Y.load(Ordering::Relaxed) {
+            MOUSE_X.store(pt.x, Ordering::Relaxed);
+            MOUSE_Y.store(pt.y, Ordering::Relaxed);
+            MOUSE_DIRTY.store(true, Ordering::Relaxed);
+            if let Some(worker) = MOUSE_WORKER.get() {
+                worker.unpark();
+            }
+        }
+        let Some((rx, ry, rw, rh)) = volume_mixer_physical_rect_for(&app_handle) else {
+            continue;
+        };
         let inside = pt.x >= rx && pt.x <= rx + rw && pt.y >= ry && pt.y <= ry + rh;
         if inside {
             continue;
