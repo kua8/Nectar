@@ -186,6 +186,8 @@
   "about.updates.group": "Software Updates",
   "about.autoUpdate": "Auto Update",
   "about.autoUpdate.desc": "Update automatically on startup",
+  "about.prerelease": "Get pre-releases",
+  "about.prerelease.desc": "Receive early builds before the weekly release. They may be unstable.",
   "about.data.group": "Data",
   "about.tour": "Replay Tour",
   "about.tour.desc": "Walk through the notch, Control Center and dock again",

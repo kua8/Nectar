@@ -186,6 +186,8 @@
   "about.updates.group": "Yazılım Güncellemeleri",
   "about.autoUpdate": "Otomatik Güncelleme",
   "about.autoUpdate.desc": "Başlangıçta otomatik güncelle",
+  "about.prerelease": "Ön sürümleri al",
+  "about.prerelease.desc": "Haftalık sürümden önce erken derlemeleri alın. Kararsız olabilirler.",
   "about.data.group": "Veri",
   "about.tour": "Turu Yeniden Oynat",
   "about.tour.desc": "Çentik, Denetim Merkezi ve dock tanıtımını tekrar görün",

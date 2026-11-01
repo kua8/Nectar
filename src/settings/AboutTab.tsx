@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
-import { Compass, Download, RefreshCw, FileDown, Upload, RotateCcw, Trash2, ClipboardCopy, FolderOpen, Crosshair, Image as ImageIcon } from "lucide-react";
+import { Compass, Download, FlaskConical, RefreshCw, FileDown, Upload, RotateCcw, Trash2, ClipboardCopy, FolderOpen, Crosshair, Image as ImageIcon } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { useT } from "../i18n";
 
@@ -9,6 +9,8 @@ interface AboutTabProps {
   appVersion: string;
   autoUpdate: boolean;
   toggleAutoUpdate: () => void;
+  prereleaseChannel: boolean;
+  togglePrereleaseChannel: () => void;
   updateStatus: string;
   updateVersion: string;
   checkForUpdates: () => void;
@@ -28,6 +30,8 @@ export function AboutTab({
   appVersion,
   autoUpdate,
   toggleAutoUpdate,
+  prereleaseChannel,
+  togglePrereleaseChannel,
   updateStatus,
   updateVersion,
   checkForUpdates,
@@ -192,6 +196,13 @@ export function AboutTab({
         <SettingRow icon={Download} label={t("about.autoUpdate")} desc={t("about.autoUpdate.desc")}>
           <label className="toggle-switch">
             <input type="checkbox" checked={autoUpdate} onChange={toggleAutoUpdate} />
+            <span className="slider"></span>
+          </label>
+        </SettingRow>
+
+        <SettingRow icon={FlaskConical} label={t("about.prerelease")} desc={t("about.prerelease.desc")}>
+          <label className="toggle-switch">
+            <input type="checkbox" checked={prereleaseChannel} onChange={togglePrereleaseChannel} />
             <span className="slider"></span>
           </label>
         </SettingRow>
