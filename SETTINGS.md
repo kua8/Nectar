@@ -24,7 +24,9 @@ Edit `settings.json` with any text editor while Nectar is running. Changes are a
 | `nectar-dock-enabled` | `"true"` / `"false"` | `"true"` | Show or hide the Nectar Dock (taskbar replacement). |
 | `nectar-dock-mode` | `"fixed"` / `"smart"` / `"peek"` | `"smart"` | Dock visibility behavior. **fixed** = always visible as AppBar. **smart** = auto-hide when overlapped by another window or a fullscreen app. **peek** = hidden until cursor approaches bottom edge. Smart/peek still reveal on hover and are clickable even over a fullscreen app — only a thin pre-emptive strip right at the screen edge stays click-through, so other apps' own edge-hugging UI (e.g. a Snipping Tool selection) is never intercepted. |
 | `nectar-dock-preview-enabled` | `"true"` / `"false"` | `"true"` | Show window thumbnail previews when hovering dock icons. |
-| `nectar-dock-search-enabled` | `"true"` / `"false"` | `"true"` | Show a search icon next to Start that opens Windows Search (Win+S). |
+| `nectar-dock-search-enabled` | `"true"` / `"false"` | `"true"` | Show a search icon next to Start. What it opens is set by `nectar-dock-search-provider`. |
+| `nectar-dock-search-provider` | `"windows"` / `"cmdpal"` / `"ptrun"` / `"raycast"` / `"shortcut"` | `"windows"` | What the dock's search icon opens. **windows** = Windows Search (Win+S). **cmdpal** = PowerToys Command Palette and **ptrun** = PowerToys Run, opened the same way as their own hotkey, so they follow your PowerToys settings. **raycast** = presses Raycast's shortcut (`nectar-dock-search-shortcut`, or Alt+Space if empty), since Raycast for Windows can't be opened by another app yet. **shortcut** = presses `nectar-dock-search-shortcut` for any other launcher. If the chosen launcher isn't running, or the shortcut can't be read, Windows Search opens instead and the dock shows why above the search icon. Legacy Mode always uses Windows Search. |
+| `nectar-dock-search-shortcut` | string | `""` | Shortcut pressed for `raycast` and `shortcut`, written like `"Alt+Space"` or `"Win+Ctrl+K"`: any of Win, Ctrl, Alt, Shift, then one key (a letter, digit, F1 to F24, Space, Enter, Tab, Esc, arrows, Home, End, PageUp, PageDown, Insert, Delete, Backspace, or one of `` ` - = , . / ; ' [ ] \ ``). |
 | `nectar-dock-calendar-enabled` | `"true"` / `"false"` | `"true"` | Show a calendar icon next to the search icon that opens the Calendar window. The Calendar window is also in the dock's Nectar Options menu, the tray menu, and the notch calendar's open button. |
 | `nectar-dock-tray-enabled` | `"true"` / `"false"` | `"true"` | Show a ^ button in the dock that opens the hidden tray icons popup. Hidden in Legacy Mode. |
 | `nectar-dock-taskview-enabled` | `"true"` / `"false"` | `"false"` | Show a Task View button next to the calendar icon (Win+Tab). Hidden in Legacy Mode. |
@@ -147,11 +149,14 @@ Removing a link or disconnecting the account deletes its stored secret and cache
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `nectar-theme-mode` | `"dark"` / `"light"` / `"custom"` / `"adaptive"` | `"dark"` | Theme mode. **dark** = dark translucent. **light** = light translucent. **custom** = user-picked color. **adaptive** = follows Windows system accent color. |
+| `nectar-theme-mode` | `"auto"` / `"dark"` / `"light"` / `"custom"` / `"adaptive"` | `"dark"` | Theme mode. **auto** = dark or light, following the Windows app mode. **dark** = dark translucent. **light** = light translucent. **custom** = user-picked color. **adaptive** = follows Windows system accent color. The Presets in Settings › Appearance set `custom` mode with a matching color, saturation, brightness and accent. |
 | `nectar-theme-color` | hex string | `"#007aff"` | Custom theme color (used in `custom` and `adaptive` modes). |
 | `nectar-theme-opacity` | float string | `"0.80"` | Background opacity (0.1 to 1.0). |
 | `nectar-theme-saturation` | float string | `"0.50"` | Color saturation for custom/adaptive themes (0.0 to 1.0). |
 | `nectar-theme-brightness` | float string | `"0.15"` | Background brightness for custom/adaptive themes (0.0 to 1.0). |
+| `nectar-theme-style` | `"solid"` / `"frosted"` / `"liquid"` / `"material"` | `"solid"` | How the notch, dock and volume/brightness overlays are drawn. **solid** = plain fill. **frosted** = milky haze with fine grain. **liquid** = clear glass with bright rims and a sheen. **material** = Material You tonal palette built from the accent color (the Windows accent when the accent is `mono`). Picking a style in Settings also sets `nectar-theme-opacity` to the value it is tuned for (0.8, 0.6, 0.45, 0.96). The notch and dock windows are transparent, so the glass styles show a blurred copy of your desktop wallpaper behind them, lined up with the screen. Where an app window is behind them, they still show the wallpaper. With a solid color wallpaper, and on the volume/brightness overlays, they fall back to a tint with highlights. The notch uses a denser fill (at least 82%) while the calendar, command center or shelf is open, so the text stays readable. Legacy Mode always uses Solid with monochrome highlights. |
+| `nectar-theme-accent` | `"mono"` / `"system"` / `"custom"` | `"mono"` | Color for toggles, active buttons, sliders, progress bars and today's date. **mono** = the text color (the classic look). **system** = Windows accent. **custom** = `nectar-theme-accent-color`. Ignored in Legacy Mode. |
+| `nectar-theme-accent-color` | hex string | `"#0a84ff"` | Accent used when `nectar-theme-accent` is `custom`. |
 | `nectar-corners-enabled` | `"true"` / `"false"` | `"false"` | Render rounded screen corner overlays on top edges. |
 
 ### Status Widgets
@@ -243,4 +248,4 @@ with open(path, 'w') as f: json.dump(settings, f)
 - The `useSettingsSync` hook auto-converts `"true"` / `"false"` strings to booleans.
 - `auto-hide` mode values in `nectar-dock-mode` and `nectar-notch-mode` are legacy aliases for `smart` — they are mapped automatically.
 - Changing `nectar-scale` triggers AppBar re-registration to adjust reserved screen space.
-- Theme changes (`nectar-theme-*`) are applied by reading all theme values from `localStorage` and calling `applyTheme()` — the theme system depends on all five theme keys being in sync.
+- Theme changes (`nectar-theme-*`) are applied by reading all theme values from `localStorage` and calling `applyTheme()` — the theme system depends on all the theme keys being in sync.

@@ -6,7 +6,7 @@ import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { getVersion } from "@tauri-apps/api/app";
 import type { UpdateCheckResult } from "../updater";
 import { useSettingsSync } from "../hooks/useSettingsSync";
-import { hexToHsl } from "../theme";
+import { hexToHsl, DEFAULT_ACCENT_COLOR, STYLE_OPACITY, type ThemePreset } from "../theme";
 import { DEFAULT_DUAL_CLOCK_ZONE } from "../dualClock";
 import type { WidgetConfig, MonitorInfo, MonitorMode } from "./types";
 
@@ -99,6 +99,12 @@ export function useSettings() {
   const [dockEnabled, setDockEnabled] = useState(true);
   const [dockPreviewEnabled, setDockPreviewEnabled] = useState(true);
   const [dockSearchEnabled, setDockSearchEnabled] = useState(true);
+  const [dockSearchProvider, setDockSearchProvider] = useState(
+    () => localStorage.getItem("nectar-dock-search-provider") || "windows"
+  );
+  const [dockSearchShortcut, setDockSearchShortcut] = useState(
+    () => localStorage.getItem("nectar-dock-search-shortcut") || ""
+  );
   const [dockCalendarEnabled, setDockCalendarEnabled] = useState(true);
   const [dockTray, setDockTray] = useState(
     () => localStorage.getItem("nectar-dock-tray-enabled") !== "false"
@@ -191,6 +197,11 @@ export function useSettings() {
     const val = localStorage.getItem("nectar-theme-brightness");
     return val !== null ? parseFloat(val) : 0.15;
   });
+  const [themeStyle, setThemeStyle] = useState(() => localStorage.getItem("nectar-theme-style") || "solid");
+  const [themeAccent, setThemeAccent] = useState(() => localStorage.getItem("nectar-theme-accent") || "mono");
+  const [themeAccentColor, setThemeAccentColor] = useState(
+    () => localStorage.getItem("nectar-theme-accent-color") || DEFAULT_ACCENT_COLOR
+  );
   const [exportStatus, setExportStatus] = useState<"idle" | "exporting" | "success" | "error">("idle");
   const [importStatus, setImportStatus] = useState<"idle" | "importing" | "success" | "error">("idle");
   const [resetStatus, setResetStatus] = useState<"idle" | "confirm" | "resetting">("idle");
@@ -239,6 +250,8 @@ export function useSettings() {
       apply(getVal("nectar-dock-enabled"), setDockEnabled, readBool);
       apply(getVal("nectar-dock-preview-enabled"), setDockPreviewEnabled, readBool);
       apply(getVal("nectar-dock-search-enabled"), setDockSearchEnabled, readBool);
+      apply(getVal("nectar-dock-search-provider"), setDockSearchProvider, (v) => v);
+      apply(getVal("nectar-dock-search-shortcut"), setDockSearchShortcut, (v) => v);
       apply(getVal("nectar-dock-calendar-enabled"), setDockCalendarEnabled, readBool);
       apply(getVal("nectar-dock-tray-enabled"), setDockTray, (v) => v !== "false");
       apply(getVal("nectar-dock-taskview-enabled"), setDockTaskView, readBool);
@@ -287,6 +300,9 @@ export function useSettings() {
       apply(getVal("nectar-theme-opacity"), setThemeOpacity, parseFloat);
       apply(getVal("nectar-theme-saturation"), setThemeSaturation, parseFloat);
       apply(getVal("nectar-theme-brightness"), setThemeBrightness, parseFloat);
+      apply(getVal("nectar-theme-style"), setThemeStyle, (v) => v);
+      apply(getVal("nectar-theme-accent"), setThemeAccent, (v) => v);
+      apply(getVal("nectar-theme-accent-color"), setThemeAccentColor, (v) => v);
 
       const widgetsVal = getVal("nectar-status-widgets");
       if (widgetsVal) {
@@ -359,6 +375,8 @@ export function useSettings() {
     "nectar-dock-win-number-enabled": setDockWinNumberEnabled,
     "nectar-dock-preview-enabled": setDockPreviewEnabled,
     "nectar-dock-search-enabled": setDockSearchEnabled,
+    "nectar-dock-search-provider": (v) => setDockSearchProvider(String(v)),
+    "nectar-dock-search-shortcut": (v) => setDockSearchShortcut(String(v)),
     "nectar-dock-calendar-enabled": setDockCalendarEnabled,
     "nectar-dock-mixed-reorder": setDockMixedReorder,
     "nectar-weather-enabled": setWeatherEnabled,
@@ -395,6 +413,9 @@ export function useSettings() {
     "nectar-theme-opacity": setThemeOpacity,
     "nectar-theme-saturation": setThemeSaturation,
     "nectar-theme-brightness": setThemeBrightness,
+    "nectar-theme-style": (v) => setThemeStyle(String(v)),
+    "nectar-theme-accent": (v) => setThemeAccent(String(v)),
+    "nectar-theme-accent-color": (v) => setThemeAccentColor(String(v)),
     "nectar-weather-city": (v) => {
       setCityName(v || "");
       setCityQuery(v || "");
@@ -680,6 +701,16 @@ export function useSettings() {
     saveSetting("nectar-dock-preview-enabled", String(next));
   };
 
+  const handleDockSearchProviderChange = (provider: string) => {
+    setDockSearchProvider(provider);
+    saveSetting("nectar-dock-search-provider", provider);
+  };
+
+  const handleDockSearchShortcutChange = (shortcut: string) => {
+    setDockSearchShortcut(shortcut);
+    saveSetting("nectar-dock-search-shortcut", shortcut);
+  };
+
   const toggleDockSearch = () => {
     const next = !dockSearchEnabled;
     setDockSearchEnabled(next);
@@ -914,6 +945,42 @@ export function useSettings() {
     saveSetting("nectar-theme-brightness", String(value));
   };
 
+  const handleThemeStyleChange = (style: string) => {
+    setThemeStyle(style);
+    saveSetting("nectar-theme-style", style);
+    // Each style is tuned for an opacity; the slider can still change it afterwards.
+    const opacity = STYLE_OPACITY[style];
+    if (opacity !== undefined) {
+      setThemeOpacity(opacity);
+      saveSetting("nectar-theme-opacity", String(opacity));
+    }
+  };
+
+  const handleAccentChange = (accent: string) => {
+    setThemeAccent(accent);
+    saveSetting("nectar-theme-accent", accent);
+  };
+
+  const handleAccentColorChange = (color: string) => {
+    setThemeAccentColor(color);
+    saveSetting("nectar-theme-accent-color", color);
+  };
+
+  const applyThemePreset = (preset: ThemePreset) => {
+    setThemeMode("custom");
+    setThemeColor(preset.color);
+    setThemeSaturation(preset.saturation);
+    setThemeBrightness(preset.brightness);
+    setThemeAccent("custom");
+    setThemeAccentColor(preset.color);
+    saveSetting("nectar-theme-mode", "custom");
+    saveSetting("nectar-theme-color", preset.color);
+    saveSetting("nectar-theme-saturation", String(preset.saturation));
+    saveSetting("nectar-theme-brightness", String(preset.brightness));
+    saveSetting("nectar-theme-accent", "custom");
+    saveSetting("nectar-theme-accent-color", preset.color);
+  };
+
   // ── City search ──
   const selectCity = async (city: {
     name: string;
@@ -1052,6 +1119,13 @@ export function useSettings() {
     handleSaturationChange,
     themeBrightness,
     handleBrightnessChange,
+    themeStyle,
+    handleThemeStyleChange,
+    themeAccent,
+    handleAccentChange,
+    themeAccentColor,
+    handleAccentColorChange,
+    applyThemePreset,
 
     // Notch
     notchMode,
@@ -1116,6 +1190,10 @@ export function useSettings() {
     toggleDockPreview,
     dockSearchEnabled,
     toggleDockSearch,
+    dockSearchProvider,
+    handleDockSearchProviderChange,
+    dockSearchShortcut,
+    handleDockSearchShortcutChange,
     dockCalendarEnabled,
     toggleDockCalendar,
     dockTray,

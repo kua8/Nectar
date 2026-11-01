@@ -123,6 +123,14 @@ function SettingsApp() {
               handleSaturationChange={settings.handleSaturationChange}
               themeBrightness={settings.themeBrightness}
               handleBrightnessChange={settings.handleBrightnessChange}
+              themeStyle={settings.themeStyle}
+              handleThemeStyleChange={settings.handleThemeStyleChange}
+              themeAccent={settings.themeAccent}
+              handleAccentChange={settings.handleAccentChange}
+              themeAccentColor={settings.themeAccentColor}
+              handleAccentColorChange={settings.handleAccentColorChange}
+              applyThemePreset={settings.applyThemePreset}
+              legacyMode={settings.legacyMode}
               cornersEnabled={settings.cornersEnabled}
               toggleCorners={settings.toggleCorners}
               scale={settings.scale}
@@ -212,6 +220,10 @@ function SettingsApp() {
               toggleDockPreview={settings.toggleDockPreview}
               dockSearchEnabled={settings.dockSearchEnabled}
               toggleDockSearch={settings.toggleDockSearch}
+              dockSearchProvider={settings.dockSearchProvider}
+              handleDockSearchProviderChange={settings.handleDockSearchProviderChange}
+              dockSearchShortcut={settings.dockSearchShortcut}
+              handleDockSearchShortcutChange={settings.handleDockSearchShortcutChange}
               dockCalendarEnabled={settings.dockCalendarEnabled}
               toggleDockCalendar={settings.toggleDockCalendar}
               legacyMode={settings.legacyMode}

@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import './Dock.css';
+import './surfaces.css';
 import { initTheme } from './theme';
 import { useSettingsSync } from './hooks/useSettingsSync';
 import { useT } from './i18n';
@@ -141,9 +142,18 @@ const ITEM_ENTRY_TRANSITION = {
   opacity: { duration: 0.15, delay: 0.15 },
   scale: { type: 'spring' as const, stiffness: 400, damping: 25, delay: 0.15 }
 };
+const DOCK_SPRING = { type: "spring", stiffness: 250, damping: 28, mass: 0.8 } as const;
 const ITEM_INITIAL = { opacity: 0, scale: 0 };
 const ITEM_ANIMATE = { opacity: 1, scale: 1 };
 const ITEM_EXIT = { opacity: 0, scale: 0 };
+// Without an explicit transition framer-motion's default spring makes the hover lift bounce.
+const ICON_SPRING = { type: "spring", stiffness: 500, damping: 38 } as const;
+const iconVariants = {
+  idle: { y: 0, scale: 1, transition: ICON_SPRING },
+  hover: { y: -5, scale: 1.1, transition: ICON_SPRING },
+  drag: { y: -10, scale: 1.1, opacity: 0.8, transition: ICON_SPRING },
+  tap: { scale: 0.95, transition: ICON_SPRING }
+};
 
 function SearchIcon() {
   return (
@@ -230,7 +240,7 @@ function WindowDots({ count }: { count: number }) {
 const Dock = memo(function Dock() {
   const t = useT();
   useEffect(() => {
-    return initTheme();
+    return initTheme({ backdrop: true });
   }, []);
 
   const [pinnedApps, setPinnedApps] = useState<AppInfo[]>([]);
@@ -868,6 +878,21 @@ const Dock = memo(function Dock() {
     handleAppClickRef.current = handleAppClick;
   });
 
+  // Which launcher the search icon couldn't open (it fell back to Windows Search), shown for a few seconds
+  const [searchNote, setSearchNote] = useState<string | null>(null);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const unlisten = getCurrentWebviewWindow().listen<string>("dock-search-note", (event) => {
+      setSearchNote(event.payload);
+      clearTimeout(timer);
+      timer = setTimeout(() => setSearchNote(null), 4500);
+    });
+    return () => {
+      clearTimeout(timer);
+      unlisten.then(f => f());
+    };
+  }, []);
+
   useEffect(() => {
     // Backend claims Win+1-9 while the taskbar is hidden and tells us the slot, same as clicking that icon.
     const unlisten = getCurrentWebviewWindow().listen<number>("dock-win-number", (event) => {
@@ -1008,13 +1033,6 @@ const Dock = memo(function Dock() {
     };
   }, [hoveredApp, isDragging, dockItems]);
 
-  const iconVariants = {
-    idle: { y: 0, scale: 1 },
-    hover: { y: -5, scale: 1.1 },
-    drag: { y: -10, scale: 1.1, opacity: 0.8 },
-    tap: { scale: 0.95 }
-  };
-
   const previewAppId = dockPreviewEnabled ? previewData?.id : undefined;
   useEffect(() => {
     if (!previewAppId) {
@@ -1105,19 +1123,22 @@ const Dock = memo(function Dock() {
         }}
         transition={{
           y: { type: "spring", stiffness: 400, damping: 35, mass: 0.8 },
-          width: { type: "spring", stiffness: 250, damping: 22, mass: 0.8 },
-          height: { type: "spring", stiffness: 250, damping: 22, mass: 0.8 },
-          layout: isDragging ? { duration: 0 } : { type: "spring", stiffness: 300, damping: 25 },
-          borderTopLeftRadius: { type: "spring", stiffness: 500, damping: 30 },
-          borderTopRightRadius: { type: "spring", stiffness: 500, damping: 30 },
-          borderBottomLeftRadius: { type: "spring", stiffness: 500, damping: 30 },
-          borderBottomRightRadius: { type: "spring", stiffness: 500, damping: 30 },
+          // Critically damped so the dock grows and settles without wobbling
+          width: DOCK_SPRING,
+          height: DOCK_SPRING,
+          layout: isDragging ? { duration: 0 } : { type: "spring", stiffness: 300, damping: 35 },
+          borderTopLeftRadius: DOCK_SPRING,
+          borderTopRightRadius: DOCK_SPRING,
+          borderBottomLeftRadius: DOCK_SPRING,
+          borderBottomRightRadius: DOCK_SPRING,
           opacity: { type: "tween", duration: 0.2 },
           scale: { duration: 0 },
         }}
         style={{ originX: 0.5, originY: 1, minWidth: 34 }}
         onContextMenu={(e) => handleContextMenu(e, null)}
       >
+        <div className="surface-backdrop" aria-hidden="true" />
+        <div className="surface-backdrop-corners" aria-hidden="true" />
         <AnimatePresence>
           {isExpanded && (
             <motion.div
@@ -1167,7 +1188,9 @@ const Dock = memo(function Dock() {
                   onMouseEnter={() => setHoveredApp('search')}
                   onMouseLeave={() => { setHoveredApp(null); setPressedApp(null); }}
                 >
-                  {(!dockPreviewEnabled || (dockPreviewEnabled && hoveredApp === 'search')) && (
+                  {searchNote ? (
+                    <div className="tooltip tooltip-note">{t(`dock.searchNote.${searchNote}`)}</div>
+                  ) : (!dockPreviewEnabled || (dockPreviewEnabled && hoveredApp === 'search')) && (
                     <div className="tooltip">{t("dockmenu.search")}</div>
                   )}
                   <motion.div

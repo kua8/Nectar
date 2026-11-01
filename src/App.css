@@ -732,8 +732,8 @@ img {
 }
 
 .calendar-day.today {
-    background: var(--nectar-text, white);
-    color: var(--nectar-bg-expanded, black);
+    background: var(--nectar-highlight, var(--nectar-text, white));
+    color: var(--nectar-on-highlight, var(--nectar-bg-expanded, black));
     font-weight: 600;
 }
 
@@ -828,8 +828,8 @@ img {
 .cal-views button.active {
     opacity: 1;
     font-weight: 600;
-    background: var(--nectar-text, white);
-    color: var(--nectar-bg-expanded, black);
+    background: var(--nectar-highlight, var(--nectar-text, white));
+    color: var(--nectar-on-highlight, var(--nectar-bg-expanded, black));
 }
 
 .calendar-container.with-agenda .calendar-day {
@@ -872,7 +872,7 @@ img {
 }
 
 .calendar-day.selected.today {
-    box-shadow: 0 0 0 2px var(--nectar-bg-expanded, black), 0 0 0 3.5px var(--nectar-text, white);
+    box-shadow: 0 0 0 2px var(--nectar-bg-expanded, black), 0 0 0 3.5px var(--nectar-highlight, var(--nectar-text, white));
 }
 
 .event-dots {
@@ -1052,8 +1052,8 @@ img {
 .cal-week-row.today .cal-week-label b {
     padding: 0 5px;
     border-radius: 999px;
-    background: var(--nectar-text, white);
-    color: var(--nectar-bg-expanded, black);
+    background: var(--nectar-highlight, var(--nectar-text, white));
+    color: var(--nectar-on-highlight, var(--nectar-bg-expanded, black));
 }
 
 .cal-week-events {
@@ -1209,8 +1209,8 @@ img {
 }
 
 .timer-btn.primary {
-    background: var(--nectar-text, white);
-    color: var(--nectar-bg-expanded, black);
+    background: var(--nectar-highlight, var(--nectar-text, white));
+    color: var(--nectar-on-highlight, var(--nectar-bg-expanded, black));
 }
 
 .timer-btn.secondary {
@@ -1436,7 +1436,7 @@ img {
     left: 0;
     top: 0;
     height: 100%;
-    background: var(--nectar-text, white);
+    background: var(--nectar-highlight, var(--nectar-text, white));
     border-radius: 3px;
     pointer-events: none;
     transition: width 0.1s ease-out;
@@ -1494,14 +1494,18 @@ img {
     border-radius: 0 0 18px 18px;
 }
 
+/* Fixed size (larger than the expanded player) so the heavy blur isn't redrawn on every
+   frame while the notch resizes. Opacity and scale are animated by framer-motion. */
 .notch-ambient-glow img {
-    width: 100%;
-    height: 100%;
+    position: absolute;
+    top: 0;
+    left: calc(50% - 180px);
+    width: 360px;
+    height: 220px;
     object-fit: cover;
     filter: blur(52px) saturate(3.5) contrast(1.1) brightness(1.4);
     transform: scale(1.8);
     opacity: 0.85;
-    transition: opacity 0.6s ease, filter 0.8s ease;
 }
 
 /* Gradient overlay to smoothly fade the image to the notch's background color without using buggy WebView2 mask-image */
@@ -1643,21 +1647,21 @@ img {
 
 /* Active Monochrome pill states */
 .cc-pill-tile.active {
-    background: var(--nectar-text, rgba(255, 255, 255, 0.95));
-    border-color: var(--nectar-text, rgba(255, 255, 255, 0.95));
+    background: var(--nectar-highlight, var(--nectar-text, rgba(255, 255, 255, 0.95)));
+    border-color: var(--nectar-highlight, var(--nectar-text, rgba(255, 255, 255, 0.95)));
 }
 
 .cc-pill-tile.active .cc-pill-title {
-    color: var(--nectar-bg-expanded, rgba(0, 0, 0, 0.9));
+    color: var(--nectar-on-highlight, var(--nectar-bg-expanded, rgba(0, 0, 0, 0.9)));
 }
 
 .cc-pill-tile.active .cc-pill-status {
-    color: var(--nectar-bg-expanded, rgba(0, 0, 0, 0.5));
+    color: var(--nectar-on-highlight, var(--nectar-bg-expanded, rgba(0, 0, 0, 0.5)));
 }
 
 .cc-pill-tile.active .cc-pill-icon-wrapper {
     background: var(--nectar-group-bg, rgba(0, 0, 0, 0.08));
-    color: var(--nectar-bg-expanded, #000);
+    color: var(--nectar-on-highlight, var(--nectar-bg-expanded, #000));
 }
 
 /* Circular Actions Row */
@@ -1694,14 +1698,14 @@ img {
 }
 
 .cc-circular-btn.active {
-    background: var(--nectar-text, #ffffff);
-    border-color: var(--nectar-text, #ffffff);
-    color: var(--nectar-bg-expanded, #000000);
+    background: var(--nectar-highlight, var(--nectar-text, #ffffff));
+    border-color: var(--nectar-highlight, var(--nectar-text, #ffffff));
+    color: var(--nectar-on-highlight, var(--nectar-bg-expanded, #000000));
     box-shadow: 0 2px 8px var(--nectar-border, rgba(255, 255, 255, 0.1));
 }
 
 .cc-circular-btn.active:hover {
-    background: rgba(255, 255, 255, 0.9);
+    background: color-mix(in srgb, var(--nectar-highlight, var(--nectar-text, #ffffff)) 88%, transparent);
 }
 
 /* Classic Sliders Area */
@@ -2031,10 +2035,11 @@ img {
     left: 0;
     top: 0;
     height: 100%;
-    background: var(--nectar-text, white);
+    background: var(--nectar-highlight, var(--nectar-text, white));
     border-radius: 2px;
     pointer-events: none;
-    transition: width 0.1s linear;
+    /* Matches the 250ms position tick so the bar glides instead of stepping */
+    transition: width 0.25s linear;
 }
 
 .cmp-seek {
@@ -2197,8 +2202,8 @@ img {
 .clock-tabs button.active {
     opacity: 1;
     font-weight: 600;
-    background: var(--nectar-text, white);
-    color: var(--nectar-bg-expanded, black);
+    background: var(--nectar-highlight, var(--nectar-text, white));
+    color: var(--nectar-on-highlight, var(--nectar-bg-expanded, black));
 }
 
 .timer-time-precise {
@@ -2251,8 +2256,8 @@ img {
     padding: 6px 10px;
     border-radius: 6px;
     border: none;
-    background: var(--nectar-text, white);
-    color: var(--nectar-bg-expanded, black);
+    background: var(--nectar-highlight, var(--nectar-text, white));
+    color: var(--nectar-on-highlight, var(--nectar-bg-expanded, black));
     font-size: 10px;
     font-weight: 700;
     cursor: pointer;
@@ -2319,7 +2324,7 @@ img {
 .cc-pill-more { margin-left: auto; display: flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; font-size: 14px; line-height: 1; opacity: 0.55; flex-shrink: 0; }
 .cc-pill-more:hover { opacity: 1; background: rgba(128, 128, 128, 0.25); }
 .cc-pill-more { color: var(--nectar-text, rgba(255, 255, 255, 0.9)); }
-.cc-pill-tile.active .cc-pill-more { color: var(--nectar-bg-expanded, rgba(0, 0, 0, 0.9)); opacity: 0.7; }
+.cc-pill-tile.active .cc-pill-more { color: var(--nectar-on-highlight, var(--nectar-bg-expanded, rgba(0, 0, 0, 0.9))); opacity: 0.7; }
 .cc-pill-tile.active .cc-pill-more:hover { opacity: 1; background: rgba(0, 0, 0, 0.12); }
 .widget-tip { position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 20; padding: 5px 10px; border-radius: 6px; background: rgba(0, 0, 0, 0.85); color: white; font-size: 11px; font-weight: 500; white-space: nowrap; pointer-events: none; animation: widget-tip-in 0.12s ease-out 0.25s backwards; }
 @keyframes widget-tip-in { from { opacity: 0; } to { opacity: 1; } }

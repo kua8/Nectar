@@ -1,13 +1,77 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent, CSSProperties } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Monitor, Eye, EyeOff, Circle, Search, Shuffle, MonitorCheck, CalendarDays, Maximize2, Keyboard, Sparkles, RotateCcw, LayoutGrid, Trash2, HardDrive, ChevronUp } from "lucide-react";
+import { Monitor, Eye, EyeOff, Circle, Search, Shuffle, MonitorCheck, CalendarDays, Maximize2, Keyboard, Sparkles, RotateCcw, LayoutGrid, Trash2, HardDrive, ChevronUp, TextSearch } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { SettingSection } from "./SettingSection";
 import { Dropdown } from "./Dropdown";
 import type { MonitorInfo, MonitorMode } from "./types";
 import { usePerMonitor } from "./usePerMonitor";
 import { useT } from "../i18n";
+
+const SEARCH_PROVIDERS = ["windows", "cmdpal", "ptrun", "raycast", "shortcut"];
+
+const SHORTCUT_MODIFIERS: Record<string, string> = {
+  ctrl: "Ctrl",
+  control: "Ctrl",
+  alt: "Alt",
+  shift: "Shift",
+  win: "Win",
+  windows: "Win",
+  meta: "Win",
+  super: "Win",
+};
+const NAMED_KEYS = ["Space", "Enter", "Tab", "Esc", "Backspace", "Delete", "Insert", "Home", "End", "PageUp", "PageDown", "Up", "Down", "Left", "Right"];
+
+// Same grammar the dock's Rust side presses (launchers.rs): modifiers, then one key.
+// Returns the tidied shortcut, "" for empty, or null if it can't be pressed.
+function normalizeShortcut(text: string): string | null {
+  const parts = text.split("+").map((p) => p.trim()).filter(Boolean);
+  if (parts.length === 0) return "";
+  const mods = new Set<string>();
+  let key: string | null = null;
+  for (const part of parts) {
+    const mod = SHORTCUT_MODIFIERS[part.toLowerCase()];
+    if (mod) {
+      mods.add(mod);
+      continue;
+    }
+    if (key) return null;
+    if (/^[a-z0-9]$/i.test(part) || /^f([1-9]|1\d|2[0-4])$/i.test(part)) key = part.toUpperCase();
+    else if (part.length === 1 && "`-=,./;'[]\\".includes(part)) key = part;
+    else key = NAMED_KEYS.find((k) => k.toLowerCase() === part.toLowerCase()) ?? null;
+    if (!key) return null;
+  }
+  if (!key) return null;
+  return [...["Win", "Ctrl", "Alt", "Shift"].filter((m) => mods.has(m)), key].join("+");
+}
+
+function ShortcutField({ value, placeholder, onCommit }: { value: string; placeholder: string; onCommit: (shortcut: string) => void }) {
+  const t = useT();
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  const normalized = normalizeShortcut(draft);
+  const commit = () => {
+    if (normalized === null) return;
+    setDraft(normalized);
+    if (normalized !== value) onCommit(normalized);
+  };
+  return (
+    <input
+      className={`shortcut-input${normalized === null ? " invalid" : ""}`}
+      value={draft}
+      placeholder={placeholder}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") commit();
+      }}
+      spellCheck={false}
+      aria-label={t("dock.searchShortcut")}
+      title={normalized === null ? t("dock.searchShortcut.invalid") : undefined}
+    />
+  );
+}
 
 const START_ICON_PRESETS = [
   { key: "default", src: "/nectar.png", label: "Nectar" },
@@ -44,6 +108,10 @@ interface DockTabProps {
   toggleDockPreview: () => void;
   dockSearchEnabled: boolean;
   toggleDockSearch: () => void;
+  dockSearchProvider: string;
+  handleDockSearchProviderChange: (provider: string) => void;
+  dockSearchShortcut: string;
+  handleDockSearchShortcutChange: (shortcut: string) => void;
   dockCalendarEnabled: boolean;
   toggleDockCalendar: () => void;
   legacyMode: boolean;
@@ -86,6 +154,10 @@ export function DockTab({
   toggleDockPreview,
   dockSearchEnabled,
   toggleDockSearch,
+  dockSearchProvider,
+  handleDockSearchProviderChange,
+  dockSearchShortcut,
+  handleDockSearchShortcutChange,
   dockCalendarEnabled,
   toggleDockCalendar,
   legacyMode,
@@ -234,6 +306,34 @@ export function DockTab({
                 <span className="slider"></span>
               </label>
             </SettingRow>
+
+            {!legacyMode && dockSearchEnabled && (
+              <SettingRow
+                icon={TextSearch}
+                label={t("dock.searchWith")}
+                desc={t(`dock.searchWith.${SEARCH_PROVIDERS.includes(dockSearchProvider) ? dockSearchProvider : "windows"}.desc`)}
+              >
+                <Dropdown
+                  value={dockSearchProvider}
+                  onChange={handleDockSearchProviderChange}
+                  options={SEARCH_PROVIDERS.map((value) => ({ value, label: t(`dock.searchWith.${value}`) }))}
+                />
+              </SettingRow>
+            )}
+
+            {!legacyMode && dockSearchEnabled && (dockSearchProvider === "raycast" || dockSearchProvider === "shortcut") && (
+              <SettingRow
+                icon={Keyboard}
+                label={t("dock.searchShortcut")}
+                desc={t(dockSearchProvider === "raycast" ? "dock.searchShortcut.descRaycast" : "dock.searchShortcut.desc")}
+              >
+                <ShortcutField
+                  value={dockSearchShortcut}
+                  placeholder={dockSearchProvider === "raycast" ? "Alt+Space" : t("dock.searchShortcut.placeholder")}
+                  onCommit={handleDockSearchShortcutChange}
+                />
+              </SettingRow>
+            )}
 
             <SettingRow icon={CalendarDays} label={t("dock.calendar")} desc={t("dock.calendar.desc")}>
               <label className="toggle-switch">

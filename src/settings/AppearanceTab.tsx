@@ -1,8 +1,15 @@
-import { Palette, Droplet, Contrast, Droplets, Sun, Square, Maximize2 } from "lucide-react";
+import { Palette, Droplet, Contrast, Droplets, Sun, Square, Maximize2, Layers, SwatchBook, Highlighter } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { SettingSection } from "./SettingSection";
 import { Dropdown } from "./Dropdown";
 import { useT } from "../i18n";
+import { THEME_PRESETS, hexToHsl, hslToHex, type ThemePreset } from "../theme";
+
+const STYLES = ["solid", "frosted", "liquid", "material"];
+
+function presetBackground(preset: ThemePreset): string {
+  return hslToHex(hexToHsl(preset.color).h, preset.saturation * 100, preset.brightness * 100);
+}
 
 interface AppearanceTabProps {
   themeMode: string;
@@ -19,6 +26,14 @@ interface AppearanceTabProps {
   toggleCorners: () => void;
   scale: number;
   handleScaleChange: (val: number) => void;
+  themeStyle: string;
+  handleThemeStyleChange: (style: string) => void;
+  themeAccent: string;
+  handleAccentChange: (accent: string) => void;
+  themeAccentColor: string;
+  handleAccentColorChange: (color: string) => void;
+  applyThemePreset: (preset: ThemePreset) => void;
+  legacyMode: boolean;
 }
 
 export function AppearanceTab({
@@ -36,19 +51,59 @@ export function AppearanceTab({
   toggleCorners,
   scale,
   handleScaleChange,
+  themeStyle,
+  handleThemeStyleChange,
+  themeAccent,
+  handleAccentChange,
+  themeAccentColor,
+  handleAccentColorChange,
+  applyThemePreset,
+  legacyMode,
 }: AppearanceTabProps) {
   const t = useT();
+  const isMaterial = !legacyMode && themeStyle === "material";
   const showCustomColor = themeMode === "custom";
-  const showAdvancedSliders = themeMode === "custom" || themeMode === "adaptive";
+  // Material You builds the whole palette from the accent, so these don't apply there.
+  const showAdvancedSliders = !isMaterial && (themeMode === "custom" || themeMode === "adaptive");
+  const isActivePreset = (preset: ThemePreset) =>
+    themeMode === "custom" &&
+    themeColor.toLowerCase() === preset.color.toLowerCase() &&
+    Math.abs(themeSaturation - preset.saturation) < 0.01 &&
+    Math.abs(themeBrightness - preset.brightness) < 0.01;
 
   return (
     <>
       <SettingSection id="appearance-theme" title={t("appearance.theme.group")} defaultOpen>
+        {!legacyMode && (
+          <>
+            <SettingRow icon={Layers} label={t("appearance.style")} desc={t("appearance.style.desc")} divider={false} />
+            <div className="style-tiles" role="radiogroup" aria-label={t("appearance.style")}>
+              {STYLES.map((style) => (
+                <button
+                  key={style}
+                  type="button"
+                  role="radio"
+                  aria-checked={themeStyle === style}
+                  className={`style-tile${themeStyle === style ? " active" : ""}`}
+                  onClick={() => handleThemeStyleChange(style)}
+                >
+                  <span className={`style-tile-preview style-preview-${style}`}>
+                    <span className="style-tile-pill" />
+                  </span>
+                  <span className="style-tile-label">{t(`appearance.style.${style}`)}</span>
+                </button>
+              ))}
+            </div>
+            <div className="setting-divider" />
+          </>
+        )}
+
         <SettingRow icon={Palette} label={t("appearance.mode")} desc={t("appearance.mode.desc")}>
           <Dropdown
             value={themeMode}
             onChange={handleThemeModeChange}
             options={[
+              { value: "auto", label: t("appearance.mode.auto") },
               { value: "dark", label: t("appearance.mode.dark") },
               { value: "light", label: t("appearance.mode.light") },
               { value: "custom", label: t("appearance.mode.custom") },
@@ -56,6 +111,59 @@ export function AppearanceTab({
             ]}
           />
         </SettingRow>
+
+        <SettingRow icon={SwatchBook} label={t("appearance.presets")} desc={t("appearance.presets.desc")}>
+          <div className="preset-swatches">
+            {THEME_PRESETS.map((preset) => {
+              const name = t(`appearance.preset.${preset.name.toLowerCase()}`);
+              return (
+                <button
+                  key={preset.name}
+                  type="button"
+                  className={`preset-swatch${isActivePreset(preset) ? " active" : ""}`}
+                  style={{ background: presetBackground(preset) }}
+                  onClick={() => applyThemePreset(preset)}
+                  title={name}
+                  aria-label={name}
+                >
+                  <span style={{ background: preset.color }} />
+                </button>
+              );
+            })}
+          </div>
+        </SettingRow>
+
+        {!legacyMode && (
+          <SettingRow
+            icon={Highlighter}
+            label={t("appearance.accent")}
+            desc={isMaterial ? t("appearance.accent.descMaterial") : t("appearance.accent.desc")}
+          >
+            <Dropdown
+              value={isMaterial && themeAccent === "mono" ? "system" : themeAccent}
+              onChange={handleAccentChange}
+              options={[
+                ...(isMaterial ? [] : [{ value: "mono", label: t("appearance.accent.mono") }]),
+                { value: "system", label: t("appearance.accent.system") },
+                { value: "custom", label: t("appearance.accent.custom") },
+              ]}
+            />
+          </SettingRow>
+        )}
+
+        {!legacyMode && themeAccent === "custom" && (
+          <SettingRow icon={Droplet} label={t("appearance.accentColor")} desc={t("appearance.accentColor.desc")}>
+            <div className="color-picker-row">
+              <input
+                type="color"
+                value={themeAccentColor}
+                onChange={(e) => handleAccentColorChange(e.target.value)}
+                className="color-picker-input"
+              />
+              <span className="color-picker-label">{themeAccentColor.toUpperCase()}</span>
+            </div>
+          </SettingRow>
+        )}
 
         {showCustomColor && (
           <SettingRow icon={Droplet} label={t("appearance.color")} desc={t("appearance.color.desc")}>
