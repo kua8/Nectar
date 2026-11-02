@@ -239,7 +239,10 @@ function SelectedDay({ day, events, time, onOpen }: TimeProps & { day: Date; eve
   return (
     <div className="calendar-agenda">
       <button className="agenda-title" onClick={onOpen}>
-        {label} <span aria-hidden>&#8250;</span>
+        {label}
+        <svg width="8" height="8" viewBox="0 0 8 8" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M2.5 1l3 3-3 3" />
+        </svg>
       </button>
       {list.length === 0 && <div className="agenda-empty">{t("calendar.noEvents")}</div>}
       {list.slice(0, 3).map((e, i) => (

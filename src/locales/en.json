@@ -465,6 +465,7 @@
   "media.play": "Play",
   "media.pause": "Pause",
   "music.openCalendar": "Open calendar and timer",
+  "music.nextPanel": "Next panel",
   "notch.timerProgress": "Timer Progress Bar",
   "notch.timerProgress.desc": "Show an edge progress bar on the notch while a timer is active",
   "notch.scrollVolume": "Scroll on Sliders",

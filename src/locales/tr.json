@@ -465,6 +465,7 @@
   "media.play": "Oynat",
   "media.pause": "Duraklat",
   "music.openCalendar": "Takvimi ve zamanlayıcıyı aç",
+  "music.nextPanel": "Sonraki panel",
   "notch.timerProgress": "Zamanlayıcı İlerleme Çubuğu",
   "notch.timerProgress.desc": "Zamanlayıcı etkinken çentik kenarında ilerleme çubuğu göster",
   "notch.scrollVolume": "Kaydırıcılarda Kaydırma",

@@ -2486,38 +2486,40 @@ img {
     color: rgba(255, 255, 255, 0.85);
 }
 
-.media-session-strip {
-    position: absolute;
-    left: 10px;
-    right: 10px;
-    bottom: 6px;
-    z-index: 5;
-    display: flex;
-    gap: 6px;
-    overflow-x: auto;
-}
-
-.media-session-strip::-webkit-scrollbar {
-    display: none;
-}
-
-.media-session-chip {
+.media-source-btn {
     flex: 0 0 auto;
     display: flex;
     align-items: center;
     gap: 5px;
-    padding: 2px 9px;
+    min-width: 0;
+    max-width: 84px;
+    height: 22px;
+    padding: 0 8px;
     border: none;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 11px;
+    background: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 10.5px;
+    font-weight: 600;
     cursor: pointer;
 }
 
-.media-session-chip.active {
-    background: rgba(255, 255, 255, 0.9);
-    color: #000;
+.media-source-btn:hover {
+    background: rgba(255, 255, 255, 0.22);
+}
+
+.media-source-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.media-source-dot {
+    flex: 0 0 auto;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #32d74b;
 }
 
 .media-session-dot {

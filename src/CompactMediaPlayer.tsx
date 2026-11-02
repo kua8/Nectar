@@ -4,7 +4,9 @@ import { invoke } from '@tauri-apps/api/core';
 import { Visualizer } from './App';
 import { useT } from './i18n';
 import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, MusicNoteIcon, SpeakerIcon, AudioOutputIcon, VolumeLowIcon, VolumeHighIcon } from './icons';
-import { CalendarDays } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
+
+import { MediaSourceButton, type MediaSession } from "./components/MediaSourceButton";
 
 interface MediaInfo {
   title: string;
@@ -35,7 +37,8 @@ interface CompactMediaPlayerProps {
   onAnimatePrev: () => void;
   onAnimateNext: () => void;
   onLayoutChange: (layout: 'classic' | 'compact') => void;
-  onOpenCalendar?: (e: React.MouseEvent) => void;
+  sessions: MediaSession[];
+  onNextPanel: (e: React.MouseEvent) => void;
 }
 
 const MARQUEE_SPEED = 30;
@@ -117,7 +120,8 @@ export function CompactMediaPlayer({
   onAnimatePrev,
   onAnimateNext,
   onLayoutChange,
-  onOpenCalendar,
+  sessions,
+  onNextPanel,
 }: CompactMediaPlayerProps) {
   const t = useT();
 
@@ -222,11 +226,10 @@ export function CompactMediaPlayer({
           <TitleMarquee title={mediaInfo.title} />
           <span className="cmp-artist">{mediaInfo.artist}</span>
         </div>
-        {onOpenCalendar && (
-          <button className="music-calendar-btn" onClick={onOpenCalendar} title={t("music.openCalendar")} aria-label={t("music.openCalendar")}>
-            <CalendarDays size={16} strokeWidth={1.75} />
-          </button>
-        )}
+        <MediaSourceButton sessions={sessions} />
+        <button className="music-calendar-btn" onClick={onNextPanel} title={t("music.nextPanel")} aria-label={t("music.nextPanel")}>
+          <ChevronRight size={16} strokeWidth={1.75} />
+        </button>
         <div className="cmp-visualizer">
           <Visualizer isPlaying={isPlaying} bars={5} height={16} />
         </div>

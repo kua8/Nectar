@@ -14,6 +14,7 @@ import { useTrailingThrottle } from "./hooks/useTrailingThrottle";
 import { useCaldav } from "./hooks/useCaldav";
 import { NotchCalendar } from "./components/NotchCalendar";
 import { NotchClock, StopwatchReadout } from "./components/NotchClock";
+import { MediaSourceButton, type MediaSession } from "./components/MediaSourceButton";
 import { ConnectionsView } from "./components/ConnectionsView";
 import { NotchTour } from "./components/NotchTour";
 import { useStopwatch } from "./hooks/useStopwatch";
@@ -32,7 +33,7 @@ import {
   zoneOffsetLabel,
 } from "./dualClock";
 import {
-  CalendarDays,
+  ChevronRight,
   Cpu,
   MemoryStick,
   HardDrive,
@@ -1355,7 +1356,7 @@ function App() {
     return () => { unlisten.then(fn => fn()); };
   }, []);
 
-  const [mediaSessions, setMediaSessions] = useState<{ id: string; name: string; title: string; is_playing: boolean; active: boolean }[]>([]);
+  const [mediaSessions, setMediaSessions] = useState<MediaSession[]>([]);
   useEffect(() => {
     const unlisten = listen<typeof mediaSessions>("media-sessions", (event) => setMediaSessions(event.payload ?? []));
     return () => { unlisten.then(fn => fn()); };
@@ -1592,6 +1593,21 @@ function App() {
     });
   };
 
+  const cycleNotchMode = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isTimerFinished) {
+      resetTimer();
+      return;
+    }
+    if (nectarMode === 'tour') return;
+    const modes = availableNotchModes();
+    const index = modes.indexOf(nectarMode);
+    if (index === -1 || modes.length < 2) return;
+    const next = modes[(index + 1) % modes.length];
+    manualMusicRef.current = next === 'music';
+    setNectarMode(next);
+  };
+
   const conditionLabel = (condition: string) => {
     const key = `weather.condition.${condition.toLowerCase().replace(/ /g, "")}`;
     const label = t(key);
@@ -1762,7 +1778,7 @@ function App() {
       if (mediaLayout === 'compact') {
         if (compactVolumeExpanded) h += 36;
       }
-      return h + (mediaSessions.length > 1 ? 26 : 0);
+      return h;
     }
     return 36;
   };
@@ -1859,21 +1875,6 @@ function App() {
       >
         {widgetTip && isHovered && <div className="widget-tip">{widgetTip}</div>}
 
-        {isMusicMode && isHovered && mediaSessions.length > 1 && (
-          <div className="media-session-strip" onClick={(e) => e.stopPropagation()}>
-            {mediaSessions.map((s) => (
-              <button
-                key={s.id}
-                className={`media-session-chip${s.active ? ' active' : ''}`}
-                title={s.title}
-                onClick={() => invoke('select_media_session', { id: s.id }).catch(() => { })}
-              >
-                {s.is_playing && <span className="media-session-dot" />}
-                {s.name}
-              </button>
-            ))}
-          </div>
-        )}
 
 
         <AnimatePresence>
@@ -1938,7 +1939,8 @@ function App() {
                         nextBack={nextBack}
                         onAnimatePrev={animatePrev}
                         onAnimateNext={animateNext}
-                        onOpenCalendar={productivityEnabled ? toggleCalendarMode : undefined}
+                        sessions={mediaSessions}
+                        onNextPanel={cycleNotchMode}
                         onLayoutChange={(layout) => {
                           setMediaLayout(layout);
                           localStorage.setItem("nectar-media-layout", layout);
@@ -1995,11 +1997,10 @@ function App() {
                             <span className="premium-artist">{mediaInfo.artist}</span>
                           </div>
                           <div className="header-visualizer-wrap">
-                            {productivityEnabled && (
-                              <button className="music-calendar-btn" onClick={toggleCalendarMode} title={t("music.openCalendar")} aria-label={t("music.openCalendar")}>
-                                <CalendarDays size={16} strokeWidth={1.75} />
-                              </button>
-                            )}
+                            <MediaSourceButton sessions={mediaSessions} />
+                            <button className="music-calendar-btn" onClick={cycleNotchMode} title={t("music.nextPanel")} aria-label={t("music.nextPanel")}>
+                              <ChevronRight size={16} strokeWidth={1.75} />
+                            </button>
                             <div className="header-visualizer">
                               <Visualizer isPlaying={isPlaying} bars={5} height={18} />
                             </div>
@@ -2178,7 +2179,7 @@ function App() {
                             <div className="time-center">
                               <div
                                 className="time-flip-container"
-                                onClick={toggleCalendarMode}
+                                onClick={cycleNotchMode}
                                 style={dualClockSize ? { minWidth: dualClockSize.main } : undefined}
                               >
                                 <AnimatePresence initial={false}>
