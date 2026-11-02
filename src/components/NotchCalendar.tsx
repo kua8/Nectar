@@ -71,10 +71,11 @@ export function NotchCalendar({ caldav, hour12 }: Props) {
   };
 
   const shift = (dir: number) => {
-    if (view === "month") {
+    const current = connected ? view : "month";
+    if (current === "month") {
       const next = new Date(anchor.getFullYear(), anchor.getMonth() + dir, 1);
       setAnchor(next.getFullYear() === today.getFullYear() && next.getMonth() === today.getMonth() ? today : next);
-    } else if (view === "week") {
+    } else if (current === "week") {
       setAnchor(addDays(anchor, 7 * dir));
     } else {
       setAnchor(addDays(anchor, dir));
@@ -102,14 +103,14 @@ export function NotchCalendar({ caldav, hour12 }: Props) {
     title = anchor.toLocaleDateString(dateLocale(), { month: "long", year: "numeric" });
   }
 
-  const showToday = connected && activeView !== "agenda" && !sameDay(anchor, today);
+  const showToday = activeView !== "agenda" && !sameDay(anchor, today);
 
   return (
     <div className={`calendar-container${connected ? " with-agenda" : ""}`}>
       <div className="calendar-header">
         <span className="month-year">{title}</span>
-        {connected && (
-          <span className="cal-nav-group">
+        <span className="cal-nav-group">
+          {connected && (
             <button className="cal-open" onClick={() => invoke("open_calendar_window").catch(() => {})} title={t("calendar.openFull")} aria-label={t("calendar.openFull")}>
               <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M15 3h6v6" />
@@ -117,23 +118,23 @@ export function NotchCalendar({ caldav, hour12 }: Props) {
                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
               </svg>
             </button>
-            {showToday && (
-              <button className="cal-today" onClick={() => setAnchor(today)}>
-                {t("calendar.today")}
+          )}
+          {showToday && (
+            <button className="cal-today" onClick={() => setAnchor(today)}>
+              {t("calendar.today")}
+            </button>
+          )}
+          {activeView !== "agenda" && (
+            <>
+              <button className="cal-nav" onClick={() => shift(-1)} aria-label={t("calendar.previous")}>
+                &#8249;
               </button>
-            )}
-            {activeView !== "agenda" && (
-              <>
-                <button className="cal-nav" onClick={() => shift(-1)} aria-label={t("calendar.previous")}>
-                  &#8249;
-                </button>
-                <button className="cal-nav" onClick={() => shift(1)} aria-label={t("calendar.next")}>
-                  &#8250;
-                </button>
-              </>
-            )}
-          </span>
-        )}
+              <button className="cal-nav" onClick={() => shift(1)} aria-label={t("calendar.next")}>
+                &#8250;
+              </button>
+            </>
+          )}
+        </span>
       </div>
 
       {connected && (
@@ -200,10 +201,10 @@ function MonthGrid({ anchor, today, events, connected, onPick }: MonthProps) {
     const classes = ["calendar-day"];
     if (sameDay(day, today)) classes.push("today");
     if (list.length) classes.push("has-events", list.length >= 4 ? "lvl-3" : list.length >= 2 ? "lvl-2" : "lvl-1");
-    if (connected && sameDay(day, anchor)) classes.push("selected");
+    if (sameDay(day, anchor)) classes.push("selected");
     const colors = Array.from(new Set(list.map((e) => e.color ?? "currentColor"))).slice(0, 3);
     cells.push(
-      <div key={i} className={classes.join(" ")} onClick={connected ? () => onPick(day) : undefined}>
+      <div key={i} className={classes.join(" ")} onClick={() => onPick(day)}>
         {i}
         {colors.length > 0 && (
           <span className="event-dots">
