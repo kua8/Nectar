@@ -3965,6 +3965,35 @@ fn shelf_image_thumbnail(path: &str) -> Option<String> {
 }
 
 #[tauri::command]
+pub async fn shelf_text_preview(path: String) -> Option<String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        use std::io::Read;
+        let p = std::path::Path::new(&path);
+        let ext = p.extension()?.to_str()?.to_ascii_lowercase();
+        if !matches!(
+            ext.as_str(),
+            "txt" | "md" | "markdown" | "log" | "json" | "csv" | "tsv" | "xml" | "yaml" | "yml" | "toml" | "ini" | "cfg" | "conf"
+                | "html" | "htm" | "css" | "js" | "jsx" | "ts" | "tsx" | "rs" | "py" | "go" | "java" | "c" | "h" | "cpp" | "cs"
+                | "sh" | "ps1" | "bat" | "sql" | "rtf"
+        ) {
+            return None;
+        }
+        let mut buf = vec![0u8; 1024];
+        let n = std::fs::File::open(p).ok()?.read(&mut buf).ok()?;
+        if n == 0 || buf[..n].contains(&0) {
+            return None;
+        }
+        let text = String::from_utf8_lossy(&buf[..n]);
+        let preview: Vec<&str> = text.lines().map(str::trim).filter(|l| !l.is_empty()).take(8).collect();
+        if preview.is_empty() { None } else { Some(preview.join("
+").chars().take(160).collect()) }
+    })
+    .await
+    .ok()
+    .flatten()
+}
+
+#[tauri::command]
 pub async fn shelf_open(path: String) -> Result<(), String> {
     tauri_plugin_opener::open_path(&path, None::<&str>).map_err(|e| e.to_string())
 }

@@ -11,6 +11,7 @@ export type ShelfItem = {
   name: string;
   text?: string;
   thumb?: string | null;
+  preview?: string | null;
 };
 
 const STORAGE_KEY = "nectar-shelf-items";
@@ -21,7 +22,7 @@ const baseName = (path: string) => path.split(/[\\/]/).filter(Boolean).pop() ?? 
 function readSaved(): ShelfItem[] {
   try {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed.map((i: ShelfItem) => ({ ...i, thumb: null })) : [];
+    return Array.isArray(parsed) ? parsed.map((i: ShelfItem) => ({ ...i, thumb: null, preview: null })) : [];
   } catch {
     return [];
   }
@@ -43,7 +44,7 @@ export function useShelf(windowLabel: string, enabled: boolean, persist: boolean
       try { localStorage.removeItem(STORAGE_KEY); } catch { /* storage unavailable */ }
       return;
     }
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(items.map(({ thumb, ...rest }) => rest))); } catch { /* storage unavailable */ }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(items.map(({ thumb, preview, ...rest }) => rest))); } catch { /* storage unavailable */ }
   }, [items, persist]);
 
   useEffect(() => {
@@ -56,9 +57,20 @@ export function useShelf(windowLabel: string, enabled: boolean, persist: boolean
     }).catch(() => { });
   }, []);
 
-  const loadThumb = useCallback((id: string, path: string) => {
+  // Explorer has no cached thumbnail for a fresh file yet (videos especially), so ask again a few times
+  const loadThumb = useCallback((id: string, path: string, attempt = 0) => {
     invoke<string | null>("shelf_thumbnail", { path }).then((thumb) => {
-      if (thumb) setItems((prev) => prev.map((i) => (i.id === id ? { ...i, thumb } : i)));
+      if (thumb) {
+        setItems((prev) => prev.map((i) => (i.id === id ? { ...i, thumb } : i)));
+        return;
+      }
+      invoke<string | null>("shelf_text_preview", { path }).then((preview) => {
+        if (preview) {
+          setItems((prev) => prev.map((i) => (i.id === id ? { ...i, preview } : i)));
+        } else if (attempt < 3) {
+          setTimeout(() => loadThumb(id, path, attempt + 1), 600 * (attempt + 1));
+        }
+      }).catch(() => { });
     }).catch(() => { });
   }, []);
 
@@ -111,12 +123,13 @@ type Props = {
   items: ShelfItem[];
   onRemove: (id: string) => void;
   onClear: () => void;
+  onDragOutStart: () => void;
   onDragOutEnd: () => void;
 };
 
 const DRAG_THRESHOLD = 6;
 
-export function NotchShelf({ items, onRemove, onClear, onDragOutEnd }: Props) {
+export function NotchShelf({ items, onRemove, onClear, onDragOutStart, onDragOutEnd }: Props) {
   const t = useT();
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const press = useRef<{ x: number; y: number; id: string; dragging: boolean } | null>(null);
@@ -131,6 +144,7 @@ export function NotchShelf({ items, onRemove, onClear, onDragOutEnd }: Props) {
     if (!icon) return;
     const path = item.kind === "file" ? item.path : await invoke<string | null>("shelf_text_file", { text: item.text ?? "" });
     if (!path) return;
+    onDragOutStart();
     try {
       await startDrag({ item: [path], icon, mode: "copy" });
     } catch { /* drag was cancelled or refused */ }
@@ -180,7 +194,7 @@ export function NotchShelf({ items, onRemove, onClear, onDragOutEnd }: Props) {
                 onMouseLeave={() => { if (press.current?.id === item.id) press.current = null; }}
               >
                 <div className="shelf-thumb">
-                  {item.thumb ? <img src={item.thumb} alt="" draggable={false} /> : <span className="shelf-glyph">{item.kind === "text" ? "T" : "▤"}</span>}
+                  {item.thumb ? <img src={item.thumb} alt="" draggable={false} /> : (item.preview ?? (item.kind === "text" ? item.text?.slice(0, 160) : null)) ? <pre className="shelf-preview">{item.preview ?? item.text?.slice(0, 160)}</pre> : <span className="shelf-glyph">{item.kind === "text" ? "T" : "▤"}</span>}
                 </div>
                 <span className="shelf-name">{copiedId === item.id ? t("shelf.copied") : item.name}</span>
                 <button

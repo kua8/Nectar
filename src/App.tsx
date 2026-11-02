@@ -1724,6 +1724,18 @@ function App() {
     setIsNotchHovered(false);
     setNectarMode(mediaInfo.has_media && isPlaying && settingsMusicCompactNotch ? 'music' : 'status');
   };
+  const shelfDrag = useRef({ active: false, until: 0 });
+  const shelfCollapseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const shelfHoldsOpen = () => shelfDrag.current.active || Date.now() < shelfDrag.current.until;
+  const deferShelfCollapse = () => {
+    clearTimeout(shelfCollapseTimer.current);
+    const wait = Math.max(0, shelfDrag.current.until - Date.now());
+    shelfCollapseTimer.current = setTimeout(async () => {
+      if (shelfHoldsOpen()) return;
+      const over = await invoke<boolean>('pointer_over_notch').catch(() => false);
+      if (!over) collapseAfterShelfDrag();
+    }, wait);
+  };
   const shelf = useShelf(windowLabel, isNotchWindow && !settingsLegacyMode && panelShelf, settingsShelfPersist, {
     onDragEnter: () => {
       setIsHovered(true);
@@ -1790,7 +1802,7 @@ function App() {
       return isImpacted ? 28.9 : 44.2;
     }
     if (nectarMode === 'tour') return 210;
-    if (nectarMode === 'shelf') return shelf.items.length === 0 ? 96 : 130;
+    if (nectarMode === 'shelf') return shelf.items.length === 0 ? 96 : 144;
     if (nectarMode === 'calendar') return settingsCalendarEnabled ? (caldav.connected ? 350 : 310) : 262;
     if (nectarMode === 'command-center') {
       if (!isHovered) return 36;
@@ -1870,6 +1882,7 @@ function App() {
           e.stopPropagation();
         }}
         onHoverStart={() => {
+          clearTimeout(shelfCollapseTimer.current);
           setIsHovered(true);
           if (nectarMode !== 'tour' && nectarMode !== 'shelf') {
             const remembered = settingsRememberMode ? rememberedModeRef.current : null;
@@ -1878,6 +1891,10 @@ function App() {
           }
         }}
         onHoverEnd={() => {
+          if (nectarMode === 'shelf' && shelfHoldsOpen()) {
+            deferShelfCollapse();
+            return;
+          }
           setIsHovered(false);
           if (nectarMode === 'command-center' || nectarMode === 'calendar') rememberedModeRef.current = nectarMode;
           const targetMode = mediaInfo.has_media && isPlaying && settingsMusicCompactNotch ? 'music' : 'status';
@@ -2553,9 +2570,13 @@ function App() {
                       items={shelf.items}
                       onRemove={shelf.remove}
                       onClear={shelf.clear}
-                      onDragOutEnd={async () => {
-                        const stillOver = await invoke<boolean>('pointer_over_notch').catch(() => false);
-                        if (!stillOver) collapseAfterShelfDrag();
+                      onDragOutStart={() => {
+                        clearTimeout(shelfCollapseTimer.current);
+                        shelfDrag.current.active = true;
+                      }}
+                      onDragOutEnd={() => {
+                        shelfDrag.current = { active: false, until: Date.now() + 2500 };
+                        deferShelfCollapse();
                       }}
                     />
                   </motion.div>

@@ -100,6 +100,7 @@ fn main() {
             hide_native_osd,
             setup_shelf_drop,
             shelf_thumbnail,
+            shelf_text_preview,
             shelf_open,
             shelf_prune,
             shelf_drag_icon,
