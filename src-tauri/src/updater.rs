@@ -5,7 +5,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
-use tauri_plugin_updater::UpdaterExt;
+use tauri_plugin_updater::{UpdaterBuilder, UpdaterExt};
 
 /// Minimum time between background update checks. Manual checks bypass this.
 const CHECK_INTERVAL_SECS: i64 = 24 * 60 * 60;
@@ -15,6 +15,7 @@ const CHECK_TIMEOUT_SECS: u64 = 10;
 /// broken release cannot reach everyone within minutes of being published.
 const MIN_AUTO_INSTALL_AGE_SECS: i64 = 24 * 60 * 60;
 const STATE_FILE: &str = "update-state.json";
+const RELEASES_API: &str = "https://api.github.com/repos/kua8/Nectar/releases?per_page=10";
 
 /// Serializes manifest requests so concurrent callers share a single network hit.
 static CHECK_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
@@ -38,6 +39,50 @@ struct PersistedUpdateState {
     app_version: String,
     version: String,
     date: String,
+    #[serde(default)]
+    channel: String,
+}
+
+fn prerelease_channel(app: &AppHandle) -> bool {
+    crate::utils::get_setting_str(app, "nectar-update-channel").as_deref() == Some("prerelease")
+}
+
+fn channel_name(app: &AppHandle) -> &'static str {
+    if prerelease_channel(app) { "prerelease" } else { "stable" }
+}
+
+/// Manifest of the newest release, pre-releases included (GitHub's `latest` skips them).
+async fn newest_release_manifest() -> Option<tauri::Url> {
+    let client = reqwest::Client::builder()
+        .user_agent("Nectar")
+        .timeout(Duration::from_secs(CHECK_TIMEOUT_SECS))
+        .build()
+        .ok()?;
+    let body = client.get(RELEASES_API).send().await.ok()?.text().await.ok()?;
+    let releases: Vec<serde_json::Value> = serde_json::from_str(&body).ok()?;
+    releases
+        .iter()
+        .filter(|release| release["draft"] != true)
+        .find_map(|release| {
+            release["assets"].as_array()?.iter().find_map(|asset| {
+                (asset["name"] == "latest.json")
+                    .then(|| asset["browser_download_url"].as_str())
+                    .flatten()
+                    .and_then(|url| url.parse().ok())
+            })
+        })
+}
+
+/// Updater for the chosen channel, falling back to stable if the release list cannot be read.
+async fn channel_updater(app: &AppHandle) -> UpdaterBuilder {
+    let builder = app.updater_builder();
+    if !prerelease_channel(app) {
+        return builder;
+    }
+    match newest_release_manifest().await {
+        Some(url) => builder.endpoints(vec![url]).unwrap_or_else(|_| app.updater_builder()),
+        None => builder,
+    }
 }
 
 fn now_secs() -> i64 {
@@ -91,7 +136,7 @@ fn cached_result(app: &AppHandle) -> Option<UpdateCheckResult> {
     if state.last_check == 0 || now_secs() - state.last_check >= CHECK_INTERVAL_SECS {
         return None;
     }
-    if state.app_version != app.package_info().version.to_string() {
+    if state.app_version != app.package_info().version.to_string() || state.channel != channel_name(app) {
         return None;
     }
     Some(result_from_state(&state))
@@ -127,7 +172,7 @@ pub async fn check(app: &AppHandle, force: bool) -> Result<UpdateCheckResult, St
         }
     }
 
-    let updater = app.updater().map_err(|e| e.to_string())?;
+    let updater = channel_updater(app).await.build().map_err(|e| e.to_string())?;
     let update = tokio::time::timeout(Duration::from_secs(CHECK_TIMEOUT_SECS), updater.check())
         .await
         .map_err(|_| "update check timed out".to_string())?
@@ -154,6 +199,7 @@ pub async fn check(app: &AppHandle, force: bool) -> Result<UpdateCheckResult, St
             app_version: app.package_info().version.to_string(),
             version: result.version.clone().unwrap_or_default(),
             date: result.date.clone().unwrap_or_default(),
+            channel: channel_name(app).to_string(),
         },
     );
     if let Ok(mut cached) = LAST_CHECK.lock() {
@@ -196,8 +242,8 @@ async fn install_inner(app: &AppHandle) -> Result<(), String> {
     let _guard = CHECK_LOCK.lock().await;
 
     let hook_handle = app.clone();
-    let updater = app
-        .updater_builder()
+    let updater = channel_updater(app)
+        .await
         .installer_args(installer_scope_args())
         .on_before_exit(move || {
             crate::state::SHUTTING_DOWN.store(true, Ordering::Relaxed);
@@ -258,6 +304,8 @@ pub async fn run_startup_check(app: AppHandle) {
         let _ = app.emit("auto-update-status", serde_json::json!({ "status": "checking" }));
     }
 
+    let ready_to_install = |result: &UpdateCheckResult| prerelease_channel(&app) || release_is_old_enough(result);
+
     let result = match check(&app, false).await {
         Ok(result) => result,
         Err(_) => {
@@ -277,10 +325,10 @@ pub async fn run_startup_check(app: AppHandle) {
         return;
     }
 
-    if auto_update && release_is_old_enough(&result) && install_needs_unavailable_elevation() {
+    if auto_update && ready_to_install(&result) && install_needs_unavailable_elevation() {
         crate::diagnostics::log("auto-update: skipping silent install, all-users install needs elevation this process doesn't have; leaving update available for manual install");
         let _ = app.emit("auto-update-status", serde_json::json!({ "status": "done" }));
-    } else if auto_update && release_is_old_enough(&result) {
+    } else if auto_update && ready_to_install(&result) {
         // On Windows this never returns: the installer exits the process.
         if install(&app).await.is_err() {
             let _ = app.emit("auto-update-status", serde_json::json!({ "status": "done" }));

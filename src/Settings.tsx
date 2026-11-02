@@ -270,6 +270,8 @@ function SettingsApp() {
               appVersion={settings.appVersion}
               autoUpdate={settings.autoUpdate}
               toggleAutoUpdate={settings.toggleAutoUpdate}
+              prereleaseChannel={settings.prereleaseChannel}
+              togglePrereleaseChannel={settings.togglePrereleaseChannel}
               updateStatus={settings.updateStatus}
               updateVersion={settings.updateVersion}
               checkForUpdates={settings.checkForUpdates}

@@ -170,6 +170,9 @@ export function useSettings() {
   const [autoUpdate, setAutoUpdate] = useState(
     () => localStorage.getItem("nectar-auto-update") === "true"
   );
+  const [prereleaseChannel, setPrereleaseChannel] = useState(
+    () => localStorage.getItem("nectar-update-channel") === "prerelease"
+  );
   const [scale, setScale] = useState(
     () => parseFloat(localStorage.getItem("nectar-scale") || "1.0")
   );
@@ -239,6 +242,7 @@ export function useSettings() {
       apply(getVal("nectar-legacy-mode"), setLegacyMode, readBool);
       apply(getVal("nectar-show-update-indicator"), setShowUpdateIndicator, readBool);
       apply(getVal("nectar-auto-update"), setAutoUpdate, readBool);
+      apply(getVal("nectar-update-channel"), setPrereleaseChannel, (v) => v === "prerelease");
       apply(getVal("nectar-volume-edge-enabled"), setVolumeEdgeEnabled, readBool);
       apply(getVal("nectar-brightness-edge-enabled"), setBrightnessEdgeEnabled, readBool);
       apply(getVal("nectar-dock-enabled"), setDockEnabled, readBool);
@@ -394,6 +398,7 @@ export function useSettings() {
     "nectar-scale": setScale,
     "nectar-temp-unit": (v) => setTempUnitFahrenheit(v === "fahrenheit"),
     "nectar-auto-update": setAutoUpdate,
+    "nectar-update-channel": (v) => setPrereleaseChannel(v === "prerelease"),
     "nectar-volume-overlay-enabled": setVolumeOverlayEnabled,
     "nectar-volume-edge-enabled": setVolumeEdgeEnabled,
     "nectar-brightness-overlay-enabled": setBrightnessOverlayEnabled,
@@ -802,6 +807,15 @@ export function useSettings() {
     saveSetting("nectar-auto-update", String(next));
   };
 
+  const togglePrereleaseChannel = async () => {
+    const next = !prereleaseChannel;
+    const value = next ? "prerelease" : "stable";
+    setPrereleaseChannel(next);
+    localStorage.setItem("nectar-update-channel", value);
+    await invoke("save_setting", { key: "nectar-update-channel", value }).catch(console.error);
+    checkForUpdates();
+  };
+
   // ── Value setters ──
   const setDockModeValue = (newMode: string) => {
     setDockMode(newMode);
@@ -1075,6 +1089,8 @@ export function useSettings() {
     toggleAutostart,
     autoUpdate,
     toggleAutoUpdate,
+    prereleaseChannel,
+    togglePrereleaseChannel,
     lowBatteryThreshold,
     handleThresholdChange,
     timeFormat24h,
