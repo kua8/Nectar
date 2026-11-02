@@ -1507,19 +1507,16 @@ input:checked + .slider:before {
   color: var(--nectar-text, #fff);
 }
 
-/* Miniature scene: a bold wallpaper (stripes so blur and clarity read), the notch on top, the dock
-   below, each drawn in its own style */
+/* Miniature of the notch and dock on a plain muted backdrop, drawn in each style */
 .style-tile-preview {
   position: relative;
   display: block;
-  height: 76px;
-  border-radius: 9px;
+  aspect-ratio: 16 / 10;
+  border-radius: 8px;
   overflow: hidden;
   background:
-    radial-gradient(34px 34px at 22% 20%, #ffd166 0%, rgba(255, 209, 102, 0) 100%),
-    radial-gradient(46px 46px at 82% 74%, #2ee6c8 0%, rgba(46, 230, 200, 0) 100%),
-    repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.22) 0 7px, rgba(255, 255, 255, 0) 7px 16px),
-    linear-gradient(135deg, #ff5f8f 0%, #8a4dff 48%, #2f7bff 100%);
+    radial-gradient(70% 80% at 25% 25%, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0) 70%),
+    linear-gradient(135deg, #66758f, #333d52);
 }
 
 .style-tile-pill,
@@ -1530,39 +1527,39 @@ input:checked + .slider:before {
   align-items: center;
   justify-content: center;
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.86);
+  background: rgba(0, 0, 0, 0.88);
 }
 
 .style-tile-pill {
   top: 0;
-  width: 52%;
-  height: 20px;
-  gap: 7px;
-  border-radius: 0 0 11px 11px;
+  width: 48%;
+  height: 24%;
+  gap: 6px;
+  border-radius: 0 0 10px 10px;
 }
 
 .style-tile-pill i {
   display: block;
   height: 4px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.85);
 }
 
 .style-tile-pill i:first-child {
-  width: 18px;
+  width: 16px;
 }
 
 .style-tile-pill i:last-child {
-  width: 8px;
+  width: 7px;
   opacity: 0.5;
 }
 
 .style-tile-dock {
   bottom: 0;
-  width: 78%;
-  height: 24px;
+  width: 74%;
+  height: 32%;
   gap: 5px;
-  border-radius: 12px 12px 0 0;
+  border-radius: 10px 10px 0 0;
 }
 
 .style-tile-dock i {
@@ -1570,20 +1567,17 @@ input:checked + .slider:before {
   width: 11px;
   height: 11px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.4);
 }
 
-.style-tile-dock i:nth-child(1) { background: #ff6b6b; }
-.style-tile-dock i:nth-child(2) { background: #4dd37a; }
-.style-tile-dock i:nth-child(3) { background: #4da3ff; }
-.style-tile-dock i:nth-child(4) { background: #ffd24d; }
-.style-tile-dock i:nth-child(5) { background: #c48bff; }
+.style-tile-dock i:nth-child(5) {
+  display: none;
+}
 
-/* Frosted: heavy blur, milky haze, hairline sides */
 .style-preview-frosted .style-tile-pill,
 .style-preview-frosted .style-tile-dock {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.1)), rgba(20, 18, 34, 0.4);
-  backdrop-filter: blur(9px) saturate(1.35);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.12)), rgba(24, 24, 32, 0.35);
+  backdrop-filter: blur(6px);
   box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.4), inset -0.5px 0 0 rgba(255, 255, 255, 0.4);
 }
 
@@ -1595,24 +1589,20 @@ input:checked + .slider:before {
   box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.4), inset -0.5px 0 0 rgba(255, 255, 255, 0.4), inset 0 0.5px 0 rgba(255, 255, 255, 0.4);
 }
 
-/* Liquid: almost clear, bright specular rims and a sheen */
 .style-preview-liquid .style-tile-pill {
-  background: linear-gradient(0deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0) 9px), rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(1px) brightness(1.1) saturate(1.2);
-  box-shadow: inset 0 -1.5px 1px rgba(255, 255, 255, 0.85), inset 1px 0 1px rgba(255, 255, 255, 0.45), inset -1px 0 1px rgba(255, 255, 255, 0.45);
+  background: linear-gradient(0deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 8px), rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 -1px 1px rgba(255, 255, 255, 0.8), inset 1px 0 1px rgba(255, 255, 255, 0.4), inset -1px 0 1px rgba(255, 255, 255, 0.4);
 }
 
 .style-preview-liquid .style-tile-dock {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0) 10px), rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(1px) brightness(1.1) saturate(1.2);
-  box-shadow: inset 0 1.5px 1px rgba(255, 255, 255, 0.85), inset 1px 0 1px rgba(255, 255, 255, 0.45), inset -1px 0 1px rgba(255, 255, 255, 0.45);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 9px), rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.8), inset 1px 0 1px rgba(255, 255, 255, 0.4), inset -1px 0 1px rgba(255, 255, 255, 0.4);
 }
 
 .style-preview-liquid .style-tile-pill i {
   background: #fff;
 }
 
-/* Material: flat tonal surface in the accent color */
 .style-preview-material .style-tile-pill,
 .style-preview-material .style-tile-dock {
   background: color-mix(in srgb, var(--nectar-accent, #007aff) 24%, #14161b);
@@ -1624,7 +1614,7 @@ input:checked + .slider:before {
 }
 
 .style-preview-material .style-tile-dock i {
-  background: color-mix(in srgb, var(--nectar-accent, #007aff) 55%, #2b2f38);
+  background: color-mix(in srgb, var(--nectar-accent, #007aff) 50%, #2b2f38);
 }
 
 .style-tile-label {
