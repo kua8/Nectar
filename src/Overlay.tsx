@@ -12,7 +12,7 @@ import { AudioOutputIcon, MixerIcon, SpeakerIcon } from "./icons";
 import { useT } from "./i18n";
 import "./Overlay.css";
 import "./surfaces.css";
-import { EdgeOutline } from "./components/EdgeOutline";
+import { SurfaceShape } from "./components/SurfaceShape";
 import { initTheme } from "./theme";
 import { setVisibleInterval } from "./hooks/visibleInterval";
 
@@ -441,7 +441,7 @@ function VolumeNotch({
       transition={{ type: "spring", stiffness: 450, damping: 30, mass: 0.7 }}
     >
       <div className="volume-notch-flares" />
-      <EdgeOutline edge="left" flare={13} radius={18} />
+      <SurfaceShape edge="left" flare={13} radius={18} />
       <motion.div
         ref={shellRef}
         className="volume-notch"
@@ -656,7 +656,7 @@ function BrightnessNotch({
       exit={{ scaleX: 0, scaleY: 0.8, opacity: 0, y: "-50%", transition: { duration: 0.2, ease: [0.32, 0.72, 0, 1] } }}
       transition={{ type: "spring", stiffness: 450, damping: 30, mass: 0.7 }}
     >
-      <EdgeOutline edge="right" flare={13} radius={18} />
+      <SurfaceShape edge="right" flare={13} radius={18} />
       <div className="brightness-notch">
         <motion.div
           className="brightness-notch-content-group"

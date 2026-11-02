@@ -24,7 +24,7 @@ import { t as translate, useT } from "./i18n";
 import { NotchShelf, useShelf } from "./components/NotchShelf";
 import { parseCcLayout, parsePanelOrder, resolveCcLayout, type CcKind } from "./panelOrder";
 import { NotchProgressBorder } from "./components/NotchProgressBorder";
-import { EdgeOutline } from "./components/EdgeOutline";
+import { SurfaceShape } from "./components/SurfaceShape";
 import type { WidgetConfig } from "./components/StatusWidgetConfig";
 import {
   DEFAULT_DUAL_CLOCK_ZONE,
@@ -1969,8 +1969,6 @@ function App() {
           default: { type: "spring", stiffness: 500, damping: 30, mass: 1 }
         }}
       >
-        <div className="surface-backdrop" aria-hidden="true" />
-        <div className="surface-backdrop-corners" aria-hidden="true" />
         {widgetTip && isHovered && <div className="widget-tip">{widgetTip}</div>}
 
 
@@ -2701,7 +2699,7 @@ function App() {
           )}
         </AnimatePresence>
 
-        <EdgeOutline edge="top" flare={isImpacted ? 13 : 0} radius={isCalendarMode ? 28 : 18} edgeRadius={18} />
+        <SurfaceShape edge="top" flare={isImpacted ? 13 : 0} radius={isCalendarMode ? 28 : 18} edgeRadius={18} />
 
         {showTimerProgressBar && (
           <NotchProgressBorder
