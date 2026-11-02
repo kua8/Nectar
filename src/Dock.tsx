@@ -270,6 +270,7 @@ const Dock = memo(function Dock() {
   const [isDockHovered, setIsDockHovered] = useState(false);
   const [isEdgeHovered, setIsEdgeHovered] = useState(false);
   const [isOverlapped, setIsOverlapped] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [showAddPopup, setShowAddPopup] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, app: AppInfo | null } | null>(null);
   const [contextMenuHeight, setContextMenuHeight] = useState(0);
@@ -330,10 +331,11 @@ const Dock = memo(function Dock() {
     }
   }, [isAnyInteraction]);
 
-  const isHidden = !startupAnimating && (
-    (dockMode === 'smart' && isOverlapped && interactionState === 'none') ||
-    (dockMode === 'peek' && interactionState === 'none')
-  );
+  const isHidden = ((dockMode === 'smart' || dockMode === 'peek') && isFullscreen) ||
+    (!startupAnimating && (
+      (dockMode === 'smart' && isOverlapped && interactionState === 'none') ||
+      (dockMode === 'peek' && interactionState === 'none')
+    ));
 
   // Adaptive mode (fixed dock): stretch to a full-width taskbar while a window is maximized.
   const isAdaptive = dockAdaptive && dockMode === 'fixed' && isMaximized && isExpanded && !isHidden;
@@ -493,6 +495,14 @@ const Dock = memo(function Dock() {
       setIsEdgeHovered(event.payload);
     });
 
+    const unlistenFullscreen = thisWindow.listen<boolean>("dock-fullscreen", (event) => {
+      setIsFullscreen(event.payload);
+      if (event.payload) {
+        setIsEdgeHovered(false);
+        setIsDockHovered(false);
+      }
+    });
+
     const unlistenMonitors = listen("monitors-changed", refreshDockMode);
 
     const unlistenMaximized = thisWindow.listen<boolean>("dock-maximized", (event) => {
@@ -503,6 +513,7 @@ const Dock = memo(function Dock() {
       unlistenMaximized.then(f => f());
       unlistenOverlap.then(f => f());
       unlistenEdgeHover.then(f => f());
+      unlistenFullscreen.then(f => f());
       unlistenMonitors.then(f => f());
     };
   }, []);

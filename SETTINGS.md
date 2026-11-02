@@ -174,6 +174,7 @@ Example:
 | `nectar-scale` | float string | `"1.0"` | UI scale factor (0.8 to 1.3). Changing this re-registers AppBars to resize the reserved screen area. |
 | `nectar-low-battery-threshold` | integer string | `"20"` | Battery percentage that triggers the low-battery alert pulse (5 to 50, step 5). |
 | `nectar-auto-update` | `"true"` / `"false"` | `"false"` | Check for and download updates automatically on startup. |
+| `nectar-update-channel` | `"stable"` / `"prerelease"` | `"stable"` | Which releases the updater offers. `"prerelease"` also offers releases published with the pre-release flag, the newest release wins. Never offers a version lower than the running one. Settings > About > Get pre-releases. |
 | `nectar-show-update-indicator` | `"true"` / `"false"` | `"true"` | Show a green dot on the notch when an update is available. |
 | `nectar-time-format-24h` | `"true"` / `"false"` | `"false"` | Use 24-hour clock format in the notch. When `"false"`, displays 12-hour format with AM/PM. |
 | `nectar-language` | `"system"` / language code, e.g. `"en"` | `"system"` | UI language. `"system"` follows the Windows display language and falls back to English when that language has no translation. Missing keys in a translation fall back to English. Translations live in `src/locales/<code>.json` and are registered in `src/i18n.ts` and `src-tauri/src/i18n.rs` (tray menu). Calendar dates and times follow this language too. |

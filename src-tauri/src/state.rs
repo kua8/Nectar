@@ -28,6 +28,8 @@ label_map!(dock_hovered, bool);
 label_map!(notch_hovered, bool);
 // Frontend says the notch is off screen (smart/peek), keep it click-through then.
 label_map!(notch_hidden, bool);
+// A fullscreen window covers this notch's monitor.
+label_map!(notch_fullscreen, bool);
 // Top edge hover intent: when the cursor entered the band, and whether it rested long enough.
 label_map!(notch_edge_enter_ms, i64);
 label_map!(notch_edge_armed, bool);
@@ -91,6 +93,7 @@ pub fn clear_window_state(label: &str) {
     if let Ok(mut m) = dock_hovered().lock() { m.remove(label); }
     if let Ok(mut m) = notch_hovered().lock() { m.remove(label); }
     if let Ok(mut m) = notch_hidden().lock() { m.remove(label); }
+    if let Ok(mut m) = notch_fullscreen().lock() { m.remove(label); }
     if let Ok(mut m) = notch_edge_enter_ms().lock() { m.remove(label); }
     if let Ok(mut m) = notch_edge_armed().lock() { m.remove(label); }
     if let Ok(mut m) = dock_overlap().lock() { m.remove(label); }
@@ -145,6 +148,7 @@ pub static ANY_MEDIA_PLAYING: AtomicBool = AtomicBool::new(false);
 pub static LAST_START_TOGGLE_MS: AtomicI64 = AtomicI64::new(0);
 pub static OVERLAY_IN_SPLASH: AtomicBool = AtomicBool::new(false);
 pub static CURRENT_FOREGROUND_FULLSCREEN: AtomicBool = AtomicBool::new(false);
+pub static CURRENT_FOREGROUND_FULLSCREEN_ON_DOCK: AtomicBool = AtomicBool::new(false);
 pub static CURRENT_FOREGROUND_MAXIMIZED: AtomicBool = AtomicBool::new(false);
 
 pub static SINGLE_INSTANCE_MUTEX_HANDLE: OnceLock<isize> = OnceLock::new();

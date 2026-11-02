@@ -525,6 +525,7 @@ function App() {
 
   const [isEdgeHovered, setIsEdgeHovered] = useState(false);
   const [isOverlapped, setIsOverlapped] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [interactionState, setInteractionState] = useState<'active' | 'grace' | 'none'>('none');
   const nectarRef = useRef<HTMLDivElement>(null);
   const dockEnabledInitial = useRef(true);
@@ -534,10 +535,11 @@ function App() {
   const [nectarMode, setNectarMode] = useState<'music' | 'calendar' | 'command-center' | 'status' | 'shelf' | 'tour'>('status');
 
   const isAnyInteraction = isHovered || isNotchHovered || isEdgeHovered;
-  const isHidden = !startupAnimating && nectarMode !== 'tour' && (
-    (notchMode === 'smart' && isOverlapped && interactionState === 'none') ||
-    (notchMode === 'peek' && interactionState === 'none' && !eventPeek)
-  );
+  const isHidden = ((notchMode === 'smart' || notchMode === 'peek') && isFullscreen) ||
+    (!startupAnimating && nectarMode !== 'tour' && (
+      (notchMode === 'smart' && isOverlapped && interactionState === 'none') ||
+      (notchMode === 'peek' && interactionState === 'none' && !eventPeek)
+    ));
 
   useEffect(() => {
     if (isAnyInteraction) {
@@ -761,6 +763,9 @@ function App() {
       setSettingsCornersEnabled(getVal("nectar-corners-enabled", "false") === "true");
       setTimeFormat24h(getVal("nectar-time-format-24h") === "true");
       setSettingsLegacyMode(getVal("nectar-legacy-mode") === "true");
+      const scrollVolume = getVal("nectar-notch-scroll-volume") === "true";
+      localStorage.setItem("nectar-notch-scroll-volume", String(scrollVolume));
+      setSettingsScrollVolume(scrollVolume);
 
       const thresholdStr = getVal("nectar-low-battery-threshold", "20");
       if (thresholdStr) setLowBatteryThreshold(parseInt(thresholdStr as string));
@@ -858,6 +863,14 @@ function App() {
       setIsEdgeHovered(event.payload);
     });
 
+    const unlistenNotchFullscreen = thisWindow.listen<boolean>("notch-fullscreen", (event) => {
+      setIsFullscreen(event.payload);
+      if (event.payload) {
+        setIsEdgeHovered(false);
+        setIsNotchHovered(false);
+      }
+    });
+
     const unlistenSettingsReset = listen("settings-reset", () => {
       localStorage.clear();
       window.location.reload();
@@ -867,6 +880,7 @@ function App() {
       unlistenVisibility.then(f => f());
       unlistenNotchOverlap.then(f => f());
       unlistenNotchEdgeHover.then(f => f());
+      unlistenNotchFullscreen.then(f => f());
       unlistenSettingsReset.then(f => f());
       document.removeEventListener('contextmenu', preventContext);
     };
