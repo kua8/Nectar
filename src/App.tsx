@@ -1422,8 +1422,7 @@ function App() {
 
   // Native Windows Media Controls - Listen for updates from background worker
   useEffect(() => {
-    const unlisten = listen<MediaInfo>("media-update", (event) => {
-      const info = event.payload;
+    const applyMedia = (info: MediaInfo | null | undefined) => {
       if (!info) return;
 
       setMediaInfo(prev => {
@@ -1460,7 +1459,9 @@ function App() {
 
         return info.artwork && info.artwork.length > 0 ? info : { ...info, artwork: prev.artwork };
       });
-    });
+    };
+    const unlisten = listen<MediaInfo>("media-update", (event) => applyMedia(event.payload));
+    invoke<MediaInfo | null>("get_media_info").then(applyMedia).catch(() => { });
 
     return () => {
       unlisten.then(fn => fn());
@@ -1800,7 +1801,7 @@ function App() {
   // Calculate width dynamically based on enabled features
   const getDynamicWidth = () => {
     if (nectarMode === 'tour') return 380;
-    if (nectarMode === 'shelf') return Math.max(300, Math.min(120 + shelf.items.length * 62, 460));
+    if (nectarMode === 'shelf') return Math.max(300, Math.min(120 + shelf.items.length * 70, 460));
     if (isCalendarMode) return Math.max(settingsCalendarEnabled && showClockColumn ? 480 : settingsCalendarEnabled ? 310 : 270, 140 + dualClockExtra);
     if (nectarMode === 'command-center' && isHovered) {
       const totalWidgets = statusWidgets.left.length + statusWidgets.right.length;
@@ -1831,7 +1832,7 @@ function App() {
       return isImpacted ? 28.9 : 44.2;
     }
     if (nectarMode === 'tour') return 210;
-    if (nectarMode === 'shelf') return shelf.items.length === 0 ? 96 : 144;
+    if (nectarMode === 'shelf') return shelf.items.length === 0 ? 96 : 156;
     if (nectarMode === 'calendar') return settingsCalendarEnabled ? (caldav.connected ? 350 : 310) : 262;
     if (nectarMode === 'command-center') {
       if (!isHovered) return 36;
@@ -1860,15 +1861,15 @@ function App() {
   // Album tints the whole notch, collapsed pill included. The expanded state
   // reads --nectar-bg-expanded and the muted/border vars live on :root, so all
   // of them have to be overridden or the panel loses the tint when hovered.
-  const withAlpha = (color: string, alpha: number) => {
+  const withAlpha = (color: string, alpha: number | string) => {
     const m = /^rgb\((.+)\)$/.exec(color.trim());
     return m ? `rgb(${m[1]} / ${alpha})` : color;
   };
   const musicTint =
     isMusicMode && settingsArtworkTheme && musicTheme.background
       ? ({
-          "--nectar-bg": musicTheme.background,
-          "--nectar-bg-expanded": musicTheme.background,
+          "--nectar-bg": withAlpha(musicTheme.background, "var(--nectar-opacity, 0.8)"),
+          "--nectar-bg-expanded": withAlpha(musicTheme.background, "var(--nectar-opacity-expanded, 0.92)"),
           "--nectar-text": musicTheme.text,
           "--nectar-text-muted": withAlpha(musicTheme.text, 0.65),
           "--nectar-border": withAlpha(musicTheme.text, 0.12),
@@ -2620,6 +2621,8 @@ function App() {
                   >
                     <NotchShelf
                       items={shelf.items}
+                      dropActive={shelf.dropActive}
+                      onReorder={shelf.reorder}
                       onRemove={shelf.remove}
                       onClear={shelf.clear}
                       onDragOutStart={() => {

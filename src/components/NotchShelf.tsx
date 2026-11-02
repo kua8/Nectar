@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { startDrag } from "@crabnebula/tauri-plugin-drag";
+import { AnimatePresence, Reorder } from "framer-motion";
 import { useT } from "../i18n";
 
 export type ShelfItem = {
@@ -36,6 +37,7 @@ type ShelfCallbacks = {
 
 export function useShelf(windowLabel: string, enabled: boolean, persist: boolean, cb: ShelfCallbacks) {
   const [items, setItems] = useState<ShelfItem[]>(() => (persist ? readSaved() : []));
+  const [dropActive, setDropActive] = useState(false);
   const cbRef = useRef(cb);
   cbRef.current = cb;
 
@@ -74,6 +76,10 @@ export function useShelf(windowLabel: string, enabled: boolean, persist: boolean
     }).catch(() => { });
   }, []);
 
+  useEffect(() => {
+    items.forEach((i) => { if (i.kind === "file" && i.path && !i.thumb && !i.preview) loadThumb(i.id, i.path); });
+  }, []);
+
   const add = useCallback((paths?: string[], text?: string) => {
     const fresh: ShelfItem[] = [];
     if (paths) {
@@ -100,13 +106,20 @@ export function useShelf(windowLabel: string, enabled: boolean, persist: boolean
 
     const unlistens: Promise<() => void>[] = [
       listen<{ label: string }>("shelf-drag-enter", (e) => {
-        if (e.payload.label === windowLabel) cbRef.current.onDragEnter();
+        if (e.payload.label === windowLabel) {
+          setDropActive(true);
+          cbRef.current.onDragEnter();
+        }
       }),
       listen<{ label: string }>("shelf-drag-leave", (e) => {
-        if (e.payload.label === windowLabel) cbRef.current.onDragLeave();
+        if (e.payload.label === windowLabel) {
+          setDropActive(false);
+          cbRef.current.onDragLeave();
+        }
       }),
       listen<{ label: string; paths?: string[]; text?: string }>("shelf-drag-drop", (e) => {
         add(e.payload.paths, e.payload.text);
+        setDropActive(false);
         if (e.payload.label === windowLabel) cbRef.current.onDrop();
       }),
     ];
@@ -116,23 +129,32 @@ export function useShelf(windowLabel: string, enabled: boolean, persist: boolean
   const remove = useCallback((id: string) => setItems((prev) => prev.filter((i) => i.id !== id)), []);
   const clear = useCallback(() => setItems([]), []);
 
-  return { items, remove, clear };
+  return { items, dropActive, reorder: setItems, remove, clear };
 }
 
 type Props = {
   items: ShelfItem[];
+  dropActive: boolean;
+  onReorder: (items: ShelfItem[]) => void;
   onRemove: (id: string) => void;
   onClear: () => void;
   onDragOutStart: () => void;
   onDragOutEnd: () => void;
 };
 
-const DRAG_THRESHOLD = 6;
+const CARD_SPRING = { type: "spring", stiffness: 520, damping: 34 } as const;
 
-export function NotchShelf({ items, onRemove, onClear, onDragOutStart, onDragOutEnd }: Props) {
+const extOf = (name: string) => {
+  const dot = name.lastIndexOf(".");
+  return dot > 0 && name.length - dot <= 5 ? name.slice(dot + 1).toUpperCase() : "";
+};
+
+export function NotchShelf({ items, dropActive, onReorder, onRemove, onClear, onDragOutStart, onDragOutEnd }: Props) {
   const t = useT();
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const press = useRef<{ x: number; y: number; id: string; dragging: boolean } | null>(null);
+  const [resetKey, setResetKey] = useState(0);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const dragState = useRef<{ out: boolean } | null>(null);
   const dragIcon = useRef<string | null>(null);
 
   useEffect(() => {
@@ -148,6 +170,7 @@ export function NotchShelf({ items, onRemove, onClear, onDragOutStart, onDragOut
     try {
       await startDrag({ item: [path], icon, mode: "copy" });
     } catch { /* drag was cancelled or refused */ }
+    setResetKey((k) => k + 1);
     onDragOutEnd();
   };
 
@@ -162,53 +185,69 @@ export function NotchShelf({ items, onRemove, onClear, onDragOutStart, onDragOut
     }
   };
 
+  const previewText = (item: ShelfItem) => item.preview ?? (item.kind === "text" ? item.text?.slice(0, 160) : null);
+
   return (
-    <div className="shelf-panel" onClick={(e) => e.stopPropagation()}>
+    <div ref={panelRef} className={`shelf-panel${dropActive ? " drop-active" : ""}`} onClick={(e) => e.stopPropagation()}>
       {items.length === 0 ? (
         <div className="shelf-empty">{t("shelf.empty")}</div>
       ) : (
         <>
-          <div className="shelf-row">
-            {items.map((item) => (
-              <div
-                key={item.id}
-                className={`shelf-item ${item.kind}`}
-                title={item.kind === "text" ? item.text : item.path}
-                onMouseDown={(e) => {
-                  if (e.button !== 0) return;
-                  press.current = { x: e.clientX, y: e.clientY, id: item.id, dragging: false };
-                }}
-                onMouseMove={(e) => {
-                  const p = press.current;
-                  if (!p || p.id !== item.id || p.dragging || e.buttons !== 1) return;
-                  if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > DRAG_THRESHOLD) {
-                    p.dragging = true;
-                    beginDrag(item);
-                  }
-                }}
-                onMouseUp={() => {
-                  const p = press.current;
-                  press.current = null;
-                  if (p && p.id === item.id && !p.dragging) activate(item);
-                }}
-                onMouseLeave={() => { if (press.current?.id === item.id) press.current = null; }}
-              >
-                <div className="shelf-thumb">
-                  {item.thumb ? <img src={item.thumb} alt="" draggable={false} /> : (item.preview ?? (item.kind === "text" ? item.text?.slice(0, 160) : null)) ? <pre className="shelf-preview">{item.preview ?? item.text?.slice(0, 160)}</pre> : <span className="shelf-glyph">{item.kind === "text" ? "T" : "▤"}</span>}
-                </div>
-                <span className="shelf-name">{copiedId === item.id ? t("shelf.copied") : item.name}</span>
-                <button
-                  className="shelf-remove"
-                  title={t("shelf.remove")}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onMouseUp={(e) => e.stopPropagation()}
-                  onClick={(e) => { e.stopPropagation(); onRemove(item.id); }}
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-          </div>
+          <Reorder.Group key={resetKey} as="div" axis="x" values={items} onReorder={onReorder} className="shelf-row">
+            <AnimatePresence initial={false}>
+              {items.map((item) => {
+                const text = item.thumb ? null : previewText(item);
+                const ext = item.kind === "file" ? extOf(item.name) : "";
+                return (
+                  <Reorder.Item
+                    key={item.id}
+                    as="div"
+                    value={item}
+                    className={`shelf-item ${item.kind}`}
+                    title={item.kind === "text" ? item.text : item.path}
+                    initial={{ opacity: 0, scale: 0.5, y: -10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.12 } }}
+                    whileDrag={{ scale: 1.1, zIndex: 5 }}
+                    transition={CARD_SPRING}
+                    onDragStart={() => { dragState.current = { out: false }; }}
+                    onDrag={(_, info) => {
+                      const state = dragState.current;
+                      const rect = panelRef.current?.getBoundingClientRect();
+                      if (!state || state.out || !rect) return;
+                      const { x, y } = info.point;
+                      if (x < rect.left || x > rect.right || y > rect.bottom || y < rect.top - 20) {
+                        state.out = true;
+                        beginDrag(item);
+                      }
+                    }}
+                    onDragEnd={() => { dragState.current = null; }}
+                    onTap={() => activate(item)}
+                  >
+                    <div className="shelf-thumb">
+                      {item.thumb ? (
+                        <img src={item.thumb} alt="" draggable={false} />
+                      ) : text ? (
+                        <pre className={`shelf-preview${text.length < 24 ? " short" : ""}`}>{text}</pre>
+                      ) : (
+                        <span className="shelf-glyph">{item.kind === "text" ? "T" : "▤"}</span>
+                      )}
+                      {ext && !item.thumb && <span className="shelf-ext">{ext}</span>}
+                    </div>
+                    <span className="shelf-name">{copiedId === item.id ? t("shelf.copied") : item.name}</span>
+                    <button
+                      className="shelf-remove"
+                      title={t("shelf.remove")}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => { e.stopPropagation(); onRemove(item.id); }}
+                    >
+                      ×
+                    </button>
+                  </Reorder.Item>
+                );
+              })}
+            </AnimatePresence>
+          </Reorder.Group>
           <button className="shelf-clear" onClick={onClear}>{t("shelf.clear")}</button>
         </>
       )}

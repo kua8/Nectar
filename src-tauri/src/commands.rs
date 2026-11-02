@@ -5,7 +5,7 @@ use windows::Win32::Foundation::{HWND, LPARAM};
 use windows::Win32::UI::WindowsAndMessaging::EnumWindows;
 use std::sync::atomic::Ordering;
 
-use crate::types::{IntRect, AppInfo, BrightnessChangeEvent, WifiStatus, AudioSessionInfo, VolumeChangeEvent};
+use crate::types::{MediaInfo, IntRect, AppInfo, BrightnessChangeEvent, WifiStatus, AudioSessionInfo, VolumeChangeEvent};
 use crate::state::*;
 use crate::utils::*;
 use crate::services::{register_appbar, register_dock_appbar, sync_overlays, unregister_appbar_native, enum_windows_proc};
@@ -3970,6 +3970,11 @@ fn shelf_image_thumbnail(path: &str) -> Option<String> {
     let mut png_bytes: Vec<u8> = Vec::new();
     thumb.write_to(&mut std::io::Cursor::new(&mut png_bytes), image::ImageFormat::Png).ok()?;
     Some(format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(&png_bytes)))
+}
+
+#[tauri::command]
+pub fn get_media_info() -> Option<MediaInfo> {
+    crate::services::LAST_MEDIA.lock().ok().and_then(|last| last.clone())
 }
 
 #[tauri::command]

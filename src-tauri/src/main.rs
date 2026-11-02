@@ -143,6 +143,7 @@ fn main() {
             update_notch_rect,
             set_dock_hovered,
             set_notch_hovered,
+            get_media_info,
             set_notch_hidden,
             set_dock_dragging,
             get_active_windows,

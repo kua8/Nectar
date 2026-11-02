@@ -2421,19 +2421,43 @@ img {
 
 .shelf-item {
     position: relative;
-    flex: 0 0 54px;
+    flex: 0 0 60px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 3px;
-    cursor: pointer;
+    gap: 4px;
+    cursor: grab;
     user-select: none;
+    touch-action: none;
+}
+
+.shelf-item:active {
+    cursor: grabbing;
+}
+
+.shelf-item:hover .shelf-thumb {
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.shelf-panel.drop-active {
+    border-radius: 14px;
+    box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.45), inset 0 0 22px rgba(255, 255, 255, 0.1);
+    animation: shelf-drop-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes shelf-drop-pulse {
+    50% { box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.2), inset 0 0 10px rgba(255, 255, 255, 0.04); }
 }
 
 .shelf-thumb {
-    width: 48px;
-    height: 48px;
-    border-radius: 10px;
+    position: relative;
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-sizing: border-box;
+    transition: border-color 0.15s, background 0.15s;
     background: rgba(255, 255, 255, 0.1);
     display: flex;
     align-items: center;
@@ -2461,13 +2485,35 @@ img {
     color: rgba(255, 255, 255, 0.75);
 }
 
+.shelf-preview.short {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font: 600 11px/1.2 system-ui, sans-serif;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.shelf-ext {
+    position: absolute;
+    left: 4px;
+    bottom: 3px;
+    padding: 1px 4px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.45);
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: rgba(255, 255, 255, 0.8);
+}
+
 .shelf-glyph {
     font-size: 20px;
     color: rgba(255, 255, 255, 0.7);
 }
 
 .shelf-name {
-    width: 54px;
+    width: 60px;
     overflow: hidden;
     display: -webkit-box;
     -webkit-box-orient: vertical;

@@ -241,6 +241,7 @@ static WINDOW_CHANGE_APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 static LAST_WINDOW_CHANGE_MS: AtomicI64 = AtomicI64::new(0);
 pub static SELECTED_MEDIA_SOURCE: Mutex<Option<String>> = Mutex::new(None);
 static ACTIVE_MEDIA_SOURCE: Mutex<String> = Mutex::new(String::new());
+pub static LAST_MEDIA: Mutex<Option<crate::types::MediaInfo>> = Mutex::new(None);
 pub static MEDIA_REFRESH: AtomicBool = AtomicBool::new(false);
 
 fn media_app_name(source_id: &str) -> String {
@@ -868,6 +869,7 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
             let mut last_device_check = std::time::Instant::now();
             #[allow(clippy::type_complexity)]
             let mut last_emitted_info: Option<(String, String, bool, bool, Option<String>, i64, i64)> = None;
+            let mut art_attempts: (String, u32) = (String::new(), 0);
             let mut last_volume: f32 = -1.0;
             let mut last_sessions_json = String::new();
             let mut last_muted: bool = false;
@@ -1041,8 +1043,13 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                                             let artist = props.Artist().unwrap_or_default().to_string();
                                             let mut artwork = None;
                                             let mut got_art_from_cache = false;
+                                            let track_key = format!("{}|{}", title, artist);
+                                            if art_attempts.0 != track_key {
+                                                art_attempts = (track_key, 0);
+                                            }
                                             if let Some((ref last_title, ref last_artist, _, _, ref last_art, _, _)) = last_emitted_info {
-                                                if last_title == &title && last_artist == &artist {
+                                                // A track whose artwork failed to load is retried a few times, the player may not have it ready yet
+                                                if last_title == &title && last_artist == &artist && (last_art.is_some() || art_attempts.1 >= 8) {
                                                     artwork = last_art.as_ref().map(|art| vec![art.clone()]);
                                                     got_art_from_cache = true;
                                                 }
@@ -1065,6 +1072,9 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                                                     if all_bytes.is_empty() { return None; }
                                                     Some(vec![format!("data:{};base64,{}", content_type, general_purpose::STANDARD.encode(all_bytes))])
                                                 })();
+                                                if artwork.is_none() {
+                                                    art_attempts.1 += 1;
+                                                }
                                             }
 
                                             // Extract timeline properties for progress bar
@@ -1113,6 +1123,9 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                         let mut payload = current.clone();
                         if !art_is_new {
                             payload.artwork = None;
+                        }
+                        if let Ok(mut last) = LAST_MEDIA.lock() {
+                            *last = Some(current.clone());
                         }
                         let _ = handle_system.emit("media-update", payload);
                         ANY_MEDIA_PLAYING.store(current.is_playing, Ordering::Relaxed);
