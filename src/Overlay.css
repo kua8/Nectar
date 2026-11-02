@@ -199,6 +199,35 @@ body,
   flex-shrink: 0;
 }
 
+/* Output device picker, mirrors the mixer button at the other end of the bar. */
+.volume-notch-device {
+  width: 100%;
+  height: 20px;
+  margin-bottom: 2px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--nectar-text, white);
+  opacity: 0.6;
+  cursor: pointer;
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease;
+}
+
+.volume-notch-device:hover,
+.volume-notch-device.active {
+  opacity: 1;
+}
+
+.volume-notch-device:active {
+  transform: scale(0.92);
+}
+
 .volume-notch-bar {
   width: 10px;
   flex: 1;
@@ -316,13 +345,126 @@ body,
   width: 100%;
   flex: 1;
   min-height: 0;
-  /* Aligns the tile sliders with the main bar (17px from the card top) and
-     the tile logos with the main action button. */
-  padding: 16px 8px 14px;
+  /* The header above takes the output button's row, so the tile sliders line
+     up with the main bar and the tile logos with the main action button. */
+  padding: 0 8px 14px;
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: thin;
   scrollbar-color: var(--nectar-border, rgba(255, 255, 255, 0.2)) transparent;
+}
+
+/* Same height and offset as .volume-notch-device so both rows line up. */
+.volume-panel-header {
+  height: 20px;
+  margin: 16px 8px 2px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 4px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--nectar-text-muted, rgba(255, 255, 255, 0.6));
+  font-size: 10px;
+  font-weight: 600;
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  text-align: left;
+  min-width: 0;
+}
+
+.volume-panel-header.clickable {
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    color 0.16s ease;
+}
+
+.volume-panel-header.clickable:hover {
+  background: var(--nectar-group-bg, rgba(255, 255, 255, 0.06));
+  color: var(--nectar-text, white);
+}
+
+.volume-panel-header svg {
+  flex-shrink: 0;
+}
+
+.volume-panel-header-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.volume-device-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-height: 0;
+  padding: 0 8px 14px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--nectar-border, rgba(255, 255, 255, 0.2)) transparent;
+}
+
+.volume-device-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 26px;
+  flex-shrink: 0;
+  padding: 0 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--nectar-text, white);
+  font-size: 11px;
+  font-weight: 500;
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.16s ease;
+}
+
+.volume-device-row:hover {
+  background: var(--nectar-group-bg, rgba(255, 255, 255, 0.06));
+}
+
+.volume-device-row.selected {
+  background: var(--nectar-border, rgba(255, 255, 255, 0.12));
+  font-weight: 600;
+  cursor: default;
+}
+
+.volume-device-row.busy {
+  opacity: 0.6;
+}
+
+.volume-device-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.volume-device-list .volume-mixer-empty {
+  flex: 1;
 }
 
 .volume-mixer-empty {
