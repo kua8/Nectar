@@ -309,7 +309,8 @@ body {
   z-index: 2;
   transform-origin: bottom center;
   pointer-events: auto;
-  transition: padding 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  /* No CSS transition on padding: framer-motion animates the size, and a running
+     padding transition makes it measure the wrong target and snap at the end. */
   overflow: visible;
   /* Re-enable pointer events for the dock itself */
 }
