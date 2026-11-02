@@ -1089,6 +1089,9 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
         use windows::Win32::Foundation::{RECT, POINT};
         let mut last_visible = true;
         let mut last_dock_overlap: Option<bool> = None;
+        let mut last_dock_fullscreen: Option<bool> = None;
+        let mut last_notch_fullscreen: Option<bool> = None;
+        let mut last_secondary_dock_fullscreen = std::collections::HashMap::<String, (bool, Instant)>::new();
         let mut last_notch_overlap: Option<bool> = None;
         let mut last_dock_maximized: Option<bool> = None;
         let mut last_fg_maximized = false;
@@ -1296,6 +1299,18 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                 crate::state::set_overlap(crate::state::dock_overlap(), "dock", if effective_dock_overlap { 1 } else { 0 });
                 crate::state::set_overlap(crate::state::notch_overlap(), "main", if should_notch_overlap { 1 } else { 0 });
                 CURRENT_FOREGROUND_FULLSCREEN.store(current_is_fs, Ordering::Relaxed);
+                let fullscreen_on_dock = current_is_fs && fg_on("dock");
+                CURRENT_FOREGROUND_FULLSCREEN_ON_DOCK.store(fullscreen_on_dock, Ordering::Relaxed);
+                if Some(fullscreen_on_dock) != last_dock_fullscreen || last_emit.elapsed() >= Duration::from_secs(3) {
+                    let _ = handle_visibility.emit_to("dock", "dock-fullscreen", fullscreen_on_dock);
+                    last_dock_fullscreen = Some(fullscreen_on_dock);
+                }
+                let fullscreen_on_notch = current_is_fs && fg_on("main");
+                crate::state::set_flag(crate::state::notch_fullscreen(), "main", fullscreen_on_notch);
+                if Some(fullscreen_on_notch) != last_notch_fullscreen || last_emit.elapsed() >= Duration::from_secs(3) {
+                    let _ = handle_visibility.emit_to("main", "notch-fullscreen", fullscreen_on_notch);
+                    last_notch_fullscreen = Some(fullscreen_on_notch);
+                }
 
                 if Some(effective_dock_overlap) != last_dock_overlap || last_emit.elapsed() >= Duration::from_secs(3) {
                     let _ = handle_visibility.emit_to("dock", "dock-overlap", effective_dock_overlap);
@@ -1316,6 +1331,19 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                     }
                     let Ok(w_hwnd) = win.hwnd() else { continue };
                     let Some((mx, my, _mw, _mh)) = monitor_rect_for_hwnd(w_hwnd) else { continue };
+                    {
+                        let fullscreen_here = current_is_fs && fg_info.is_some_and(|(screen, _, _)| screen.left == mx && screen.top == my);
+                        if !is_dock {
+                            crate::state::set_flag(crate::state::notch_fullscreen(), &label, fullscreen_here);
+                        }
+                        let needs_update = last_secondary_dock_fullscreen.get(&label)
+                            .is_none_or(|(previous, sent_at)| *previous != fullscreen_here || sent_at.elapsed() >= Duration::from_secs(3));
+                        if needs_update {
+                            let event = if is_dock { "dock-fullscreen" } else { "notch-fullscreen" };
+                            let _ = handle_visibility.emit_to(label.as_str(), event, fullscreen_here);
+                            last_secondary_dock_fullscreen.insert(label.clone(), (fullscreen_here, now));
+                        }
+                    }
                     let overlap = match fg_info {
                         Some((screen, rect, covers)) if screen.left == mx && screen.top == my => {
                             if covers {
@@ -1409,7 +1437,13 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
 
 
 
-fn set_physical_monitors_brightness(brightness: u32) {
+static DDC_FOUND: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+static DDC_APPLIED: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+/// Returns how many external monitors were found and how many took the new value.
+fn set_physical_monitors_brightness(brightness: u32) -> (u32, u32) {
+    DDC_FOUND.store(0, Ordering::Relaxed);
+    DDC_APPLIED.store(0, Ordering::Relaxed);
     unsafe {
         use windows::Win32::Graphics::Gdi::{EnumDisplayMonitors, HDC, HMONITOR};
         use windows::Win32::Foundation::{RECT, LPARAM};
@@ -1447,6 +1481,24 @@ fn set_physical_monitors_brightness(brightness: u32) {
                     hMonitor: usize,
                     dwNewBrightness: u32,
                 ) -> BOOL;
+                fn GetMonitorBrightness(
+                    hMonitor: usize,
+                    pdwMinimumBrightness: *mut u32,
+                    pdwCurrentBrightness: *mut u32,
+                    pdwMaximumBrightness: *mut u32,
+                ) -> BOOL;
+                fn GetVCPFeatureAndVCPFeatureReply(
+                    hMonitor: usize,
+                    bVCPCode: u8,
+                    pvct: *mut u32,
+                    pdwCurrentValue: *mut u32,
+                    pdwMaximumValue: *mut u32,
+                ) -> BOOL;
+                fn SetVCPFeature(
+                    hMonitor: usize,
+                    bVCPCode: u8,
+                    dwNewValue: u32,
+                ) -> BOOL;
             }
 
             let mut count = 0u32;
@@ -1454,9 +1506,39 @@ fn set_physical_monitors_brightness(brightness: u32) {
                 let mut monitors = vec![std::mem::zeroed::<PHYSICAL_MONITOR>(); count as usize];
                 if GetPhysicalMonitorsFromHMONITOR(hmonitor, count, monitors.as_mut_ptr()).as_bool() {
                     for mon in &monitors {
-                        if mon.h_physical_monitor != 0 {
-                            let _ = SetMonitorBrightness(mon.h_physical_monitor, brightness);
+                        // 0 is a valid handle here, the first monitor gets it.
+                        let handle = mon.h_physical_monitor;
+                        DDC_FOUND.fetch_add(1, Ordering::Relaxed);
+                        // VCP 0x10 is brightness. Unlike the high-level call it needs no capabilities string, which many DisplayPort monitors lack.
+                        let (mut kind, mut cur, mut vcp_max) = (0u32, 0u32, 0u32);
+                        if !GetVCPFeatureAndVCPFeatureReply(handle, 0x10, &mut kind, &mut cur, &mut vcp_max).as_bool() || vcp_max == 0 {
+                            vcp_max = 100;
                         }
+                        let target = vcp_max * brightness / 100;
+                        let mut done = false;
+                        for attempt in 0..3 {
+                            if SetVCPFeature(handle, 0x10, target).as_bool() {
+                                done = true;
+                                break;
+                            }
+                            if attempt < 2 {
+                                std::thread::sleep(std::time::Duration::from_millis(60));
+                            }
+                        }
+                        if done {
+                            DDC_APPLIED.fetch_add(1, Ordering::Relaxed);
+                            continue;
+                        }
+                        let (mut min, mut now, mut max) = (0u32, 0u32, 0u32);
+                        if GetMonitorBrightness(handle, &mut min, &mut now, &mut max).as_bool() && max > min
+                            && SetMonitorBrightness(handle, min + (max - min) * brightness / 100).as_bool()
+                        {
+                            DDC_APPLIED.fetch_add(1, Ordering::Relaxed);
+                            continue;
+                        }
+                        let code = windows::Win32::Foundation::GetLastError().0;
+                        let name = String::from_utf16_lossy(&mon.sz_physical_monitor_description).trim_end_matches('\0').to_string();
+                        crate::diagnostics::log(&format!("brightness: monitor \"{name}\" did not accept a brightness change over DDC/CI, error {code}"));
                     }
                     let _ = DestroyPhysicalMonitors(count, monitors.as_mut_ptr());
                 }
@@ -1469,6 +1551,21 @@ fn set_physical_monitors_brightness(brightness: u32) {
             Some(monitor_enum_proc),
             LPARAM(brightness as isize),
         );
+    }
+    (DDC_FOUND.load(Ordering::Relaxed), DDC_APPLIED.load(Ordering::Relaxed))
+}
+
+/// Keeps external monitors working when the laptop WMI setup fails.
+fn external_brightness_only(rx: std::sync::mpsc::Receiver<u32>) {
+    crate::diagnostics::log("brightness: WMI unavailable, controlling external monitors only");
+    while let Ok(mut brightness) = rx.recv() {
+        while let Ok(newer) = rx.try_recv() {
+            brightness = newer;
+        }
+        let (found, applied) = set_physical_monitors_brightness(brightness.min(100));
+        if found > 0 && applied == 0 {
+            crate::diagnostics::log(&format!("brightness: {found} external monitor(s) found, none accepted {brightness}"));
+        }
     }
 }
 
@@ -1490,6 +1587,7 @@ pub fn setup_brightness_worker() {
             Ok(l) => l,
             Err(_) => {
                 let _ = CoUninitialize();
+                external_brightness_only(rx);
                 return;
             }
         };
@@ -1499,6 +1597,7 @@ pub fn setup_brightness_worker() {
             Ok(s) => s,
             Err(_) => {
                 let _ = CoUninitialize();
+                external_brightness_only(rx);
                 return;
             }
         };
@@ -1576,7 +1675,10 @@ pub fn setup_brightness_worker() {
             }
 
             // 2. Desktop external monitor via Physical Monitor API (DXVA2 DDC/CI)
-            set_physical_monitors_brightness(brightness);
+            let (found, applied) = set_physical_monitors_brightness(brightness);
+            if found > 0 && applied == 0 {
+                crate::diagnostics::log(&format!("brightness: {found} external monitor(s) found, none accepted {brightness}"));
+            }
 
 
         }
@@ -1802,13 +1904,22 @@ fn setup_volume_mixer_watchdog(app_handle: AppHandle) {
         if SHUTTING_DOWN.load(Ordering::Relaxed) {
             continue;
         }
-        let Some((rx, ry, rw, rh)) = volume_mixer_physical_rect_for(&app_handle) else {
-            continue;
-        };
         let mut pt = windows::Win32::Foundation::POINT::default();
         if unsafe { windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut pt) }.is_err() {
             continue;
         }
+        // The hook goes silent over elevated windows (Task Manager), so a stale click-through state would block them.
+        if pt.x != MOUSE_X.load(Ordering::Relaxed) || pt.y != MOUSE_Y.load(Ordering::Relaxed) {
+            MOUSE_X.store(pt.x, Ordering::Relaxed);
+            MOUSE_Y.store(pt.y, Ordering::Relaxed);
+            MOUSE_DIRTY.store(true, Ordering::Relaxed);
+            if let Some(worker) = MOUSE_WORKER.get() {
+                worker.unpark();
+            }
+        }
+        let Some((rx, ry, rw, rh)) = volume_mixer_physical_rect_for(&app_handle) else {
+            continue;
+        };
         let inside = pt.x >= rx && pt.x <= rx + rw && pt.y >= ry && pt.y <= ry + rh;
         if inside {
             continue;
@@ -1878,6 +1989,16 @@ fn in_show_desktop_corner(x: i32, y: i32) -> bool {
     };
     let (right, bottom) = (mx + mw as i32, my + mh as i32);
     x >= right - CORNER && x < right && y >= bottom - CORNER && y < bottom
+}
+
+/// Smart and Peek notches stay hidden while a fullscreen window covers their monitor.
+fn notch_suppressed(app_handle: &AppHandle, label: &str) -> bool {
+    crate::state::get_flag(crate::state::notch_fullscreen(), label)
+        && crate::monitors::resolve_mode_for_label(app_handle, crate::types::WindowKind::Notch, label) != "fixed"
+}
+
+fn dock_edge_hover_allowed(fullscreen_on_dock: bool, at_bottom_edge: bool, dock_hovered: bool) -> bool {
+    !fullscreen_on_dock && (at_bottom_edge || dock_hovered)
 }
 
 unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Foundation::POINT) {
@@ -1950,6 +2071,7 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
             let (notch_mon_w, _notch_mon_h) = (notch_cached_size.0 as i32, notch_cached_size.1 as i32);
 
             let fg_fs = CURRENT_FOREGROUND_FULLSCREEN.load(Ordering::Relaxed);
+            let dock_fg_fs = CURRENT_FOREGROUND_FULLSCREEN_ON_DOCK.load(Ordering::Relaxed);
 
             // --- Dock Interaction ---
             if let Some(dock_win) = app_handle.get_webview_window("dock") {
@@ -2015,14 +2137,17 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
                     let at_bottom_edge = cursor.y >= (dock_mon_y + dock_mon_h - (8.0 * scale) as i32) &&
                                          cursor.x >= dock_mon_x && cursor.x <= (dock_mon_x + dock_mon_w);
 
-                    if at_bottom_edge || in_dock_hover {
+                    if dock_fg_fs {
+                        MH_DOCK_EXPIRY_MS.store(0, Ordering::Relaxed);
+                    }
+                    if dock_edge_hover_allowed(dock_fg_fs, at_bottom_edge, in_dock_hover) {
                         is_hovered = true;
                         MH_DOCK_EXPIRY_MS.store(now + 500, Ordering::Relaxed);
                     }
 
                     // Approaching along the bottom edge keeps the dock interactive
                     // while near its horizontal span, so the reveal can't be clicked
-                    if at_bottom_edge && !fg_fs {
+                    if at_bottom_edge && !dock_fg_fs {
                         if let Some((span_left, span_right)) = dock_span {
                             let edge_pad = (60.0 * scale) as i32;
                             if cursor.x >= span_left - edge_pad && cursor.x <= span_right + edge_pad {
@@ -2047,9 +2172,9 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
                         dbg_scale, dbg_box, is_click_interactive, MH_LAST_DOCK_IGNORE.load(Ordering::Relaxed),
                     ));
 
-                    let should_ignore = !is_click_interactive
+                    let should_ignore = dock_fg_fs || (!is_click_interactive
                         && !MENU_IS_OPEN.load(Ordering::Relaxed)
-                        && !DOCK_IS_DRAGGING.load(Ordering::Relaxed);
+                        && !DOCK_IS_DRAGGING.load(Ordering::Relaxed));
                     let prev_ignore = MH_LAST_DOCK_IGNORE.load(Ordering::Relaxed);
                     let new_ignore = if should_ignore { 1 } else { 0 };
                     if prev_ignore != new_ignore {
@@ -2071,13 +2196,17 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
             {
                 if let Some(main_win) = app_handle.get_webview_window("main") {
                     if main_win.is_visible().unwrap_or(false) {
-                        let in_notch_hover = crate::state::get_flag(crate::state::notch_hovered(), "main");
+                        let notch_fs = notch_suppressed(app_handle, "main");
+                        let in_notch_hover = !notch_fs && crate::state::get_flag(crate::state::notch_hovered(), "main");
                         let mut is_notch_hovered = false;
                         let scale = main_win.scale_factor().unwrap_or(1.0);
                         let in_top_band = cursor.y <= (notch_mon_y + (8.0 * scale) as i32) &&
                                           cursor.x >= notch_mon_x && cursor.x <= (notch_mon_x + notch_mon_w);
-                        let at_top_edge = top_edge_armed(app_handle, "main", in_top_band, now);
+                        let at_top_edge = top_edge_armed(app_handle, "main", in_top_band && !notch_fs, now);
 
+                        if notch_fs {
+                            MH_TOPBAR_EXPIRY_MS.store(0, Ordering::Relaxed);
+                        }
                         if at_top_edge || in_notch_hover {
                             is_notch_hovered = true;
                             MH_TOPBAR_EXPIRY_MS.store(now + 500, Ordering::Relaxed);
@@ -2152,7 +2281,7 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
                             scale, dbg_box, is_click_interactive, at_top_edge, MH_LAST_MAIN_IGNORE.load(Ordering::Relaxed),
                         ));
 
-                        let final_ignore = !is_click_interactive && !MENU_IS_OPEN.load(Ordering::Relaxed);
+                        let final_ignore = notch_fs || (!is_click_interactive && !MENU_IS_OPEN.load(Ordering::Relaxed));
                         let prev_ignore = MH_LAST_MAIN_IGNORE.load(Ordering::Relaxed);
                         let new_ignore = if final_ignore { 1 } else { 0 };
                         if prev_ignore != new_ignore {
@@ -2444,12 +2573,16 @@ fn hit_test_extra_notch_windows(app_handle: &AppHandle, cursor: windows::Win32::
         let Some((mon_x, mon_y, mon_w, _mon_h)) = monitor_rect_for_hwnd(hwnd) else { continue };
 
         let scale = main_win.scale_factor().unwrap_or(1.0);
-        let in_notch_hover = crate::state::get_flag(crate::state::notch_hovered(), &label);
+        let notch_fs = notch_suppressed(app_handle, &label);
+        let in_notch_hover = !notch_fs && crate::state::get_flag(crate::state::notch_hovered(), &label);
         let in_top_band = cursor.y <= (mon_y + (8.0 * scale) as i32) &&
                           cursor.x >= mon_x && cursor.x <= (mon_x + mon_w);
-        let at_top_edge = top_edge_armed(app_handle, &label, in_top_band, now);
+        let at_top_edge = top_edge_armed(app_handle, &label, in_top_band && !notch_fs, now);
 
         let mut is_notch_hovered = false;
+        if notch_fs {
+            crate::state::set_i64(crate::state::notch_extra_expiry_ms(), &label, 0);
+        }
         if at_top_edge || in_notch_hover {
             is_notch_hovered = true;
             crate::state::set_i64(crate::state::notch_extra_expiry_ms(), &label, now + 500);
@@ -2501,7 +2634,7 @@ fn hit_test_extra_notch_windows(app_handle: &AppHandle, cursor: windows::Win32::
             crate::state::set_i32(crate::state::notch_extra_last_edge_hover(), &label, new_hover);
         }
 
-        let final_ignore = !is_click_interactive && !MENU_IS_OPEN.load(Ordering::Relaxed);
+        let final_ignore = notch_fs || (!is_click_interactive && !MENU_IS_OPEN.load(Ordering::Relaxed));
         let prev_ignore = crate::state::get_i32(crate::state::notch_extra_last_ignore(), &label, -1);
         let new_ignore = if final_ignore { 1 } else { 0 };
         if prev_ignore != new_ignore {
@@ -3519,7 +3652,21 @@ fn recover_from_webview_failure(handle: &AppHandle) {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_helper_name, is_launchable_entry, win_number_index};
+    use super::{dock_edge_hover_allowed, is_helper_name, is_launchable_entry, win_number_index};
+
+    #[test]
+    fn fullscreen_dock_does_not_reveal_on_edge_or_hover() {
+        assert!(!dock_edge_hover_allowed(true, true, false));
+        assert!(!dock_edge_hover_allowed(true, false, true));
+        assert!(!dock_edge_hover_allowed(true, true, true));
+    }
+
+    #[test]
+    fn ordinary_dock_preserves_edge_and_hover_reveal() {
+        assert!(dock_edge_hover_allowed(false, true, false));
+        assert!(dock_edge_hover_allowed(false, false, true));
+        assert!(!dock_edge_hover_allowed(false, false, false));
+    }
 
     #[test]
     fn win_number_maps_top_row_digits_only() {

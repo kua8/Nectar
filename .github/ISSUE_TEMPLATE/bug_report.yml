@@ -37,12 +37,16 @@ body:
       options:
         - Dock
         - Notch
+        - Control Center
         - Calendar / calendar sync
         - Timer / stopwatch
         - Settings
         - Installer / uninstaller
         - Auto-update
         - Tray
+        - Audio / media
+        - Multiple monitors
+        - Language / translation
         - Something else
     validations:
       required: true
@@ -76,8 +80,10 @@ body:
     id: diagnostics
     attributes:
       label: Diagnostics
-      description: In Settings › About, click **Copy Diagnostics** and paste the result here. For logs, use **Open Log Folder** and attach `nectar.log`.
+      description: Required. In Settings › About, click **Copy Diagnostics** and paste the result here. It includes the Nectar version, Windows build, monitors and recent log, so we don't have to guess. If Nectar won't open, say so here.
       render: text
+    validations:
+      required: true
 
   - type: textarea
     id: screenshots
