@@ -24,6 +24,7 @@ import { t as translate, useT } from "./i18n";
 import { NotchShelf, useShelf } from "./components/NotchShelf";
 import { parseCcLayout, parsePanelOrder, resolveCcLayout, type CcKind } from "./panelOrder";
 import { NotchProgressBorder } from "./components/NotchProgressBorder";
+import { EdgeOutline } from "./components/EdgeOutline";
 import type { WidgetConfig } from "./components/StatusWidgetConfig";
 import {
   DEFAULT_DUAL_CLOCK_ZONE,
@@ -2699,6 +2700,8 @@ function App() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        <EdgeOutline edge="top" flare={isImpacted ? 13 : 0} radius={isCalendarMode ? 28 : 18} edgeRadius={18} />
 
         {showTimerProgressBar && (
           <NotchProgressBorder

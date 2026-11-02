@@ -5,6 +5,7 @@ import { listen } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import './Dock.css';
 import './surfaces.css';
+import { EdgeOutline } from "./components/EdgeOutline";
 import { initTheme } from './theme';
 import { useSettingsSync } from './hooks/useSettingsSync';
 import { useT } from './i18n';
@@ -1158,6 +1159,7 @@ const Dock = memo(function Dock() {
       >
         <div className="surface-backdrop" aria-hidden="true" />
         <div className="surface-backdrop-corners" aria-hidden="true" />
+        {isExpanded && !isHidden && <EdgeOutline edge="bottom" flare={13} radius={18} />}
         <AnimatePresence>
           {isExpanded && (
             <motion.div

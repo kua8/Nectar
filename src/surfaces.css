@@ -18,8 +18,7 @@
         var(--surface-grain),
         linear-gradient(180deg, rgba(255, 255, 255, 0.17), rgba(255, 255, 255, 0.1));
     box-shadow:
-        inset 0 0 0 0.5px rgba(255, 255, 255, 0.18),
-        0 8px 24px rgba(0, 0, 0, 0.22);
+        inset 0 0 0 0.5px rgba(255, 255, 255, 0.18);
 }
 
 .style-frosted.light-mode .nectar,
@@ -30,8 +29,7 @@
         var(--surface-grain),
         linear-gradient(180deg, rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.22));
     box-shadow:
-        inset 0 0 0 0.5px rgba(255, 255, 255, 0.6),
-        0 8px 24px rgba(0, 0, 0, 0.1);
+        inset 0 0 0 0.5px rgba(255, 255, 255, 0.6);
 }
 
 /* ── Liquid glass: clear body, bright specular rims, sheen and depth ── */
@@ -48,8 +46,7 @@
         inset 0 -1px 1.5px rgba(255, 255, 255, 0.42),
         inset 1px 0 1px rgba(255, 255, 255, 0.16),
         inset -1px 0 1px rgba(255, 255, 255, 0.16),
-        inset 0 0 16px rgba(255, 255, 255, 0.1),
-        0 10px 30px rgba(0, 0, 0, 0.3);
+        inset 0 0 16px rgba(255, 255, 255, 0.1);
 }
 
 /* The notch hangs from the top edge, so its lower lip catches the light instead. Fixed-height
@@ -62,8 +59,7 @@
         inset 0 -1px 1.5px rgba(255, 255, 255, 0.45),
         inset 1px 0 1px rgba(255, 255, 255, 0.16),
         inset -1px 0 1px rgba(255, 255, 255, 0.16),
-        inset 0 -6px 16px rgba(255, 255, 255, 0.08),
-        0 10px 30px rgba(0, 0, 0, 0.3);
+        inset 0 -6px 16px rgba(255, 255, 255, 0.08);
 }
 
 /* The dock sits on the bottom edge, so light comes in from above */
@@ -75,8 +71,7 @@
         inset 0 1px 1.5px rgba(255, 255, 255, 0.45),
         inset 1px 0 1px rgba(255, 255, 255, 0.16),
         inset -1px 0 1px rgba(255, 255, 255, 0.16),
-        inset 0 6px 16px rgba(255, 255, 255, 0.08),
-        0 -6px 30px rgba(0, 0, 0, 0.25);
+        inset 0 6px 16px rgba(255, 255, 255, 0.08);
 }
 
 /* Dense content (calendar grid, command center) needs a thicker fill than the pill to stay readable */
@@ -123,12 +118,10 @@
 }
 
 .has-backdrop:is(.style-frosted, .style-liquid) .dock {
-    --glass-tint: color-mix(in srgb, var(--nectar-bg, rgba(0, 0, 0, 0.8)) 62%, transparent);
-    box-shadow: 0 -6px 30px rgba(0, 0, 0, 0.25);
+    --glass-tint: color-mix(in srgb, var(--nectar-bg, rgba(0, 0, 0, 0.8)) 62%, transparent);
 }
 
-.has-backdrop:is(.style-frosted, .style-liquid) .nectar {
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+.has-backdrop:is(.style-frosted, .style-liquid) .nectar {
 }
 
 .has-backdrop:is(.style-frosted, .style-liquid) :is(.surface-backdrop, .surface-backdrop-corners) {
@@ -251,114 +244,108 @@
         inset 0 8px 18px rgba(255, 255, 255, 0.1);
 }
 
-/* ── Edge-flush sides carry no rim ──
-   The notch hangs from the top edge, the dock sits on the bottom edge, the volume panel on the left
-   and brightness panel on the right. A rim along the side that touches the screen shows up as a
-   stray line, so each surface gets its rim on the other sides only. Keep after the style rules. */
+/* The concave corners get the same haze (and grain) as the body so they don't read as a darker block */
 
-.style-frosted .nectar {
-    box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.18), inset -0.5px 0 0 rgba(255, 255, 255, 0.18), inset 0 -0.5px 0 rgba(255, 255, 255, 0.18), 0 8px 24px rgba(0, 0, 0, 0.22);
+.has-backdrop.style-frosted .nectar > .surface-backdrop-corners {
+    background-image: var(--surface-grain), linear-gradient(rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.07)), linear-gradient(var(--glass-tint), var(--glass-tint)), var(--backdrop-image);
+    background-size: auto, auto, auto, var(--backdrop-size);
+    background-position: 0 0, 0 0, 0 0, var(--backdrop-x) var(--backdrop-top);
+    background-repeat: repeat, no-repeat, no-repeat, no-repeat;
 }
 
-.style-frosted .dock {
-    box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.18), inset -0.5px 0 0 rgba(255, 255, 255, 0.18), inset 0 0.5px 0 rgba(255, 255, 255, 0.18), 0 -8px 24px rgba(0, 0, 0, 0.22);
+.has-backdrop.style-frosted .dock > .surface-backdrop-corners {
+    background-image: var(--surface-grain), linear-gradient(rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.04)), linear-gradient(var(--glass-tint), var(--glass-tint)), var(--backdrop-image);
+    background-size: auto, auto, auto, var(--backdrop-size);
+    background-position: 0 0, 0 0, 0 0, var(--backdrop-x) var(--backdrop-bottom);
+    background-repeat: repeat, no-repeat, no-repeat, no-repeat;
 }
 
-.style-frosted .volume-notch {
-    box-shadow: inset -0.5px 0 0 rgba(255, 255, 255, 0.18), inset 0 0.5px 0 rgba(255, 255, 255, 0.18), inset 0 -0.5px 0 rgba(255, 255, 255, 0.18), 0 8px 24px rgba(0, 0, 0, 0.22);
+.has-backdrop.style-frosted.light-mode .nectar > .surface-backdrop-corners {
+    background-image: var(--surface-grain), linear-gradient(rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.22)), linear-gradient(var(--glass-tint), var(--glass-tint)), var(--backdrop-image);
+    background-size: auto, auto, auto, var(--backdrop-size);
+    background-position: 0 0, 0 0, 0 0, var(--backdrop-x) var(--backdrop-top);
+    background-repeat: repeat, no-repeat, no-repeat, no-repeat;
 }
 
-.style-frosted .brightness-notch {
-    box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.18), inset 0 0.5px 0 rgba(255, 255, 255, 0.18), inset 0 -0.5px 0 rgba(255, 255, 255, 0.18), 0 8px 24px rgba(0, 0, 0, 0.22);
+.has-backdrop.style-frosted.light-mode .dock > .surface-backdrop-corners {
+    background-image: var(--surface-grain), linear-gradient(rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0.13)), linear-gradient(var(--glass-tint), var(--glass-tint)), var(--backdrop-image);
+    background-size: auto, auto, auto, var(--backdrop-size);
+    background-position: 0 0, 0 0, 0 0, var(--backdrop-x) var(--backdrop-bottom);
+    background-repeat: repeat, no-repeat, no-repeat, no-repeat;
 }
 
-.style-frosted.light-mode .nectar {
-    box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.6), inset -0.5px 0 0 rgba(255, 255, 255, 0.6), inset 0 -0.5px 0 rgba(255, 255, 255, 0.6), 0 8px 24px rgba(0, 0, 0, 0.1);
+.has-backdrop.style-liquid .nectar > .surface-backdrop-corners {
+    background-image: linear-gradient(rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05)), linear-gradient(var(--glass-tint), var(--glass-tint)), var(--backdrop-image);
+    background-size: auto, auto, var(--backdrop-size);
+    background-position: 0 0, 0 0, var(--backdrop-x) var(--backdrop-top);
+    background-repeat: no-repeat, no-repeat, no-repeat;
 }
 
-.style-frosted.light-mode .dock {
-    box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.6), inset -0.5px 0 0 rgba(255, 255, 255, 0.6), inset 0 0.5px 0 rgba(255, 255, 255, 0.6), 0 -8px 24px rgba(0, 0, 0, 0.1);
+.has-backdrop.style-liquid .dock > .surface-backdrop-corners {
+    background-image: linear-gradient(rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05)), linear-gradient(var(--glass-tint), var(--glass-tint)), var(--backdrop-image);
+    background-size: auto, auto, var(--backdrop-size);
+    background-position: 0 0, 0 0, var(--backdrop-x) var(--backdrop-bottom);
+    background-repeat: no-repeat, no-repeat, no-repeat;
 }
 
-.style-frosted.light-mode .volume-notch {
-    box-shadow: inset -0.5px 0 0 rgba(255, 255, 255, 0.6), inset 0 0.5px 0 rgba(255, 255, 255, 0.6), inset 0 -0.5px 0 rgba(255, 255, 255, 0.6), 0 8px 24px rgba(0, 0, 0, 0.1);
+/* ── Outline ──
+   EdgeOutline.tsx draws one line that follows the whole surface, flares included, and stops at the
+   screen edge, so the glass, Material and light surfaces take their outline from it instead of a
+   box-shadow rim (which runs straight down the sides and stops where the flare starts). */
+
+.edge-outline {
+    display: none;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+    z-index: 3;
 }
 
-.style-frosted.light-mode .brightness-notch {
-    box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.6), inset 0 0.5px 0 rgba(255, 255, 255, 0.6), inset 0 -0.5px 0 rgba(255, 255, 255, 0.6), 0 8px 24px rgba(0, 0, 0, 0.1);
+.edge-outline path {
+    fill: none;
+    stroke: var(--surface-outline, rgba(255, 255, 255, 0.22));
+    stroke-width: 1;
+    stroke-linecap: round;
+    stroke-linejoin: round;
 }
 
-.style-liquid .volume-notch {
-    box-shadow:
-        inset 0 1px 1px rgba(255, 255, 255, 0.3),
-        inset 0 -1px 1.5px rgba(255, 255, 255, 0.42),
-        inset -1px 0 1px rgba(255, 255, 255, 0.16),
-        inset 0 0 16px rgba(255, 255, 255, 0.1),
-        0 10px 30px rgba(0, 0, 0, 0.3);
+:root.light-mode {
+    --surface-outline: rgba(0, 0, 0, 0.14);
 }
 
-.style-liquid .brightness-notch {
-    box-shadow:
-        inset 0 1px 1px rgba(255, 255, 255, 0.3),
-        inset 0 -1px 1.5px rgba(255, 255, 255, 0.42),
-        inset 1px 0 1px rgba(255, 255, 255, 0.16),
-        inset 0 0 16px rgba(255, 255, 255, 0.1),
-        0 10px 30px rgba(0, 0, 0, 0.3);
+:root.style-material {
+    --surface-outline: var(--nectar-border, rgba(255, 255, 255, 0.16));
 }
 
-.style-material .nectar {
-    box-shadow: inset 1px 0 0 var(--nectar-border, rgba(255, 255, 255, 0.12)), inset -1px 0 0 var(--nectar-border, rgba(255, 255, 255, 0.12)), inset 0 -1px 0 var(--nectar-border, rgba(255, 255, 255, 0.12));
+:root:is(.style-frosted, .style-liquid, .style-material, .light-mode) .edge-outline {
+    display: block;
 }
 
-.style-material .dock {
-    box-shadow: inset 1px 0 0 var(--nectar-border, rgba(255, 255, 255, 0.12)), inset -1px 0 0 var(--nectar-border, rgba(255, 255, 255, 0.12)), inset 0 1px 0 var(--nectar-border, rgba(255, 255, 255, 0.12));
+:root:is(.style-frosted, .style-liquid, .style-material, .light-mode) :is(.nectar, .dock, .volume-notch, .brightness-notch),
+:root:is(.style-frosted, .style-liquid, .style-material, .light-mode) :is(.nectar, .dock) > .surface-backdrop {
+    box-shadow: none !important;
 }
 
-.style-material .volume-notch {
-    box-shadow: inset -1px 0 0 var(--nectar-border, rgba(255, 255, 255, 0.12)), inset 0 1px 0 var(--nectar-border, rgba(255, 255, 255, 0.12)), inset 0 -1px 0 var(--nectar-border, rgba(255, 255, 255, 0.12));
+:root.style-liquid :is(.nectar, .dock, .volume-notch, .brightness-notch),
+:root.style-liquid :is(.nectar, .dock) > .surface-backdrop {
+    box-shadow: inset 0 0 16px rgba(255, 255, 255, 0.1) !important;
 }
 
-.style-material .brightness-notch {
-    box-shadow: inset 1px 0 0 var(--nectar-border, rgba(255, 255, 255, 0.12)), inset 0 1px 0 var(--nectar-border, rgba(255, 255, 255, 0.12)), inset 0 -1px 0 var(--nectar-border, rgba(255, 255, 255, 0.12));
+:root:is(.style-frosted, .style-liquid, .style-material, .light-mode) :is(.volume-notch, .brightness-notch) {
+    border-color: transparent !important;
 }
 
-/* The wallpaper copy behind the notch and dock draws its own rim on the body */
-.has-backdrop.style-frosted .nectar > .surface-backdrop {
-    box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.2), inset -0.5px 0 0 rgba(255, 255, 255, 0.2), inset 0 -0.5px 0 rgba(255, 255, 255, 0.2);
-}
-
-.has-backdrop.style-frosted .dock > .surface-backdrop {
-    box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.2), inset -0.5px 0 0 rgba(255, 255, 255, 0.2), inset 0 0.5px 0 rgba(255, 255, 255, 0.2);
-}
-
-.has-backdrop.style-frosted.light-mode .nectar > .surface-backdrop {
-    box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.6), inset -0.5px 0 0 rgba(255, 255, 255, 0.6), inset 0 -0.5px 0 rgba(255, 255, 255, 0.6);
-}
-
-.has-backdrop.style-frosted.light-mode .dock > .surface-backdrop {
-    box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.6), inset -0.5px 0 0 rgba(255, 255, 255, 0.6), inset 0 0.5px 0 rgba(255, 255, 255, 0.6);
+:root:is(.style-frosted, .style-liquid, .style-material, .light-mode) :is(.volume-notch-flares, .brightness-notch)::before,
+:root:is(.style-frosted, .style-liquid, .style-material, .light-mode) :is(.volume-notch-flares, .brightness-notch)::after {
+    background: var(--nectar-bg, rgba(0, 0, 0, 0.8)) !important;
 }
 
 /* ── Light mode polish ──
-   White on a light wallpaper has no edge, so the solid and Material surfaces get a hairline and a
-   soft shadow (never on the side that touches the screen), tiles get a real fill, and the album
+   Light surfaces get their edge from the outline above, dock tiles get a real fill, and the album
    glow is toned down so it tints the panel instead of flooding it. */
-
-.light-mode.style-solid .nectar {
-    box-shadow: inset 1px 0 0 rgba(0, 0, 0, 0.07), inset -1px 0 0 rgba(0, 0, 0, 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.07), 0 10px 28px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.08);
-}
-
-.light-mode.style-solid .dock {
-    box-shadow: inset 1px 0 0 rgba(0, 0, 0, 0.07), inset -1px 0 0 rgba(0, 0, 0, 0.07), inset 0 1px 0 rgba(0, 0, 0, 0.07), 0 -8px 26px rgba(0, 0, 0, 0.14), 0 -2px 6px rgba(0, 0, 0, 0.07);
-}
-
-.light-mode.style-solid .volume-notch {
-    box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.07), inset 0 1px 0 rgba(0, 0, 0, 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.07), 6px 0 24px rgba(0, 0, 0, 0.14);
-}
-
-.light-mode.style-solid .brightness-notch {
-    box-shadow: inset 1px 0 0 rgba(0, 0, 0, 0.07), inset 0 1px 0 rgba(0, 0, 0, 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.07), -6px 0 24px rgba(0, 0, 0, 0.14);
-}
 
 .light-mode .dock-icon {
     background: rgba(0, 0, 0, 0.055);
