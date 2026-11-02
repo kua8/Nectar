@@ -70,6 +70,9 @@ export function useSettings() {
   );
   const [mediaAmbienceEnabled, setMediaAmbienceEnabled] = useState(true);
   const [mediaCompactGlowEnabled, setMediaCompactGlowEnabled] = useState(true);
+  const [mediaArtworkThemeEnabled, setMediaArtworkThemeEnabled] = useState(
+    () => localStorage.getItem("nectar-media-artwork-theme") === "true"
+  );
   const [mediaLayout, setMediaLayout] = useState<"classic" | "compact">(
     () => (localStorage.getItem("nectar-media-layout") as "classic" | "compact") || "classic"
   );
@@ -232,6 +235,7 @@ export function useSettings() {
       apply(getVal("nectar-brightness-overlay-enabled"), setBrightnessOverlayEnabled, readBool);
       apply(getVal("nectar-media-ambience-enabled"), setMediaAmbienceEnabled, readBool);
       apply(getVal("nectar-media-compact-glow-enabled"), setMediaCompactGlowEnabled, readBool);
+      apply(getVal("nectar-media-artwork-theme"), setMediaArtworkThemeEnabled, (v) => v === "true");
       apply(getVal("nectar-corners-enabled"), setCornersEnabled, readBool);
       apply(getVal("nectar-time-format-24h"), setTimeFormat24h, readBool);
       apply(getVal("nectar-legacy-mode"), setLegacyMode, readBool);
@@ -381,6 +385,7 @@ export function useSettings() {
     "nectar-notch-remember-mode": setRememberMode,
     "nectar-media-ambience-enabled": setMediaAmbienceEnabled,
     "nectar-media-compact-glow-enabled": setMediaCompactGlowEnabled,
+    "nectar-media-artwork-theme": setMediaArtworkThemeEnabled,
     "nectar-media-layout": setMediaLayout,
     "nectar-corners-enabled": setCornersEnabled,
     "nectar-show-update-indicator": setShowUpdateIndicator,
@@ -641,6 +646,12 @@ export function useSettings() {
     const next = !mediaCompactGlowEnabled;
     setMediaCompactGlowEnabled(next);
     saveSetting("nectar-media-compact-glow-enabled", String(next));
+  };
+
+  const toggleArtworkTheme = () => {
+    const next = !mediaArtworkThemeEnabled;
+    setMediaArtworkThemeEnabled(next);
+    saveSetting("nectar-media-artwork-theme", String(next));
   };
 
   const toggleCorners = () => {
@@ -1103,6 +1114,8 @@ export function useSettings() {
     toggleAmbience,
     mediaCompactGlowEnabled,
     toggleCompactGlow,
+    mediaArtworkThemeEnabled,
+    toggleArtworkTheme,
 
     // Weather
     weatherEnabled,
