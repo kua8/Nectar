@@ -57,12 +57,27 @@
     box-shadow: none !important;
 }
 
-:root:is(.style-material, .light-mode) :is(.volume-notch, .brightness-notch) {
+/* The volume and brightness panels always take their outline from the shape (the old border and
+   the ring drawn on their flares tapered off at the corners), in every style */
+.volume-notch-wrapper > .edge-outline,
+.brightness-notch-wrapper > .edge-outline {
+    display: block;
+}
+
+.volume-notch-wrapper,
+.brightness-notch-wrapper {
+    --surface-outline: var(--nectar-border, rgba(255, 255, 255, 0.12));
+}
+
+.volume-notch,
+.brightness-notch {
     border-color: transparent !important;
 }
 
-:root:is(.style-material, .light-mode) :is(.volume-notch-flares, .brightness-notch)::before,
-:root:is(.style-material, .light-mode) :is(.volume-notch-flares, .brightness-notch)::after {
+.volume-notch-flares::before,
+.volume-notch-flares::after,
+.brightness-notch::before,
+.brightness-notch::after {
     background: var(--nectar-bg, rgba(0, 0, 0, 0.8)) !important;
 }
 

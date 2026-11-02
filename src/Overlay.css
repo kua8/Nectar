@@ -127,6 +127,8 @@ body,
   border-radius: 0 18px 18px 0;
   border: 1px solid var(--nectar-border, rgba(255, 255, 255, 0.1));
   border-left: none;
+  border-top: none;
+  border-bottom: none;
   width: 42px;
   height: 196px;
   position: relative;
