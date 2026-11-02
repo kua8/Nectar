@@ -1019,13 +1019,13 @@ export function useSettings() {
     setThemeSaturation(preset.saturation);
     setThemeBrightness(preset.brightness);
     setThemeAccent("custom");
-    setThemeAccentColor(preset.color);
+    setThemeAccentColor(preset.accent);
     saveSetting("nectar-theme-mode", "custom");
     saveSetting("nectar-theme-color", preset.color);
     saveSetting("nectar-theme-saturation", String(preset.saturation));
     saveSetting("nectar-theme-brightness", String(preset.brightness));
     saveSetting("nectar-theme-accent", "custom");
-    saveSetting("nectar-theme-accent-color", preset.color);
+    saveSetting("nectar-theme-accent-color", preset.accent);
   };
 
   // ── City search ──

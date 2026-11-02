@@ -92,17 +92,20 @@ export interface ThemePreset {
   color: string;
   saturation: number;
   brightness: number;
+  accent: string;
 }
 
-// Background hue comes from `color`; the same color is used as the accent.
+// Background hue comes from `color`, kept low in saturation so surfaces stay calm; the accent is picked by eye.
 export const THEME_PRESETS: ThemePreset[] = [
-  { name: "Midnight", color: "#5e8bff", saturation: 0.45, brightness: 0.13 },
-  { name: "Ocean", color: "#2ec4d6", saturation: 0.6, brightness: 0.13 },
-  { name: "Forest", color: "#34c77b", saturation: 0.35, brightness: 0.12 },
-  { name: "Plum", color: "#c77dff", saturation: 0.3, brightness: 0.14 },
-  { name: "Ember", color: "#ff7a45", saturation: 0.45, brightness: 0.13 },
-  { name: "Latte", color: "#c0742d", saturation: 0.4, brightness: 0.88 },
-  { name: "Mist", color: "#0a84ff", saturation: 0.35, brightness: 0.92 },
+  { name: "Graphite", color: "#8e8e93", saturation: 0.04, brightness: 0.09, accent: "#0a84ff" },
+  { name: "Midnight", color: "#5e8bff", saturation: 0.4, brightness: 0.1, accent: "#7aa2ff" },
+  { name: "Ocean", color: "#2ec4d6", saturation: 0.45, brightness: 0.09, accent: "#35d0e0" },
+  { name: "Forest", color: "#34c77b", saturation: 0.28, brightness: 0.09, accent: "#4ade80" },
+  { name: "Plum", color: "#c77dff", saturation: 0.3, brightness: 0.11, accent: "#c58bff" },
+  { name: "Rose", color: "#ff5e8a", saturation: 0.3, brightness: 0.11, accent: "#ff6b95" },
+  { name: "Ember", color: "#ff7a45", saturation: 0.32, brightness: 0.1, accent: "#ff8a5c" },
+  { name: "Latte", color: "#c0742d", saturation: 0.18, brightness: 0.95, accent: "#b8641c" },
+  { name: "Mist", color: "#0a84ff", saturation: 0.2, brightness: 0.95, accent: "#0a6ee0" },
 ];
 
 export const DEFAULT_ACCENT_COLOR = "#0a84ff";
@@ -244,16 +247,18 @@ export async function applyTheme(
   // Large panels (calendar, command center) need a denser fill than the pill to stay readable on glass.
   const opPanel = Math.max(opExpanded, 0.82);
   let surface = '#000000';
+  root.style.setProperty('--nectar-opacity', String(op));
+  root.style.setProperty('--nectar-opacity-expanded', String(opExpanded));
 
   if (mode === 'light') {
     surface = '#f5f5f7';
-    root.style.setProperty('--nectar-bg', `rgba(255, 255, 255, ${op})`);
-    root.style.setProperty('--nectar-bg-expanded', `rgba(245, 245, 247, ${opExpanded})`);
+    root.style.setProperty('--nectar-bg', `rgba(250, 250, 252, ${op})`);
+    root.style.setProperty('--nectar-bg-expanded', `rgba(245, 245, 248, ${opExpanded})`);
     root.style.setProperty('--nectar-bg-panel', `rgba(245, 245, 247, ${opPanel})`);
     root.style.setProperty('--nectar-text', '#1c1c1e');
     root.style.setProperty('--nectar-text-muted', 'rgba(28, 28, 30, 0.65)');
     root.style.setProperty('--nectar-border', 'rgba(0, 0, 0, 0.12)');
-    root.style.setProperty('--nectar-group-bg', 'rgba(0, 0, 0, 0.04)');
+    root.style.setProperty('--nectar-group-bg', 'rgba(0, 0, 0, 0.05)');
     root.style.setProperty('--nectar-accent', '#007aff');
     root.style.setProperty('--nectar-scrollbar-thumb', 'rgba(0, 0, 0, 0.15)');
     root.classList.add('light-mode');

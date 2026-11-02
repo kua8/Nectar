@@ -250,3 +250,126 @@
         inset -1px 0 1px rgba(255, 255, 255, 0.2),
         inset 0 8px 18px rgba(255, 255, 255, 0.1);
 }
+
+/* ── Edge-flush sides carry no rim ──
+   The notch hangs from the top edge, the dock sits on the bottom edge, the volume panel on the left
+   and brightness panel on the right. A rim along the side that touches the screen shows up as a
+   stray line, so each surface gets its rim on the other sides only. Keep after the style rules. */
+
+.style-frosted .nectar {
+    box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.18), inset -0.5px 0 0 rgba(255, 255, 255, 0.18), inset 0 -0.5px 0 rgba(255, 255, 255, 0.18), 0 8px 24px rgba(0, 0, 0, 0.22);
+}
+
+.style-frosted .dock {
+    box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.18), inset -0.5px 0 0 rgba(255, 255, 255, 0.18), inset 0 0.5px 0 rgba(255, 255, 255, 0.18), 0 -8px 24px rgba(0, 0, 0, 0.22);
+}
+
+.style-frosted .volume-notch {
+    box-shadow: inset -0.5px 0 0 rgba(255, 255, 255, 0.18), inset 0 0.5px 0 rgba(255, 255, 255, 0.18), inset 0 -0.5px 0 rgba(255, 255, 255, 0.18), 0 8px 24px rgba(0, 0, 0, 0.22);
+}
+
+.style-frosted .brightness-notch {
+    box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.18), inset 0 0.5px 0 rgba(255, 255, 255, 0.18), inset 0 -0.5px 0 rgba(255, 255, 255, 0.18), 0 8px 24px rgba(0, 0, 0, 0.22);
+}
+
+.style-frosted.light-mode .nectar {
+    box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.6), inset -0.5px 0 0 rgba(255, 255, 255, 0.6), inset 0 -0.5px 0 rgba(255, 255, 255, 0.6), 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.style-frosted.light-mode .dock {
+    box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.6), inset -0.5px 0 0 rgba(255, 255, 255, 0.6), inset 0 0.5px 0 rgba(255, 255, 255, 0.6), 0 -8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.style-frosted.light-mode .volume-notch {
+    box-shadow: inset -0.5px 0 0 rgba(255, 255, 255, 0.6), inset 0 0.5px 0 rgba(255, 255, 255, 0.6), inset 0 -0.5px 0 rgba(255, 255, 255, 0.6), 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.style-frosted.light-mode .brightness-notch {
+    box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.6), inset 0 0.5px 0 rgba(255, 255, 255, 0.6), inset 0 -0.5px 0 rgba(255, 255, 255, 0.6), 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.style-liquid .volume-notch {
+    box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.3),
+        inset 0 -1px 1.5px rgba(255, 255, 255, 0.42),
+        inset -1px 0 1px rgba(255, 255, 255, 0.16),
+        inset 0 0 16px rgba(255, 255, 255, 0.1),
+        0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.style-liquid .brightness-notch {
+    box-shadow:
+        inset 0 1px 1px rgba(255, 255, 255, 0.3),
+        inset 0 -1px 1.5px rgba(255, 255, 255, 0.42),
+        inset 1px 0 1px rgba(255, 255, 255, 0.16),
+        inset 0 0 16px rgba(255, 255, 255, 0.1),
+        0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.style-material .nectar {
+    box-shadow: inset 1px 0 0 var(--nectar-border, rgba(255, 255, 255, 0.12)), inset -1px 0 0 var(--nectar-border, rgba(255, 255, 255, 0.12)), inset 0 -1px 0 var(--nectar-border, rgba(255, 255, 255, 0.12));
+}
+
+.style-material .dock {
+    box-shadow: inset 1px 0 0 var(--nectar-border, rgba(255, 255, 255, 0.12)), inset -1px 0 0 var(--nectar-border, rgba(255, 255, 255, 0.12)), inset 0 1px 0 var(--nectar-border, rgba(255, 255, 255, 0.12));
+}
+
+.style-material .volume-notch {
+    box-shadow: inset -1px 0 0 var(--nectar-border, rgba(255, 255, 255, 0.12)), inset 0 1px 0 var(--nectar-border, rgba(255, 255, 255, 0.12)), inset 0 -1px 0 var(--nectar-border, rgba(255, 255, 255, 0.12));
+}
+
+.style-material .brightness-notch {
+    box-shadow: inset 1px 0 0 var(--nectar-border, rgba(255, 255, 255, 0.12)), inset 0 1px 0 var(--nectar-border, rgba(255, 255, 255, 0.12)), inset 0 -1px 0 var(--nectar-border, rgba(255, 255, 255, 0.12));
+}
+
+/* The wallpaper copy behind the notch and dock draws its own rim on the body */
+.has-backdrop.style-frosted .nectar > .surface-backdrop {
+    box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.2), inset -0.5px 0 0 rgba(255, 255, 255, 0.2), inset 0 -0.5px 0 rgba(255, 255, 255, 0.2);
+}
+
+.has-backdrop.style-frosted .dock > .surface-backdrop {
+    box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.2), inset -0.5px 0 0 rgba(255, 255, 255, 0.2), inset 0 0.5px 0 rgba(255, 255, 255, 0.2);
+}
+
+.has-backdrop.style-frosted.light-mode .nectar > .surface-backdrop {
+    box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.6), inset -0.5px 0 0 rgba(255, 255, 255, 0.6), inset 0 -0.5px 0 rgba(255, 255, 255, 0.6);
+}
+
+.has-backdrop.style-frosted.light-mode .dock > .surface-backdrop {
+    box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.6), inset -0.5px 0 0 rgba(255, 255, 255, 0.6), inset 0 0.5px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* ── Light mode polish ──
+   White on a light wallpaper has no edge, so the solid and Material surfaces get a hairline and a
+   soft shadow (never on the side that touches the screen), tiles get a real fill, and the album
+   glow is toned down so it tints the panel instead of flooding it. */
+
+.light-mode.style-solid .nectar {
+    box-shadow: inset 1px 0 0 rgba(0, 0, 0, 0.07), inset -1px 0 0 rgba(0, 0, 0, 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.07), 0 10px 28px rgba(0, 0, 0, 0.16), 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.light-mode.style-solid .dock {
+    box-shadow: inset 1px 0 0 rgba(0, 0, 0, 0.07), inset -1px 0 0 rgba(0, 0, 0, 0.07), inset 0 1px 0 rgba(0, 0, 0, 0.07), 0 -8px 26px rgba(0, 0, 0, 0.14), 0 -2px 6px rgba(0, 0, 0, 0.07);
+}
+
+.light-mode.style-solid .volume-notch {
+    box-shadow: inset -1px 0 0 rgba(0, 0, 0, 0.07), inset 0 1px 0 rgba(0, 0, 0, 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.07), 6px 0 24px rgba(0, 0, 0, 0.14);
+}
+
+.light-mode.style-solid .brightness-notch {
+    box-shadow: inset 1px 0 0 rgba(0, 0, 0, 0.07), inset 0 1px 0 rgba(0, 0, 0, 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.07), -6px 0 24px rgba(0, 0, 0, 0.14);
+}
+
+.light-mode .dock-icon {
+    background: rgba(0, 0, 0, 0.055);
+    border-color: rgba(0, 0, 0, 0.08);
+}
+
+.light-mode .notch-ambient-glow img {
+    filter: blur(52px) saturate(1.7) brightness(1.08);
+    opacity: 0.5;
+}
+
+.light-mode .notch-ambient-glow::after {
+    background: radial-gradient(ellipse at center, transparent 25%, rgba(255, 255, 255, 0.3) 55%, var(--notch-bg, var(--nectar-bg)) 88%);
+}

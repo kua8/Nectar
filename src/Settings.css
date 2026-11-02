@@ -11,7 +11,8 @@
 }
 
 .light-mode {
-  --window-bg: rgba(246, 246, 248, 0.72);
+  --group-bg: rgba(255, 255, 255, 0.7);
+  --window-bg: rgba(240, 240, 244, 0.94);
   --window-line: rgba(0, 0, 0, 0.1);
   --window-bar: rgba(0, 0, 0, 0.02);
   --window-bar-line: rgba(0, 0, 0, 0.06);

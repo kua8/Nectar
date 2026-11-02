@@ -126,7 +126,7 @@ export function AppearanceTab({
                   title={name}
                   aria-label={name}
                 >
-                  <span style={{ background: preset.color }} />
+                  <span style={{ background: preset.accent }} />
                 </button>
               );
             })}

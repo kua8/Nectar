@@ -141,7 +141,7 @@ function finish(bgSource: RGB, accentCandidates: (RGB | undefined)[]): ArtTheme 
 
   return {
     // 0.85 alpha restores the frosted card look — slash syntax required.
-    background: `rgb(${bg.map(Math.round).join(" ")} / 0.85)`,
+    background: `rgb(${bg.map(Math.round).join(" ")})`,
     text: css(textColor),
     accent: css(accent),
   };
