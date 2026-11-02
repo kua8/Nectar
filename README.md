@@ -38,22 +38,13 @@
 
 ## Features
 
-- **A notch that does things.** Music, quick controls, system stats, and a calendar in one spring-animated island at the top of your screen.
-- **A dock that replaces your taskbar.** It mirrors your real taskbar (same pinned apps, same order, real icons and names) and hides the native one.
-- **Native where it counts.** The system tray opens the actual Windows flyout, and Quit ends an app the way Task Manager's End task does.
-- **Yours to shape.** Solid, Frosted Glass, Liquid Glass and Material You styles, accent colors and presets, three visibility modes, per-monitor placement, and every option in a plain `settings.json` you can edit live.
-- **Light on the system.** Audio capture, cursor tracking, and thumbnail work pause themselves when nothing needs them.
-
-## The Notch
-
-A notch at the top of your screen that adapts to what you're doing. Scroll or swipe to change modes, or pin it in place like a hardware notch.
 | What you get | How |
 | --- | --- |
 | **A notch that does things** | Music, a Control Center you arrange yourself, status, a calendar and a file shelf in one spring-animated island. |
 | **A dock that replaces your taskbar** | Mirrors your real taskbar, same pinned apps and order, with real icons and names. |
 | **Native where it counts** | The tray opens the real Windows flyout, and Quit ends an app like Task Manager's End task. |
 | **Out of your way** | Fixed, Smart or Peek modes, and both stay hidden over fullscreen games. |
-| **Made for your setup** | Every monitor, one monitor, or a specific one. English and Turkish. Every option lives in a plain `settings.json`. |
+| **Made for your setup** | Every monitor, one monitor, or a specific one. Solid, glass or Material You styles with your own accent color. English and Turkish. Every option lives in a plain `settings.json`. |
 | **Light on the system** | Audio capture, cursor tracking and thumbnail work pause themselves when nothing needs them. |
 
 <div align="center">
