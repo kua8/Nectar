@@ -16,6 +16,7 @@ mod caldav;
 mod calendar_sync;
 mod ics;
 mod active_look;
+mod launchers;
 mod connections;
 mod audio_devices;
 mod i18n;

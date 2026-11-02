@@ -567,14 +567,22 @@ pub fn open_dock_extra(target: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn open_app(app: AppHandle, app_name: String, args: Option<String>) {
+pub async fn open_app(app: AppHandle, window: Window, app_name: String, args: Option<String>) {
     if app_name == "start" {
         toggle_start_menu();
         return;
     }
 
     if app_name == "search" {
-        tauri::async_runtime::spawn_blocking(|| send_win_chord(windows::Win32::UI::Input::KeyboardAndMouse::VK_S));
+        let legacy = get_setting_str(&app, "nectar-legacy-mode").is_some_and(|v| v == "true");
+        let provider = if legacy { String::new() } else { get_setting_str(&app, "nectar-dock-search-provider").unwrap_or_default() };
+        let shortcut = get_setting_str(&app, "nectar-dock-search-shortcut");
+        let label = window.label().to_string();
+        tauri::async_runtime::spawn_blocking(move || {
+            if let Some(note) = crate::launchers::open_search(&provider, shortcut.as_deref()) {
+                let _ = app.emit_to(label.as_str(), "dock-search-note", note);
+            }
+        });
         return;
     }
 
