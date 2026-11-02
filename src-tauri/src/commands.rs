@@ -47,11 +47,13 @@ pub fn set_window_keyboard_focus(window: Window, enabled: bool) {
 #[tauri::command]
 pub async fn set_dock_hovered(window: Window, hovered: bool) {
     crate::state::set_flag(crate::state::dock_hovered(), window.label(), hovered);
+    crate::mem::set_busy(hovered);
 }
 
 #[tauri::command]
 pub async fn set_notch_hovered(window: Window, hovered: bool) {
     crate::state::set_flag(crate::state::notch_hovered(), window.label(), hovered);
+    crate::mem::set_busy(hovered);
 }
 
 #[tauri::command]
@@ -1964,30 +1966,14 @@ pub fn hide_native_osd() {
     }
 }
 
-fn bring_window_to_front(app: &AppHandle, label: &str) {
-    if let Some(win) = app.get_webview_window(label) {
-        let _ = win.show();
-        let _ = win.unminimize();
-        let _ = win.set_focus();
-        if let Ok(hwnd) = win.hwnd() {
-            unsafe {
-                use windows::Win32::UI::WindowsAndMessaging::{SetForegroundWindow, ShowWindow, SW_RESTORE, SW_SHOW};
-                let _ = ShowWindow(hwnd, SW_SHOW);
-                let _ = ShowWindow(hwnd, SW_RESTORE);
-                let _ = SetForegroundWindow(hwnd);
-            }
-        }
-    }
-}
-
 #[tauri::command]
 pub fn open_settings_window(app: AppHandle) {
-    bring_window_to_front(&app, "settings");
+    crate::lazy_windows::open(&app, crate::lazy_windows::SETTINGS);
 }
 
 #[tauri::command]
 pub fn open_calendar_window(app: AppHandle) {
-    bring_window_to_front(&app, "calendar");
+    crate::lazy_windows::open(&app, crate::lazy_windows::CALENDAR);
 }
 
 #[tauri::command]
@@ -2044,6 +2030,7 @@ fn notch_anchor(app: &AppHandle) -> Option<(i32, i32)> {
 #[tauri::command]
 pub fn hide_overlay(app: AppHandle) {
     if let Some(win) = app.get_webview_window("overlay") { let _ = win.hide(); }
+    crate::mem::trim_soon();
 }
 
 #[tauri::command]
@@ -3249,6 +3236,27 @@ pub fn open_battery_saver_settings() {
 }
 
 // --- System metrics for status widgets ---
+
+#[derive(serde::Serialize)]
+pub struct SystemMetrics {
+    cpu: u32,
+    ram: f32,
+    disk_free_gb: u64,
+    net_up: u64,
+    net_down: u64,
+}
+
+#[tauri::command]
+pub fn get_system_metrics() -> SystemMetrics {
+    let (net_up, net_down) = get_network_speed().unwrap_or((0, 0));
+    SystemMetrics {
+        cpu: get_cpu_usage().unwrap_or(0),
+        ram: get_ram_usage().unwrap_or(0.0),
+        disk_free_gb: get_disk_space().unwrap_or(0),
+        net_up,
+        net_down,
+    }
+}
 
 #[tauri::command]
 pub fn get_cpu_usage() -> Result<u32, String> {

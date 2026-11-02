@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ChevronLeft, Lock, X, Bluetooth, Check, Speaker } from "lucide-react";
 import { useT } from "../i18n";
+import { setVisibleInterval } from "../hooks/visibleInterval";
 
 interface WifiNetwork {
   ssid: string;
@@ -77,7 +78,7 @@ export function ConnectionsView({ kind, onBack, onOpenWindowsSettings }: Props) 
 
   useEffect(() => {
     void refresh();
-    const timer = setInterval(() => void refresh(), REFRESH_MS);
+    const timer = setVisibleInterval(() => void refresh(), REFRESH_MS);
     return () => clearInterval(timer);
   }, [refresh]);
 

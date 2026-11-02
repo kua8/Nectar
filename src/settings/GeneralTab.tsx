@@ -1,4 +1,4 @@
-import { Power, Download, Clock, History, BatteryWarning, RefreshCw, LogOut, Languages } from "lucide-react";
+import { Power, Download, Clock, History, BatteryWarning, RefreshCw, LogOut, Languages, MemoryStick, Zap } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { SettingSection } from "./SettingSection";
 import { Dropdown } from "./Dropdown";
@@ -13,6 +13,10 @@ interface GeneralTabProps {
   toggleLegacyMode: () => void;
   showUpdateIndicator: boolean;
   toggleUpdateIndicator: () => void;
+  ramSaver: boolean;
+  toggleRamSaver: () => void;
+  ramUltra: boolean;
+  toggleRamUltra: () => void;
   lowBatteryThreshold: number;
   hasBattery: boolean;
   handleThresholdChange: (val: number) => void;
@@ -29,6 +33,10 @@ export function GeneralTab({
   toggleLegacyMode,
   showUpdateIndicator,
   toggleUpdateIndicator,
+  ramSaver,
+  toggleRamSaver,
+  ramUltra,
+  toggleRamUltra,
   lowBatteryThreshold,
   hasBattery,
   handleThresholdChange,
@@ -72,10 +80,32 @@ export function GeneralTab({
           icon={History}
           label={t("general.legacyMode")}
           desc={t("general.legacyMode.desc")}
-          divider={hasBattery}
         >
           <label className="toggle-switch">
             <input type="checkbox" checked={legacyMode} onChange={toggleLegacyMode} />
+            <span className="slider"></span>
+          </label>
+        </SettingRow>
+
+        <SettingRow
+          icon={MemoryStick}
+          label={t("general.ramSaver")}
+          desc={t("general.ramSaver.desc")}
+        >
+          <label className="toggle-switch">
+            <input type="checkbox" checked={ramSaver} onChange={toggleRamSaver} />
+            <span className="slider"></span>
+          </label>
+        </SettingRow>
+
+        <SettingRow
+          icon={Zap}
+          label={t("general.ramUltra")}
+          desc={t("general.ramUltra.desc")}
+          divider={hasBattery}
+        >
+          <label className="toggle-switch">
+            <input type="checkbox" checked={ramUltra} onChange={toggleRamUltra} />
             <span className="slider"></span>
           </label>
         </SettingRow>

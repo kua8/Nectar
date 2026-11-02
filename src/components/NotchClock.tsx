@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { Stopwatch } from "../hooks/useStopwatch";
 import { formatStopwatch, parseDuration } from "../clockFormat";
 import { useT } from "../i18n";
+import { setVisibleInterval } from "../hooks/visibleInterval";
 
 type Tab = "timer" | "stopwatch";
 
@@ -14,7 +15,7 @@ export function StopwatchReadout({ base, startedAt, precise }: { base: number; s
 
   useEffect(() => {
     if (startedAt === null) return;
-    const id = setInterval(() => setNow(Date.now()), precise ? 50 : 250);
+    const id = setVisibleInterval(() => setNow(Date.now()), precise ? 50 : 250);
     return () => clearInterval(id);
   }, [startedAt, precise]);
 

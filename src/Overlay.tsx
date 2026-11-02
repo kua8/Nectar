@@ -11,6 +11,7 @@ import { MixerIcon, SpeakerIcon } from "./icons";
 import { useT } from "./i18n";
 import "./Overlay.css";
 import { initTheme } from "./theme";
+import { setVisibleInterval } from "./hooks/visibleInterval";
 
 // ─── App Volume Mixer ───────────────────────────────────────────────────────
 
@@ -233,7 +234,7 @@ function VolumeNotch({
   useEffect(() => {
     if (!mixerExpanded) return;
     refreshSessions();
-    const interval = setInterval(refreshSessions, 2000);
+    const interval = setVisibleInterval(refreshSessions, 2000);
     return () => clearInterval(interval);
   }, [mixerExpanded, refreshSessions]);
 

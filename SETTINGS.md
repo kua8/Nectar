@@ -180,6 +180,8 @@ Example:
 | `nectar-language` | `"system"` / language code, e.g. `"en"` | `"system"` | UI language. `"system"` follows the Windows display language and falls back to English when that language has no translation. Missing keys in a translation fall back to English. Translations live in `src/locales/<code>.json` and are registered in `src/i18n.ts` and `src-tauri/src/i18n.rs` (tray menu). Calendar dates and times follow this language too. |
 | `nectar-tour-seen` | `"1"` | unset | Set once the first-run tour has been finished or skipped. Delete it to see the tour again, or use Settings > About > Replay Tour. |
 | `nectar-legacy-mode` | `"true"` / `"false"` | `"false"` | Keep the classic notch and dock. Turns off features added after 1.4 (dock Task View, Recycle Bin and drive buttons, and later additions). Settings > General > Legacy Mode. |
+| `nectar-ram-saver` | `"true"` / `"false"` | `"true"` | Hand unused pages back to Windows a few seconds after you stop interacting, and re-trim while the app stays idle. The app is a WebView2 host, so most of its footprint is cache that Chromium would otherwise keep resident forever; this is what brings it from ~125 MB down to ~20 MB of private working set. Applied live, no restart. Settings > General > Memory Saver. |
+| `nectar-ram-ultra` | `"true"` / `"false"` | `"false"` | Adds `--disable-gpu` to the WebView2 arguments, which removes the GPU process and about 140 MB of commit at the cost of software rasterising the blur effects. **Requires a restart** (WebView2 reads its arguments once at startup). Settings > General > Maximum Memory Saving. |
 
 ### Internal (Do Not Edit Manually)
 

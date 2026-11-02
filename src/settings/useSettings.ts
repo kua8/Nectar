@@ -85,6 +85,12 @@ export function useSettings() {
   const [legacyMode, setLegacyMode] = useState(
     () => localStorage.getItem("nectar-legacy-mode") === "true"
   );
+  const [ramSaver, setRamSaver] = useState(
+    () => localStorage.getItem("nectar-ram-saver") !== "false"
+  );
+  const [ramUltra, setRamUltra] = useState(
+    () => localStorage.getItem("nectar-ram-ultra") === "true"
+  );
   const [tempUnitFahrenheit, setTempUnitFahrenheit] = useState(false);
   const [cityName, setCityName] = useState("");
   const [cityQuery, setCityQuery] = useState("");
@@ -236,6 +242,8 @@ export function useSettings() {
       apply(getVal("nectar-time-format-24h"), setTimeFormat24h, readBool);
       apply(getVal("nectar-legacy-mode"), setLegacyMode, readBool);
       apply(getVal("nectar-show-update-indicator"), setShowUpdateIndicator, readBool);
+      apply(getVal("nectar-ram-saver"), setRamSaver, (v) => v !== "false");
+      apply(getVal("nectar-ram-ultra"), setRamUltra, readBool);
       apply(getVal("nectar-auto-update"), setAutoUpdate, readBool);
       apply(getVal("nectar-update-channel"), setPrereleaseChannel, (v) => v === "prerelease");
       apply(getVal("nectar-volume-edge-enabled"), setVolumeEdgeEnabled, readBool);
@@ -386,6 +394,8 @@ export function useSettings() {
     "nectar-show-update-indicator": setShowUpdateIndicator,
     "nectar-time-format-24h": setTimeFormat24h,
     "nectar-legacy-mode": setLegacyMode,
+    "nectar-ram-saver": (v) => setRamSaver(v !== "false"),
+    "nectar-ram-ultra": (v) => setRamUltra(v === "true"),
     "nectar-low-battery-threshold": setLowBatteryThreshold,
     "nectar-scale": setScale,
     "nectar-temp-unit": (v) => setTempUnitFahrenheit(v === "fahrenheit"),
@@ -665,6 +675,18 @@ export function useSettings() {
     const next = !legacyMode;
     setLegacyMode(next);
     saveSetting("nectar-legacy-mode", String(next));
+  };
+
+  const toggleRamSaver = () => {
+    const next = !ramSaver;
+    setRamSaver(next);
+    saveSetting("nectar-ram-saver", String(next));
+  };
+
+  const toggleRamUltra = () => {
+    const next = !ramUltra;
+    setRamUltra(next);
+    saveSetting("nectar-ram-ultra", String(next));
   };
 
   const toggleTempUnit = () => {
@@ -1052,6 +1074,10 @@ export function useSettings() {
     toggleLegacyMode,
     showUpdateIndicator,
     toggleUpdateIndicator,
+    ramSaver,
+    toggleRamSaver,
+    ramUltra,
+    toggleRamUltra,
     scale,
     handleScaleChange,
     cornersEnabled,

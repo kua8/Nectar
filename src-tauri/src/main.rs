@@ -20,6 +20,9 @@ mod connections;
 mod audio_devices;
 mod i18n;
 mod shelf;
+mod mem;
+mod webview_tuning;
+mod lazy_windows;
 
 use tauri::Manager;
 use windows::Win32::System::Console::SetConsoleCtrlHandler;
@@ -48,6 +51,9 @@ fn main() {
     }
 
     diagnostics::init();
+
+    mem::init();
+    webview_tuning::apply();
 
     unsafe {
         let _ = SetConsoleCtrlHandler(Some(ctrl_handler), true);
@@ -199,6 +205,7 @@ fn main() {
             get_notch_mode_for_window,
             set_dock_mode_for_window,
             set_notch_mode_for_window,
+            get_system_metrics,
             get_cpu_usage,
             get_ram_usage,
             get_disk_space,
@@ -307,6 +314,7 @@ fn main() {
             start_window_style_guard(app.handle().clone());
             setup_audio_visualization(app.handle().clone());
             setup_settings_watcher(app.handle().clone());
+            mem::start_reclaim_worker(app.handle().clone());
 
             // Listen for second-instance signal to open settings
             if let Some(&h_event) = SINGLE_INSTANCE_EVENT_HANDLE.get() {
@@ -326,38 +334,6 @@ fn main() {
                 }
             }
 
-            if let Some(settings_win) = app.get_webview_window("settings") {
-                #[cfg(target_os = "windows")]
-                {
-                    let _ = window_vibrancy::apply_acrylic(&settings_win, Some((10, 10, 15, 20)));
-                }
-                if let Ok(hwnd) = settings_win.hwnd() {
-                    crate::active_look::keep_active_look(hwnd);
-                }
-                let win_clone = settings_win.clone();
-                settings_win.on_window_event(move |event| {
-                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                        api.prevent_close();
-                        let _ = win_clone.hide();
-                    }
-                });
-            }
-            if let Some(calendar_win) = app.get_webview_window("calendar") {
-                #[cfg(target_os = "windows")]
-                {
-                    let _ = window_vibrancy::apply_acrylic(&calendar_win, Some((10, 10, 15, 20)));
-                }
-                if let Ok(hwnd) = calendar_win.hwnd() {
-                    crate::active_look::keep_active_look(hwnd);
-                }
-                let win_clone = calendar_win.clone();
-                calendar_win.on_window_event(move |event| {
-                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                        api.prevent_close();
-                        let _ = win_clone.hide();
-                    }
-                });
-            }
             {
                 use tauri::menu::{Menu, MenuItem};
                 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
