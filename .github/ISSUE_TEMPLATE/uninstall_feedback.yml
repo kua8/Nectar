@@ -14,8 +14,10 @@ body:
   - type: textarea
     id: comment
     attributes:
-      label: Anything else you'd like to add?
-      description: Optional, but the more specific, the more useful.
+      label: What went wrong?
+      description: The more specific, the more useful.
+    validations:
+      required: true
 
   - type: input
     id: version

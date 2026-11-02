@@ -30,6 +30,8 @@ type Screen =
   | "uninstall-done"
   | "error";
 
+const MIN_FEEDBACK_CHARS = 10;
+
 const FEEDBACK_REASONS = [
   "Found a bug",
   "Missing a feature I need",
@@ -447,7 +449,7 @@ export default function App() {
                     <div className="feedback-textarea-wrap">
                       <textarea
                         className="feedback-textarea"
-                        placeholder="Anything else you'd like to add? (optional)"
+                        placeholder="Tell us what went wrong (at least 10 characters)"
                         value={feedbackComment}
                         onChange={(e) => setFeedbackComment(e.target.value)}
                       />
@@ -460,7 +462,7 @@ export default function App() {
                   <div className="spacer" />
                   <div className="actions">
                     <SecondaryButton onClick={() => closeWindow()}>Skip</SecondaryButton>
-                    <PrimaryButton disabled={!feedbackReason} onClick={handleSendFeedback}>
+                    <PrimaryButton disabled={!feedbackReason || feedbackComment.trim().length < MIN_FEEDBACK_CHARS} onClick={handleSendFeedback}>
                       Send feedback
                     </PrimaryButton>
                   </div>
