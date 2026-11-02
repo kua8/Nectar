@@ -10,6 +10,7 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { MixerIcon, SpeakerIcon } from "./icons";
 import { useT } from "./i18n";
 import "./Overlay.css";
+import "./surfaces.css";
 import { initTheme } from "./theme";
 
 // ─── App Volume Mixer ───────────────────────────────────────────────────────
