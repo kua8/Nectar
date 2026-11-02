@@ -231,10 +231,8 @@ function sessionForApp(app: AppInfo, sessions: AppMediaSession[]): AppMediaSessi
 
 function WindowDots({ count }: { count: number }) {
   return (
-    <div className="window-dots">
-      {Array.from({ length: Math.min(Math.max(count, 1), 3) }, (_, i) => (
-        <div key={i} className="active-indicator" />
-      ))}
+    <div className={`window-dots${count > 1 ? " multi" : ""}`}>
+      <div className="active-indicator" />
     </div>
   );
 }
@@ -1017,7 +1015,7 @@ const Dock = memo(function Dock() {
             const results = await Promise.all(
               hwndsToCapture.map(async ([hwnd, title]) => {
                 try {
-                  const res = await invoke<[string, number] | null>("capture_window_thumbnail", { hwnd, maxWidth: 320, maxHeight: 200 });
+                  const res = await invoke<[string, number] | null>("capture_window_thumbnail", { hwnd, maxWidth: 480, maxHeight: 300 });
                   if (res) {
                     const [image, lastFocused] = res;
                     return { hwnd, title, image, lastFocused };

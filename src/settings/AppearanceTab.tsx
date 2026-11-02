@@ -88,7 +88,16 @@ export function AppearanceTab({
                   onClick={() => handleThemeStyleChange(style)}
                 >
                   <span className={`style-tile-preview style-preview-${style}`}>
-                    <span className="style-tile-pill" />
+                    <span className="style-tile-pill">
+                      <i />
+                      <i />
+                    </span>
+                    <span className="style-tile-dock">
+                      <i />
+                      <i />
+                      <i />
+                      <i />
+                    </span>
                   </span>
                   <span className="style-tile-label">{t(`appearance.style.${style}`)}</span>
                 </button>

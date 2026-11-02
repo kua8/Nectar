@@ -1507,67 +1507,126 @@ input:checked + .slider:before {
   color: var(--nectar-text, #fff);
 }
 
+/* Miniature scene: a soft wallpaper with the notch on top and the dock below, drawn in each style */
 .style-tile-preview {
   position: relative;
-  display: flex;
-  justify-content: center;
-  height: 46px;
-  border-radius: 7px;
+  display: block;
+  height: 64px;
+  border-radius: 8px;
   overflow: hidden;
   background:
-    radial-gradient(circle at 30% 30%, #ffd166 0 9px, transparent 10px),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.35) 0 3px, transparent 3px 9px),
-    linear-gradient(135deg, #ff8a80 0%, #7c83fd 55%, #36d1dc 100%);
+    radial-gradient(60% 80% at 18% 22%, #ffb86b 0%, transparent 62%),
+    radial-gradient(70% 90% at 88% 72%, #4fb3ff 0%, transparent 66%),
+    linear-gradient(135deg, #8a5cff, #2f6fd6);
+}
+
+.style-tile-pill,
+.style-tile-dock {
+  position: absolute;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.82);
 }
 
 .style-tile-pill {
-  width: 62%;
-  height: 18px;
+  top: 0;
+  width: 46%;
+  height: 15px;
   border-radius: 0 0 9px 9px;
-  background: rgba(0, 0, 0, 0.8);
+}
+
+.style-tile-pill i {
+  display: block;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.style-tile-pill i:first-child {
+  width: 14px;
+}
+
+.style-tile-pill i:last-child {
+  width: 6px;
+  opacity: 0.5;
+}
+
+.style-tile-dock {
+  bottom: 0;
+  width: 74%;
+  height: 17px;
+  border-radius: 9px 9px 0 0;
+}
+
+.style-tile-dock i {
+  display: block;
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.style-preview-frosted .style-tile-pill,
+.style-preview-frosted .style-tile-dock {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)),
+    rgba(18, 18, 26, 0.42);
+  backdrop-filter: blur(6px) saturate(1.2);
+  box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.3), inset -0.5px 0 0 rgba(255, 255, 255, 0.3);
 }
 
 .style-preview-frosted .style-tile-pill {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.1)),
-    rgba(20, 20, 24, 0.5);
-  box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.3), 0 3px 8px rgba(0, 0, 0, 0.2);
-  backdrop-filter: blur(4px);
+  box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.3), inset -0.5px 0 0 rgba(255, 255, 255, 0.3), inset 0 -0.5px 0 rgba(255, 255, 255, 0.3);
+}
+
+.style-preview-frosted .style-tile-dock {
+  box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.3), inset -0.5px 0 0 rgba(255, 255, 255, 0.3), inset 0 0.5px 0 rgba(255, 255, 255, 0.3);
 }
 
 .style-preview-liquid .style-tile-pill {
   background:
-    radial-gradient(120% 140% at 50% 115%, rgba(255, 255, 255, 0.3), transparent 55%),
-    rgba(0, 0, 0, 0.28);
-  box-shadow:
-    inset 0 -1px 1px rgba(255, 255, 255, 0.6),
-    inset 1px 0 1px rgba(255, 255, 255, 0.25),
-    inset -1px 0 1px rgba(255, 255, 255, 0.25),
-    0 3px 8px rgba(0, 0, 0, 0.25);
+    linear-gradient(0deg, rgba(255, 255, 255, 0.28), transparent 7px),
+    rgba(10, 12, 24, 0.22);
+  box-shadow: inset 0 -1px 1px rgba(255, 255, 255, 0.7), inset 1px 0 1px rgba(255, 255, 255, 0.3), inset -1px 0 1px rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(2px);
 }
 
-.style-preview-material .style-tile-pill {
-  background: color-mix(in srgb, var(--nectar-accent, #007aff) 22%, #15171c);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nectar-accent, #007aff) 30%, transparent);
+.style-preview-liquid .style-tile-dock {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3), transparent 8px),
+    rgba(10, 12, 24, 0.22);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.7), inset 1px 0 1px rgba(255, 255, 255, 0.3), inset -1px 0 1px rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(2px);
 }
 
-.style-preview-material .style-tile-pill::after {
-  content: "";
-  display: block;
-  width: 10px;
-  height: 4px;
-  margin: 7px auto 0;
-  border-radius: 2px;
-  background: color-mix(in srgb, var(--nectar-accent, #007aff) 55%, white);
+.style-preview-liquid .style-tile-dock i {
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.style-preview-material .style-tile-pill,
+.style-preview-material .style-tile-dock {
+  background: color-mix(in srgb, var(--nectar-accent, #007aff) 20%, #16181d);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nectar-accent, #007aff) 32%, transparent);
+}
+
+.style-preview-material .style-tile-pill i:first-child {
+  background: color-mix(in srgb, var(--nectar-accent, #007aff) 60%, white);
+}
+
+.style-preview-material .style-tile-dock i {
+  background: color-mix(in srgb, var(--nectar-accent, #007aff) 45%, #2a2d34);
 }
 
 .style-tile-label {
   font-size: 10.5px;
   font-weight: 600;
+  line-height: 1.2;
   text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .preset-swatches {

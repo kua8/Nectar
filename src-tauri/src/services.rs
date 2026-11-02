@@ -450,7 +450,7 @@ unsafe extern "system" fn focus_event_proc(
         if THUMB_CAPTURE_IN_FLIGHT.swap(true, Ordering::Relaxed) { return; }
         let _guard = ThumbnailCaptureGuard;
 
-        if let Some(img) = crate::utils::capture_hwnd_to_base64(hwnd, 320, 200) {
+        if let Some(img) = crate::utils::capture_hwnd_to_base64(hwnd, 480, 300) {
             if let Some(cache) = crate::state::THUMBNAIL_CACHE.get() {
                 if let Ok(mut guard) = cache.lock() {
                     guard.insert(hwnd_raw, (img, crate::utils::get_now_ms()));
@@ -517,7 +517,7 @@ unsafe extern "system" fn thumbnail_capture_proc(
         }
 
         let hwnd = HWND(hwnd_raw as *mut _);
-        if let Some(img) = crate::utils::capture_hwnd_to_base64(hwnd, 320, 200) {
+        if let Some(img) = crate::utils::capture_hwnd_to_base64(hwnd, 480, 300) {
             if let Some(cache) = crate::state::THUMBNAIL_CACHE.get() {
                 if let Ok(mut guard) = cache.lock() {
                     guard.insert(hwnd_raw, (img, crate::utils::get_now_ms()));

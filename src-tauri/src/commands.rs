@@ -2954,6 +2954,14 @@ pub async fn capture_window_thumbnail(hwnd: isize, max_width: u32, max_height: u
 
         let result = crate::utils::capture_hwnd_to_base64(hwnd, max_width, max_height);
 
+        // PrintWindow and the screen copy both fail for some windows while they are covered, so
+        // fall back to the last good capture instead of showing nothing until the app is focused.
+        if result.is_none() {
+            let cached_img = crate::state::THUMBNAIL_CACHE.get()
+                .and_then(|cache| cache.lock().ok().and_then(|g| g.get(&hwnd_key).map(|(img, _)| img.clone())));
+            return cached_img.map(|img| (img, focus_time));
+        }
+
         if let Some(ref img) = result {
             if let Some(cache) = crate::state::THUMBNAIL_CACHE.get() {
                 if let Ok(mut guard) = cache.lock() {

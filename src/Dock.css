@@ -274,8 +274,8 @@ body {
   width: 100%;
   aspect-ratio: 16 / 10;
   border-radius: 8px;
-  object-fit: cover;
-  object-position: top left;
+  object-fit: contain;
+  object-position: center;
   background: rgba(0, 0, 0, 0.5);
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
@@ -489,9 +489,8 @@ body {
 /* Active application indicator */
 .window-dots {
   position: absolute;
-  bottom: -4px;
+  bottom: -7px;
   display: flex;
-  gap: 3px;
 }
 
 .window-dots .active-indicator {
@@ -499,13 +498,16 @@ body {
 }
 
 .active-indicator {
-  position: absolute;
-  bottom: -4px;
-  width: 4px;
-  height: 4px;
+  width: 14px;
+  height: 3px;
   background: var(--nectar-highlight, white);
-  border-radius: 50%;
-  box-shadow: 0 0 4px var(--nectar-highlight, rgba(255, 255, 255, 0.8));
+  border-radius: 2px;
+  box-shadow: 0 0 4px var(--nectar-highlight, rgba(255, 255, 255, 0.6));
+  transition: width 0.15s ease;
+}
+
+.window-dots.multi .active-indicator {
+  width: 20px;
 }
 
 .start-icon-inner {
