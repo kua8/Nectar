@@ -8,6 +8,7 @@ import "./App.css";
 import { initTheme } from "./theme";
 import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, VolumeLowIcon, VolumeHighIcon, MusicNoteIcon } from "./icons";
 import { CompactMediaPlayer } from "./CompactMediaPlayer";
+import { artTheme, FALLBACK_THEME, type ArtTheme } from "./music/palette";
 import { useWeather } from "./hooks/useWeather";
 import { useSettingsSync } from "./hooks/useSettingsSync";
 import { useTrailingThrottle } from "./hooks/useTrailingThrottle";
@@ -455,6 +456,8 @@ function App() {
   });
   const [albumArtUrl, setAlbumArtUrl] = useState<string | null>(null);
   const [albumArtKey, setAlbumArtKey] = useState(0);
+  const [musicTheme, setMusicTheme] = useState<ArtTheme>(FALLBACK_THEME);
+  const musicThemeCache = useRef(new Map<string, ArtTheme>());
   const [volume, setVolume] = useState(0.5);
   const [isMuted, setIsMuted] = useState(false);
   // Sliders show 0 while muted, like the overlay.
@@ -722,9 +725,32 @@ function App() {
   const [settingsAlbumArtEnabled, setSettingsAlbumArtEnabled] = useState(() => localStorage.getItem("nectar-media-album-art-enabled") !== "false");
   const [settingsAmbienceEnabled, setSettingsAmbienceEnabled] = useState(() => localStorage.getItem("nectar-media-ambience-enabled") !== "false");
   const [settingsCompactGlowEnabled, setSettingsCompactGlowEnabled] = useState(() => localStorage.getItem("nectar-media-compact-glow-enabled") !== "false");
+  const [settingsArtworkTheme, setSettingsArtworkTheme] = useState(() => localStorage.getItem("nectar-media-artwork-theme") === "true");
   const [settingsCornersEnabled, setSettingsCornersEnabled] = useState(() => localStorage.getItem("nectar-corners-enabled") === "true");
   const [mediaLayout, setMediaLayout] = useState<'classic' | 'compact'>(() => (localStorage.getItem("nectar-media-layout") as 'classic' | 'compact') || 'classic');
   const [compactVolumeExpanded, setCompactVolumeExpanded] = useState(false);
+
+  // Album-art color grading: extract the palette once per artwork URL and cache
+  // it (Rust re-emits the same data URL for the same track, see services.rs).
+  useEffect(() => {
+    if (!settingsArtworkTheme || !albumArtUrl) {
+      setMusicTheme(FALLBACK_THEME);
+      return;
+    }
+    const cached = musicThemeCache.current.get(albumArtUrl);
+    if (cached) {
+      setMusicTheme(cached);
+      return;
+    }
+    let cancelled = false;
+    artTheme(albumArtUrl).then((theme) => {
+      musicThemeCache.current.set(albumArtUrl, theme);
+      if (!cancelled) setMusicTheme(theme);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [albumArtUrl, settingsArtworkTheme]);
 
   // Weather hook
   const { temperature, weatherCondition, weatherIcon: WeatherIcon, cityName, tempUnit } = useWeather(settingsWeatherEnabled);
@@ -769,6 +795,7 @@ function App() {
       setSettingsAlbumArtEnabled(getVal("nectar-media-album-art-enabled", "true") !== "false");
       setSettingsAmbienceEnabled(getVal("nectar-media-ambience-enabled", "true") !== "false");
       setSettingsCompactGlowEnabled(getVal("nectar-media-compact-glow-enabled", "true") !== "false");
+      setSettingsArtworkTheme(getVal("nectar-media-artwork-theme", "false") === "true");
       setSettingsCornersEnabled(getVal("nectar-corners-enabled", "false") === "true");
       setTimeFormat24h(getVal("nectar-time-format-24h") === "true");
       setSettingsLegacyMode(getVal("nectar-legacy-mode") === "true");
@@ -921,6 +948,7 @@ function App() {
       "nectar-media-album-art-enabled": setSettingsAlbumArtEnabled,
       "nectar-media-ambience-enabled": setSettingsAmbienceEnabled,
       "nectar-media-compact-glow-enabled": setSettingsCompactGlowEnabled,
+      "nectar-media-artwork-theme": setSettingsArtworkTheme,
       "nectar-media-layout": setMediaLayout,
       "nectar-corners-enabled": setSettingsCornersEnabled,
       "nectar-scale": setScale,
@@ -1826,6 +1854,25 @@ function App() {
 
   const isCalendarMode = nectarMode === 'calendar';
 
+  // Album tints the whole notch, collapsed pill included. The expanded state
+  // reads --nectar-bg-expanded and the muted/border vars live on :root, so all
+  // of them have to be overridden or the panel loses the tint when hovered.
+  const withAlpha = (color: string, alpha: number) => {
+    const m = /^rgb\((.+)\)$/.exec(color.trim());
+    return m ? `rgb(${m[1]} / ${alpha})` : color;
+  };
+  const musicTint =
+    isMusicMode && settingsArtworkTheme && musicTheme.background
+      ? ({
+          "--nectar-bg": musicTheme.background,
+          "--nectar-bg-expanded": musicTheme.background,
+          "--nectar-text": musicTheme.text,
+          "--nectar-text-muted": withAlpha(musicTheme.text, 0.65),
+          "--nectar-border": withAlpha(musicTheme.text, 0.12),
+          "--music-accent": musicTheme.accent,
+        } as React.CSSProperties)
+      : undefined;
+
   // Close compact media player expansions when notch is unhovered or mode changes
   useEffect(() => {
     if (mediaLayout === 'compact') {
@@ -1904,7 +1951,7 @@ function App() {
             setNectarMode(targetMode);
           }
         }}
-        style={{ originY: 0 }}
+        style={{ originY: 0, ...musicTint }}
         transition={{
           width: SHELL_SPRING,
           height: SHELL_SPRING,
@@ -1922,7 +1969,7 @@ function App() {
 
 
         <AnimatePresence>
-          {isMusicMode && settingsAmbienceEnabled && albumArtUrl && isHovered && !isCalendarMode && (
+          {isMusicMode && settingsAmbienceEnabled && !settingsArtworkTheme && albumArtUrl && isHovered && !isCalendarMode && (
             <motion.div
               className="notch-ambient-glow"
               initial={{ opacity: 0 }}

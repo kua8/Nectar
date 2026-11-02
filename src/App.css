@@ -70,6 +70,9 @@ img {
     justify-content: flex-start;
     position: relative;
     --notch-bg: var(--nectar-bg, rgba(0, 0, 0, 0.8));
+    /* Progress fills / visualizer bars. Inline override from the album-art tint
+       on the same element replaces it with the extracted accent. */
+    --music-accent: var(--nectar-text, white);
     background: var(--notch-bg);
     border-radius: 0 0 18px 18px;
     border: none;
@@ -407,7 +410,7 @@ img {
   will-change: transform;
     width: 3px;
     height: 100%;
-    background: var(--nectar-text, white);
+    background: var(--music-accent);
     box-shadow: 0 0 8px var(--nectar-border, rgba(255, 255, 255, 0.3));
     border-radius: 2px;
     transform-origin: center;
@@ -1426,7 +1429,7 @@ img {
     left: 0;
     top: 0;
     height: 100%;
-    background: var(--nectar-text, white);
+    background: var(--music-accent);
     border-radius: 3px;
     pointer-events: none;
     transition: width 0.1s ease-out;
@@ -2025,7 +2028,7 @@ img {
     left: 0;
     top: 0;
     height: 100%;
-    background: var(--nectar-text, white);
+    background: var(--music-accent);
     border-radius: 2px;
     pointer-events: none;
     /* Matches the 250ms position tick so the bar glides instead of stepping */
@@ -2089,7 +2092,7 @@ img {
     left: 0;
     top: 0;
     height: 100%;
-    background: var(--nectar-text, white);
+    background: var(--music-accent);
     border-radius: 2px;
     pointer-events: none;
     transition: width 0.1s ease-out;

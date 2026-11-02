@@ -4,6 +4,7 @@ import {
   Music,
   Minimize2,
   LayoutList,
+  Palette,
   Sparkles,
   Circle,
   CloudSun,
@@ -69,6 +70,8 @@ interface NotchTabProps {
   toggleAmbience: () => void;
   mediaCompactGlowEnabled: boolean;
   toggleCompactGlow: () => void;
+  artworkThemeEnabled: boolean;
+  toggleArtworkTheme: () => void;
   notchScrollVolume: boolean;
   toggleNotchScrollVolume: () => void;
   shelfPersist: boolean;
@@ -140,6 +143,8 @@ export function NotchTab({
   toggleAmbience,
   mediaCompactGlowEnabled,
   toggleCompactGlow,
+  artworkThemeEnabled,
+  toggleArtworkTheme,
   notchScrollVolume,
   toggleNotchScrollVolume,
   shelfPersist,
@@ -349,6 +354,13 @@ export function NotchTab({
                   {t("notch.mediaLayout.compact")}
                 </span>
               </div>
+            </SettingRow>
+
+            <SettingRow icon={Palette} label={t("notch.artworkTheme")} desc={t("notch.artworkTheme.desc")}>
+              <label className="toggle-switch">
+                <input type="checkbox" checked={artworkThemeEnabled} onChange={toggleArtworkTheme} />
+                <span className="slider"></span>
+              </label>
             </SettingRow>
 
             <SettingRow icon={Sparkles} label={t("notch.ambientGlow")} desc={t("notch.ambientGlow.desc")}>
