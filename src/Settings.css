@@ -1507,114 +1507,69 @@ input:checked + .slider:before {
   color: var(--nectar-text, #fff);
 }
 
-/* Miniature of the notch and dock on a plain muted backdrop, drawn in each style */
+/* Miniature of the notch on a flat two-colour backdrop, so blur, clarity and tint read at a glance */
 .style-tile-preview {
   position: relative;
   display: block;
   aspect-ratio: 16 / 10;
   border-radius: 8px;
   overflow: hidden;
-  background:
-    radial-gradient(70% 80% at 25% 25%, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0) 70%),
-    linear-gradient(135deg, #66758f, #333d52);
+  background: linear-gradient(90deg, #3f86d6 0 50%, #e08f5a 50% 100%);
 }
 
-.style-tile-pill,
 .style-tile-dock {
+  display: none;
+}
+
+.style-tile-pill {
   position: absolute;
+  top: 0;
   left: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
+  width: 66%;
+  height: 56%;
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.88);
-}
-
-.style-tile-pill {
-  top: 0;
-  width: 48%;
-  height: 24%;
-  gap: 6px;
-  border-radius: 0 0 10px 10px;
+  border-radius: 0 0 14px 14px;
+  background: rgba(0, 0, 0, 0.9);
 }
 
 .style-tile-pill i {
   display: block;
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.85);
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .style-tile-pill i:first-child {
-  width: 16px;
+  width: 22px;
 }
 
 .style-tile-pill i:last-child {
-  width: 7px;
+  width: 10px;
   opacity: 0.5;
 }
 
-.style-tile-dock {
-  bottom: 0;
-  width: 74%;
-  height: 32%;
-  gap: 5px;
-  border-radius: 10px 10px 0 0;
-}
-
-.style-tile-dock i {
-  display: block;
-  width: 11px;
-  height: 11px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.4);
-}
-
-.style-tile-dock i:nth-child(5) {
-  display: none;
-}
-
-.style-preview-frosted .style-tile-pill,
-.style-preview-frosted .style-tile-dock {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.12)), rgba(24, 24, 32, 0.35);
-  backdrop-filter: blur(6px);
-  box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.4), inset -0.5px 0 0 rgba(255, 255, 255, 0.4);
-}
-
 .style-preview-frosted .style-tile-pill {
-  box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.4), inset -0.5px 0 0 rgba(255, 255, 255, 0.4), inset 0 -0.5px 0 rgba(255, 255, 255, 0.4);
-}
-
-.style-preview-frosted .style-tile-dock {
-  box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.4), inset -0.5px 0 0 rgba(255, 255, 255, 0.4), inset 0 0.5px 0 rgba(255, 255, 255, 0.4);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.14)), rgba(24, 24, 32, 0.3);
+  backdrop-filter: blur(7px);
+  box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.45), inset -0.5px 0 0 rgba(255, 255, 255, 0.45), inset 0 -0.5px 0 rgba(255, 255, 255, 0.45);
 }
 
 .style-preview-liquid .style-tile-pill {
-  background: linear-gradient(0deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 8px), rgba(255, 255, 255, 0.05);
-  box-shadow: inset 0 -1px 1px rgba(255, 255, 255, 0.8), inset 1px 0 1px rgba(255, 255, 255, 0.4), inset -1px 0 1px rgba(255, 255, 255, 0.4);
+  background: linear-gradient(0deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0) 12px), rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 -1.5px 1px rgba(255, 255, 255, 0.85), inset 1px 0 1px rgba(255, 255, 255, 0.45), inset -1px 0 1px rgba(255, 255, 255, 0.45);
 }
 
-.style-preview-liquid .style-tile-dock {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 9px), rgba(255, 255, 255, 0.05);
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.8), inset 1px 0 1px rgba(255, 255, 255, 0.4), inset -1px 0 1px rgba(255, 255, 255, 0.4);
-}
-
-.style-preview-liquid .style-tile-pill i {
-  background: #fff;
-}
-
-.style-preview-material .style-tile-pill,
-.style-preview-material .style-tile-dock {
+.style-preview-material .style-tile-pill {
   background: color-mix(in srgb, var(--nectar-accent, #007aff) 24%, #14161b);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nectar-accent, #007aff) 38%, transparent);
 }
 
 .style-preview-material .style-tile-pill i:first-child {
   background: color-mix(in srgb, var(--nectar-accent, #007aff) 65%, white);
-}
-
-.style-preview-material .style-tile-dock i {
-  background: color-mix(in srgb, var(--nectar-accent, #007aff) 50%, #2b2f38);
 }
 
 .style-tile-label {
