@@ -133,7 +133,7 @@ function DockAppIcon({ src, alt, nectar }: { src: string | undefined; alt: strin
 
 // Start button icon: a public asset, or the data URI of an uploaded icon ("custom:" prefix).
 function resolveStartIcon(startIcon: string): string {
-  if (startIcon === "windows") return "/windows.png";
+  if (startIcon === "windows") return "/windows.svg";
   if (startIcon.startsWith("custom:")) return startIcon.slice("custom:".length);
   return "/nectar.png";
 }

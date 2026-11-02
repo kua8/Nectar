@@ -1169,6 +1169,7 @@ input:checked + .slider:before {
 /* Control Center layout: one label column, one pill size, even spacing between rows */
 .widget-config--control-center {
   margin: 0 14px;
+  padding-bottom: 14px;
   gap: 0;
 }
 
@@ -1239,7 +1240,8 @@ input:checked + .slider:before {
 }
 
 .widget-config--control-center .panel-order-reset {
-  margin-top: 4px;
+  align-self: flex-end;
+  margin: 4px 4px 0 0;
 }
 
 .caldav-actions {
