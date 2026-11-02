@@ -4,19 +4,6 @@ import en from "./locales/en.json";
 
 type Messages = Record<string, string>;
 
-/**
- * Locale tables.
- *
- * Only English is bundled eagerly. Every window used to parse every locale at
- * startup even though one language is ever displayed, and this table is part of
- * the chunk all five windows preload. The rest are fetched when the language is
- * actually selected; until one arrives the UI falls back to English, which is
- * the same behaviour as a missing key.
- *
- * To add a language: drop `src/locales/<code>.json` next to the others, add a
- * loader to `LAZY_LOCALES`, and register it in `src-tauri/src/i18n.rs` so the
- * tray menu is translated too.
- */
 export const LANGUAGES: Record<string, { name: string }> = {
   en: { name: "English" },
   tr: { name: "Türkçe" },

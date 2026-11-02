@@ -337,18 +337,6 @@ const TitleMarquee = ({ title }: { title: string }) => {
 
 
 
-/**
- * The notch clock, owning its own one-second state.
- *
- * The time used to live in `App`, so every second re-executed ~800 lines of
- * JSX, the notch's width/height helpers and every mounted panel — the only
- * continuous JavaScript work the app did while idle. Now only this span
- * re-renders when the minute changes.
- *
- * The tick is scheduled against the wall clock rather than with a 1 s interval:
- * a `setInterval` drifts and fires mid-second, so the displayed minute can
- * lag behind the real one by up to a second.
- */
 function TimeDisplay({ hour12 }: { hour12: boolean }) {
   const format = () => new Date().toLocaleTimeString([], {
     hour: "2-digit",
