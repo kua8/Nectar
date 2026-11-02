@@ -745,6 +745,8 @@ const Dock = memo(function Dock() {
   const handleContextMenu = (e: React.MouseEvent, app: AppInfo | null) => {
     e.stopPropagation();
     e.preventDefault();
+    setHoveredApp(null);
+    setPreviewData(null);
     setContextMenuHeight(0);
     setContextMenuWidth(0);
     const dockRect = dockRef.current?.getBoundingClientRect();
@@ -983,7 +985,7 @@ const Dock = memo(function Dock() {
       return () => clearTimeout(timer);
     }
 
-    if (hoveredApp && !isDragging) {
+    if (hoveredApp && !isDragging && !contextMenu) {
       const app = dockItems.find(a => itemKey(a) === hoveredApp);
       if (app && app.is_running) {
         const hwndsToCapture = app.all_hwnds || (app.hwnd ? [[app.hwnd, app.name]] : []);
@@ -999,7 +1001,7 @@ const Dock = memo(function Dock() {
                     return { hwnd, title, image, lastFocused };
                   }
                 } catch {}
-                return null;
+                return { hwnd, title, image: "", lastFocused: 0 };
               })
             );
 
@@ -1027,7 +1029,7 @@ const Dock = memo(function Dock() {
     return () => {
       if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
     };
-  }, [hoveredApp, isDragging, dockItems]);
+  }, [hoveredApp, isDragging, dockItems, contextMenu]);
 
   const iconVariants = {
     idle: { y: 0, scale: 1 },
@@ -1312,8 +1314,8 @@ const Dock = memo(function Dock() {
                       <div className="preview-items">
                         {previewData.previews.map((prev, idx) => (
                           <div key={prev.hwnd} className="preview-item" onClick={() => invoke('focus_window', { hwnd: prev.hwnd })}>
-                            <img src={prev.image} alt={`Preview ${idx}`} />
-                            <div className="preview-label">{prev.title || app.name}</div>
+                            {prev.image ? <img src={prev.image} alt={`Preview ${idx}`} /> : <div className="preview-fallback">{app.icon ? <img src={app.icon} alt="" /> : <span>{app.name.charAt(0)}</span>}</div>}
+                            <div className="preview-label">{app.icon && <img src={app.icon} alt="" />}<span>{prev.title || app.name}</span></div>
                             <button
                               className="preview-close-btn"
                               onClick={(e) => handleClosePreview(e, prev.hwnd)}
@@ -1417,8 +1419,8 @@ const Dock = memo(function Dock() {
                             <div className="preview-items">
                               {previewData.previews.map((prev, idx) => (
                                 <div key={prev.hwnd} className="preview-item" onClick={() => invoke('focus_window', { hwnd: prev.hwnd })}>
-                                  <img src={prev.image} alt={`Preview ${idx}`} />
-                                  <div className="preview-label">{prev.title || app.name}</div>
+                                  {prev.image ? <img src={prev.image} alt={`Preview ${idx}`} /> : <div className="preview-fallback">{app.icon ? <img src={app.icon} alt="" /> : <span>{app.name.charAt(0)}</span>}</div>}
+                                  <div className="preview-label">{app.icon && <img src={app.icon} alt="" />}<span>{prev.title || app.name}</span></div>
                                   <button
                                     className="preview-close-btn"
                                     onClick={(e) => handleClosePreview(e, prev.hwnd)}
@@ -1515,8 +1517,8 @@ const Dock = memo(function Dock() {
                             <div className="preview-items">
                               {previewData.previews.map((prev, idx) => (
                                 <div key={prev.hwnd} className="preview-item" onClick={() => invoke('focus_window', { hwnd: prev.hwnd })}>
-                                  <img src={prev.image} alt={`Preview ${idx}`} />
-                                  <div className="preview-label">{prev.title || app.name}</div>
+                                  {prev.image ? <img src={prev.image} alt={`Preview ${idx}`} /> : <div className="preview-fallback">{app.icon ? <img src={app.icon} alt="" /> : <span>{app.name.charAt(0)}</span>}</div>}
+                                  <div className="preview-label">{app.icon && <img src={app.icon} alt="" />}<span>{prev.title || app.name}</span></div>
                                   <button
                                     className="preview-close-btn"
                                     onClick={(e) => handleClosePreview(e, prev.hwnd)}
