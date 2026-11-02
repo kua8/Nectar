@@ -11,6 +11,24 @@ use windows::Win32::Foundation::CloseHandle;
 use std::path::Path;
 use wmi::{COMLibrary, WMIConnection};
 
+fn is_windows_shell_launcher_process(path: &str) -> bool {
+    let exe = path.rsplit(['\\', '/']).next().unwrap_or("").to_ascii_lowercase();
+    matches!(exe.as_str(), "startmenuexperiencehost.exe" | "searchhost.exe" | "searchapp.exe" | "searchui.exe" | "shellexperiencehost.exe")
+}
+
+/// Identify Start, Search, and shell flyouts by their executable, not a localized window title.
+unsafe fn is_windows_shell_launcher_window(hwnd: HWND) -> bool {
+    let mut process_id = 0u32;
+    GetWindowThreadProcessId(hwnd, Some(&mut process_id));
+    if process_id == 0 { return false; }
+    let Ok(process) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, process_id) else { return false; };
+    let mut path = [0u16; 520];
+    let mut len = path.len() as u32;
+    let result = QueryFullProcessImageNameW(process, PROCESS_NAME_WIN32, windows::core::PWSTR(path.as_mut_ptr()), &mut len);
+    let _ = CloseHandle(process);
+    result.is_ok() && is_windows_shell_launcher_process(&String::from_utf16_lossy(&path[..len as usize]))
+}
+
 static KEYBOARD_HOOK_APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 
 /// Whether a HUD overlay is enabled. When it's off, its keys and the native flyout stay with Windows.
@@ -1092,12 +1110,15 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
         let mut last_dock_fullscreen: Option<bool> = None;
         let mut last_notch_fullscreen: Option<bool> = None;
         let mut last_secondary_dock_fullscreen = std::collections::HashMap::<String, (bool, Instant)>::new();
+        let mut last_dock_shell_surface: Option<bool> = None;
+        let mut last_secondary_dock_shell_surface = std::collections::HashMap::<String, (bool, Instant)>::new();
         let mut last_notch_overlap: Option<bool> = None;
         let mut last_dock_maximized: Option<bool> = None;
         let mut last_fg_maximized = false;
         let mut last_hwnd = HWND(std::ptr::null_mut());
         let mut last_emit = Instant::now();
         let mut is_known_shell = false;
+        let mut is_shell_launcher_focused = false;
         let my_process_id = std::process::id();
         let mut last_monitor_update = Instant::now() - Duration::from_secs(5);
         let mut cached_scale = 1.0f64;
@@ -1168,11 +1189,13 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                     let title = String::from_utf16_lossy(&text[..text_len as usize]);
 
                     let is_desktop = class_str == "Progman" || class_str == "WorkerW";
-                    let is_start = (class_str == "Windows.UI.Core.CoreWindow" || class_str == "SimpleWindow") && 
+                    // Process-based detection also works with localized titles such as Turkish "Arama".
+                    is_shell_launcher_focused = is_windows_shell_launcher_window(hwnd);
+                    let is_start = (class_str == "Windows.UI.Core.CoreWindow" || class_str == "SimpleWindow") &&
                                    (title == "Start" || title == "Search");
                     let is_shell = class_str == "Shell_TrayWnd" || class_str == "Shell_SecondaryTrayWnd" || is_start;
-                    
-                    is_known_shell = is_desktop || is_shell; 
+
+                    is_known_shell = is_desktop || is_shell || is_shell_launcher_focused;
                 }
 
                 if !hwnd.is_invalid() {
@@ -1268,6 +1291,7 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                     should_overlap = false;
                     current_is_fs = false;
                     is_known_shell = false;
+                    is_shell_launcher_focused = false;
                 }
 
                 // Overlap only counts on the monitor the foreground window is on.
@@ -1278,6 +1302,10 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                 };
                 let fg_on = |label: &str| match (fg_info, monitor_of(label)) {
                     (Some((screen, _, _)), Some((mx, my, _, _))) => screen.left == mx && screen.top == my,
+                    _ => true,
+                };
+                let shell_on = |label: &str| is_shell_launcher_focused && match (monitor_rect_for_hwnd(hwnd), monitor_of(label)) {
+                    (Some((sx, sy, _, _)), Some((mx, my, _, _))) => sx == mx && sy == my,
                     _ => true,
                 };
                 if !fg_on("dock") {
@@ -1298,6 +1326,12 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
 
                 crate::state::set_overlap(crate::state::dock_overlap(), "dock", if effective_dock_overlap { 1 } else { 0 });
                 crate::state::set_overlap(crate::state::notch_overlap(), "main", if should_notch_overlap { 1 } else { 0 });
+                let shell_on_dock = shell_on("dock");
+                CURRENT_FOREGROUND_SHELL_ON_DOCK.store(shell_on_dock, Ordering::Relaxed);
+                if Some(shell_on_dock) != last_dock_shell_surface || last_emit.elapsed() >= Duration::from_secs(3) {
+                    let _ = handle_visibility.emit_to("dock", "dock-shell-surface", shell_on_dock);
+                    last_dock_shell_surface = Some(shell_on_dock);
+                }
                 CURRENT_FOREGROUND_FULLSCREEN.store(current_is_fs, Ordering::Relaxed);
                 let fullscreen_on_dock = current_is_fs && fg_on("dock");
                 CURRENT_FOREGROUND_FULLSCREEN_ON_DOCK.store(fullscreen_on_dock, Ordering::Relaxed);
@@ -1342,6 +1376,15 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                             let event = if is_dock { "dock-fullscreen" } else { "notch-fullscreen" };
                             let _ = handle_visibility.emit_to(label.as_str(), event, fullscreen_here);
                             last_secondary_dock_fullscreen.insert(label.clone(), (fullscreen_here, now));
+                        }
+                    }
+                    if is_dock {
+                        let shell_here = shell_on(label.as_str());
+                        let shell_needs_update = last_secondary_dock_shell_surface.get(&label)
+                            .is_none_or(|(previous, sent_at)| *previous != shell_here || sent_at.elapsed() >= Duration::from_secs(3));
+                        if shell_needs_update {
+                            let _ = handle_visibility.emit_to(label.as_str(), "dock-shell-surface", shell_here);
+                            last_secondary_dock_shell_surface.insert(label.clone(), (shell_here, now));
                         }
                     }
                     let overlap = match fg_info {
@@ -2072,6 +2115,7 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
 
             let fg_fs = CURRENT_FOREGROUND_FULLSCREEN.load(Ordering::Relaxed);
             let dock_fg_fs = CURRENT_FOREGROUND_FULLSCREEN_ON_DOCK.load(Ordering::Relaxed);
+            let shell_focused = CURRENT_FOREGROUND_SHELL_ON_DOCK.load(Ordering::Relaxed);
 
             // --- Dock Interaction ---
             if let Some(dock_win) = app_handle.get_webview_window("dock") {
@@ -2137,17 +2181,17 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
                     let at_bottom_edge = cursor.y >= (dock_mon_y + dock_mon_h - (8.0 * scale) as i32) &&
                                          cursor.x >= dock_mon_x && cursor.x <= (dock_mon_x + dock_mon_w);
 
-                    if dock_fg_fs {
+                    if dock_fg_fs || shell_focused {
                         MH_DOCK_EXPIRY_MS.store(0, Ordering::Relaxed);
                     }
-                    if dock_edge_hover_allowed(dock_fg_fs, at_bottom_edge, in_dock_hover) {
+                    if dock_edge_hover_allowed(dock_fg_fs || shell_focused, at_bottom_edge, in_dock_hover) {
                         is_hovered = true;
                         MH_DOCK_EXPIRY_MS.store(now + 500, Ordering::Relaxed);
                     }
 
                     // Approaching along the bottom edge keeps the dock interactive
                     // while near its horizontal span, so the reveal can't be clicked
-                    if at_bottom_edge && !dock_fg_fs {
+                    if at_bottom_edge && !dock_fg_fs && !shell_focused {
                         if let Some((span_left, span_right)) = dock_span {
                             let edge_pad = (60.0 * scale) as i32;
                             if cursor.x >= span_left - edge_pad && cursor.x <= span_right + edge_pad {
@@ -2172,7 +2216,7 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
                         dbg_scale, dbg_box, is_click_interactive, MH_LAST_DOCK_IGNORE.load(Ordering::Relaxed),
                     ));
 
-                    let should_ignore = dock_fg_fs || (!is_click_interactive
+                    let should_ignore = dock_fg_fs || shell_focused || (!is_click_interactive
                         && !MENU_IS_OPEN.load(Ordering::Relaxed)
                         && !DOCK_IS_DRAGGING.load(Ordering::Relaxed));
                     let prev_ignore = MH_LAST_DOCK_IGNORE.load(Ordering::Relaxed);
@@ -3652,7 +3696,7 @@ fn recover_from_webview_failure(handle: &AppHandle) {
 
 #[cfg(test)]
 mod tests {
-    use super::{dock_edge_hover_allowed, is_helper_name, is_launchable_entry, win_number_index};
+    use super::{dock_edge_hover_allowed, is_helper_name, is_launchable_entry, is_windows_shell_launcher_process, win_number_index};
 
     #[test]
     fn fullscreen_dock_does_not_reveal_on_edge_or_hover() {
@@ -3666,6 +3710,17 @@ mod tests {
         assert!(dock_edge_hover_allowed(false, true, false));
         assert!(dock_edge_hover_allowed(false, false, true));
         assert!(!dock_edge_hover_allowed(false, false, false));
+    }
+
+
+    #[test]
+    fn shell_launchers_are_recognized_without_translated_window_titles() {
+        for exe in ["SearchApp.exe", "SearchUI.exe", "SearchHost.exe", "StartMenuExperienceHost.exe", "ShellExperienceHost.exe"] {
+            assert!(is_windows_shell_launcher_process(&format!(r"C:\Windows\SystemApps\{}", exe)));
+        }
+        assert!(!is_windows_shell_launcher_process(r"C:\Windows\explorer.exe"));
+        assert!(!is_windows_shell_launcher_process(r"C:\Tools\SearchAppHelper.exe"));
+        assert!(!is_windows_shell_launcher_process(r"C:\Program Files\Nectar\nectar.exe"));
     }
 
     #[test]

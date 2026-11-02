@@ -262,6 +262,7 @@ const Dock = memo(function Dock() {
   const [isEdgeHovered, setIsEdgeHovered] = useState(false);
   const [isOverlapped, setIsOverlapped] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isShellSurfaceFocused, setIsShellSurfaceFocused] = useState(false);
   const [showAddPopup, setShowAddPopup] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, app: AppInfo | null } | null>(null);
   const [contextMenuHeight, setContextMenuHeight] = useState(0);
@@ -322,7 +323,7 @@ const Dock = memo(function Dock() {
     }
   }, [isAnyInteraction]);
 
-  const isHidden = ((dockMode === 'smart' || dockMode === 'peek') && isFullscreen) ||
+  const isHidden = ((dockMode === 'smart' || dockMode === 'peek') && (isFullscreen || isShellSurfaceFocused)) ||
     (!startupAnimating && (
       (dockMode === 'smart' && isOverlapped && interactionState === 'none') ||
       (dockMode === 'peek' && interactionState === 'none')
@@ -494,6 +495,14 @@ const Dock = memo(function Dock() {
       }
     });
 
+    const unlistenShellSurface = thisWindow.listen<boolean>("dock-shell-surface", (event) => {
+      setIsShellSurfaceFocused(event.payload);
+      if (event.payload) {
+        setIsEdgeHovered(false);
+        setIsDockHovered(false);
+      }
+    });
+
     const unlistenMonitors = listen("monitors-changed", refreshDockMode);
 
     const unlistenMaximized = thisWindow.listen<boolean>("dock-maximized", (event) => {
@@ -505,6 +514,7 @@ const Dock = memo(function Dock() {
       unlistenOverlap.then(f => f());
       unlistenEdgeHover.then(f => f());
       unlistenFullscreen.then(f => f());
+      unlistenShellSurface.then(f => f());
       unlistenMonitors.then(f => f());
     };
   }, []);
