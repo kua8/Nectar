@@ -1480,19 +1480,19 @@ input:checked + .slider:before {
 .style-tiles {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  padding: 0 14px 12px 54px;
+  gap: 10px;
+  padding: 0 14px 14px;
 }
 
 .style-tile {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 6px;
-  padding: 5px;
-  border-radius: 10px;
+  gap: 8px;
+  padding: 6px 6px 8px;
+  border-radius: 12px;
   background: none;
-  border: 1px solid transparent;
+  border: 1.5px solid transparent;
   color: var(--nectar-text-muted, rgba(255, 255, 255, 0.6));
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
@@ -1507,17 +1507,19 @@ input:checked + .slider:before {
   color: var(--nectar-text, #fff);
 }
 
-/* Miniature scene: a soft wallpaper with the notch on top and the dock below, drawn in each style */
+/* Miniature scene: a bold wallpaper (stripes so blur and clarity read), the notch on top, the dock
+   below, each drawn in its own style */
 .style-tile-preview {
   position: relative;
   display: block;
-  height: 64px;
-  border-radius: 8px;
+  height: 76px;
+  border-radius: 9px;
   overflow: hidden;
   background:
-    radial-gradient(60% 80% at 18% 22%, #ffb86b 0%, transparent 62%),
-    radial-gradient(70% 90% at 88% 72%, #4fb3ff 0%, transparent 66%),
-    linear-gradient(135deg, #8a5cff, #2f6fd6);
+    radial-gradient(34px 34px at 22% 20%, #ffd166 0%, rgba(255, 209, 102, 0) 100%),
+    radial-gradient(46px 46px at 82% 74%, #2ee6c8 0%, rgba(46, 230, 200, 0) 100%),
+    repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.22) 0 7px, rgba(255, 255, 255, 0) 7px 16px),
+    linear-gradient(135deg, #ff5f8f 0%, #8a4dff 48%, #2f7bff 100%);
 }
 
 .style-tile-pill,
@@ -1527,98 +1529,102 @@ input:checked + .slider:before {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.82);
+  background: rgba(0, 0, 0, 0.86);
 }
 
 .style-tile-pill {
   top: 0;
-  width: 46%;
-  height: 15px;
-  border-radius: 0 0 9px 9px;
+  width: 52%;
+  height: 20px;
+  gap: 7px;
+  border-radius: 0 0 11px 11px;
 }
 
 .style-tile-pill i {
   display: block;
-  height: 3px;
+  height: 4px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .style-tile-pill i:first-child {
-  width: 14px;
+  width: 18px;
 }
 
 .style-tile-pill i:last-child {
-  width: 6px;
+  width: 8px;
   opacity: 0.5;
 }
 
 .style-tile-dock {
   bottom: 0;
-  width: 74%;
-  height: 17px;
-  border-radius: 9px 9px 0 0;
+  width: 78%;
+  height: 24px;
+  gap: 5px;
+  border-radius: 12px 12px 0 0;
 }
 
 .style-tile-dock i {
   display: block;
-  width: 8px;
-  height: 8px;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.2);
+  width: 11px;
+  height: 11px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.5);
 }
 
+.style-tile-dock i:nth-child(1) { background: #ff6b6b; }
+.style-tile-dock i:nth-child(2) { background: #4dd37a; }
+.style-tile-dock i:nth-child(3) { background: #4da3ff; }
+.style-tile-dock i:nth-child(4) { background: #ffd24d; }
+.style-tile-dock i:nth-child(5) { background: #c48bff; }
+
+/* Frosted: heavy blur, milky haze, hairline sides */
 .style-preview-frosted .style-tile-pill,
 .style-preview-frosted .style-tile-dock {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)),
-    rgba(18, 18, 26, 0.42);
-  backdrop-filter: blur(6px) saturate(1.2);
-  box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.3), inset -0.5px 0 0 rgba(255, 255, 255, 0.3);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.1)), rgba(20, 18, 34, 0.4);
+  backdrop-filter: blur(9px) saturate(1.35);
+  box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.4), inset -0.5px 0 0 rgba(255, 255, 255, 0.4);
 }
 
 .style-preview-frosted .style-tile-pill {
-  box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.3), inset -0.5px 0 0 rgba(255, 255, 255, 0.3), inset 0 -0.5px 0 rgba(255, 255, 255, 0.3);
+  box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.4), inset -0.5px 0 0 rgba(255, 255, 255, 0.4), inset 0 -0.5px 0 rgba(255, 255, 255, 0.4);
 }
 
 .style-preview-frosted .style-tile-dock {
-  box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.3), inset -0.5px 0 0 rgba(255, 255, 255, 0.3), inset 0 0.5px 0 rgba(255, 255, 255, 0.3);
+  box-shadow: inset 0.5px 0 0 rgba(255, 255, 255, 0.4), inset -0.5px 0 0 rgba(255, 255, 255, 0.4), inset 0 0.5px 0 rgba(255, 255, 255, 0.4);
 }
 
+/* Liquid: almost clear, bright specular rims and a sheen */
 .style-preview-liquid .style-tile-pill {
-  background:
-    linear-gradient(0deg, rgba(255, 255, 255, 0.28), transparent 7px),
-    rgba(10, 12, 24, 0.22);
-  box-shadow: inset 0 -1px 1px rgba(255, 255, 255, 0.7), inset 1px 0 1px rgba(255, 255, 255, 0.3), inset -1px 0 1px rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(2px);
+  background: linear-gradient(0deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0) 9px), rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(1px) brightness(1.1) saturate(1.2);
+  box-shadow: inset 0 -1.5px 1px rgba(255, 255, 255, 0.85), inset 1px 0 1px rgba(255, 255, 255, 0.45), inset -1px 0 1px rgba(255, 255, 255, 0.45);
 }
 
 .style-preview-liquid .style-tile-dock {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.3), transparent 8px),
-    rgba(10, 12, 24, 0.22);
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.7), inset 1px 0 1px rgba(255, 255, 255, 0.3), inset -1px 0 1px rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(2px);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0) 10px), rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(1px) brightness(1.1) saturate(1.2);
+  box-shadow: inset 0 1.5px 1px rgba(255, 255, 255, 0.85), inset 1px 0 1px rgba(255, 255, 255, 0.45), inset -1px 0 1px rgba(255, 255, 255, 0.45);
 }
 
-.style-preview-liquid .style-tile-dock i {
-  background: rgba(255, 255, 255, 0.32);
+.style-preview-liquid .style-tile-pill i {
+  background: #fff;
 }
 
+/* Material: flat tonal surface in the accent color */
 .style-preview-material .style-tile-pill,
 .style-preview-material .style-tile-dock {
-  background: color-mix(in srgb, var(--nectar-accent, #007aff) 20%, #16181d);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nectar-accent, #007aff) 32%, transparent);
+  background: color-mix(in srgb, var(--nectar-accent, #007aff) 24%, #14161b);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nectar-accent, #007aff) 38%, transparent);
 }
 
 .style-preview-material .style-tile-pill i:first-child {
-  background: color-mix(in srgb, var(--nectar-accent, #007aff) 60%, white);
+  background: color-mix(in srgb, var(--nectar-accent, #007aff) 65%, white);
 }
 
 .style-preview-material .style-tile-dock i {
-  background: color-mix(in srgb, var(--nectar-accent, #007aff) 45%, #2a2d34);
+  background: color-mix(in srgb, var(--nectar-accent, #007aff) 55%, #2b2f38);
 }
 
 .style-tile-label {

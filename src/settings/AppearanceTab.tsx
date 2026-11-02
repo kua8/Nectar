@@ -97,6 +97,7 @@ export function AppearanceTab({
                       <i />
                       <i />
                       <i />
+                      <i />
                     </span>
                   </span>
                   <span className="style-tile-label">{t(`appearance.style.${style}`)}</span>
