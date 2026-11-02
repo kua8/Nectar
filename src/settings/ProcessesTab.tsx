@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { X, RefreshCw } from "lucide-react";
 import { useT } from "../i18n";
+import { setVisibleInterval } from "../hooks/visibleInterval";
 
 interface ProcessInfo {
   pid: number;
@@ -45,7 +46,7 @@ export function ProcessesTab() {
 
   useEffect(() => {
     refresh();
-    refreshTimer.current = setInterval(refresh, 5000);
+    refreshTimer.current = setVisibleInterval(refresh, 5000);
     return () => {
       if (refreshTimer.current) clearInterval(refreshTimer.current);
     };

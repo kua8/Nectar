@@ -8,6 +8,7 @@ import { initTheme } from './theme';
 import { useSettingsSync } from './hooks/useSettingsSync';
 import { useT } from './i18n';
 import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon } from './icons';
+import { setVisibleInterval } from "./hooks/visibleInterval";
 
 interface AppInfo {
   name: string;
@@ -144,6 +145,13 @@ const ITEM_ENTRY_TRANSITION = {
 const ITEM_INITIAL = { opacity: 0, scale: 0 };
 const ITEM_ANIMATE = { opacity: 1, scale: 1 };
 const ITEM_EXIT = { opacity: 0, scale: 0 };
+
+const ICON_VARIANTS = {
+  idle: { y: 0, scale: 1 },
+  hover: { y: -5, scale: 1.1 },
+  drag: { y: -10, scale: 1.1, opacity: 0.8 },
+  tap: { scale: 0.95 }
+};
 
 function SearchIcon() {
   return (
@@ -354,9 +362,11 @@ const Dock = memo(function Dock() {
     };
 
     // Keep polling until visible — no time cap, since the dock can be
-    // enabled at runtime from settings after any delay.
+    let attempts = 0;
     const interval = setInterval(async () => {
       if (cleared) return;
+      attempts++;
+      if (attempts > 25 && attempts % 5 !== 0) return;
       if (await checkVisibility()) {
         clearInterval(interval);
         cleared = true;
@@ -393,25 +403,14 @@ const Dock = memo(function Dock() {
     const observer = new ResizeObserver(updateRect);
     if (dockRef.current) observer.observe(dockRef.current);
 
-    let rafId: number;
-    const chaseStart = performance.now();
-    const chase = () => {
-      updateRect();
-      if (performance.now() - chaseStart < 700) {
-        rafId = requestAnimationFrame(chase);
-      }
-    };
-    rafId = requestAnimationFrame(chase);
-
-    const poll = setInterval(updateRect, 500);
+    const poll = setVisibleInterval(updateRect, 500);
 
     return () => {
       window.removeEventListener('resize', updateRect);
       observer.disconnect();
       clearInterval(poll);
-      cancelAnimationFrame(rafId);
     };
-  }, [pinnedApps, activeApps, isHidden, previewData, scale]);
+  }, [isHidden, previewData, scale]);
 
   const refreshDockMode = () => {
     invoke<string>('get_dock_mode_for_window').then(setDockMode).catch(() => {});
@@ -465,8 +464,6 @@ const Dock = memo(function Dock() {
       setPinnedApps(pinned.map(a => ({ ...a, is_pinned: true })));
       pinned.forEach(app => fetchIcon(app.path));
 
-      // Warm the installed apps cache so the add-app popup opens with data.
-      invoke<AppInfo[]>('get_installed_apps').catch(() => {});
 
       // Load custom icons
       try {
@@ -551,7 +548,13 @@ const Dock = memo(function Dock() {
       const running = await invoke<AppInfo[]>('get_active_windows');
       // Drop out-of-order responses, an old poll must not bring back closed apps.
       if (seq !== pollSeq) return;
-      setActiveApps(running);
+      setActiveApps(prev => {
+        const same = prev.length === running.length && prev.every((p, i) => {
+          const r = running[i];
+          return p.path === r.path && p.name === r.name && p.hwnd === r.hwnd && p.is_running === r.is_running;
+        });
+        return same ? prev : running;
+      });
 
       setActiveOrder(prev => {
         const newPaths = running.map(r => appIdentity(r.path, r.executable, r.name));
@@ -579,7 +582,7 @@ const Dock = memo(function Dock() {
     });
 
     // Safety net: even if a window event is missed, converge on the real state
-    const interval = setInterval(poll, 10000);
+    const interval = setVisibleInterval(poll, 10000);
 
     return () => {
       clearInterval(interval);
@@ -1031,13 +1034,6 @@ const Dock = memo(function Dock() {
     };
   }, [hoveredApp, isDragging, dockItems, contextMenu]);
 
-  const iconVariants = {
-    idle: { y: 0, scale: 1 },
-    hover: { y: -5, scale: 1.1 },
-    drag: { y: -10, scale: 1.1, opacity: 0.8 },
-    tap: { scale: 0.95 }
-  };
-
   const previewAppId = dockPreviewEnabled ? previewData?.id : undefined;
   useEffect(() => {
     if (!previewAppId) {
@@ -1046,7 +1042,7 @@ const Dock = memo(function Dock() {
     }
     const refresh = () => invoke<AppMediaSession[]>('get_app_media_sessions').then(setMediaSessions).catch(() => {});
     refresh();
-    const timer = setInterval(refresh, 2000);
+    const timer = setVisibleInterval(refresh, 2000);
     return () => clearInterval(timer);
   }, [previewAppId]);
 
@@ -1093,7 +1089,7 @@ const Dock = memo(function Dock() {
       {(!dockPreviewEnabled || hoveredApp === id) && <div className="tooltip">{label}</div>}
       <motion.div
         className="dock-icon"
-        variants={iconVariants}
+        variants={ICON_VARIANTS}
         animate={pressedApp === id ? "tap" : (hoveredApp === id ? "hover" : "idle")}
         onPointerDown={() => setPressedApp(id)}
         onPointerUp={() => setPressedApp(null)}
@@ -1166,7 +1162,7 @@ const Dock = memo(function Dock() {
                   )}
                   <motion.div 
                     className="dock-icon"
-                    variants={iconVariants}
+                    variants={ICON_VARIANTS}
                     animate={pressedApp === itemKey(startItem) ? "tap" : (hoveredApp === itemKey(startItem) ? "hover" : "idle")}
                     onPointerDown={() => setPressedApp(itemKey(startItem))}
                     onPointerUp={() => setPressedApp(null)}
@@ -1195,7 +1191,7 @@ const Dock = memo(function Dock() {
                   )}
                   <motion.div
                     className="dock-icon"
-                    variants={iconVariants}
+                    variants={ICON_VARIANTS}
                     animate={pressedApp === 'search' ? "tap" : (hoveredApp === 'search' ? "hover" : "idle")}
                     onPointerDown={() => setPressedApp('search')}
                     onPointerUp={() => setPressedApp(null)}
@@ -1224,7 +1220,7 @@ const Dock = memo(function Dock() {
                   )}
                   <motion.div
                     className="dock-icon"
-                    variants={iconVariants}
+                    variants={ICON_VARIANTS}
                     animate={pressedApp === 'calendar' ? "tap" : (hoveredApp === 'calendar' ? "hover" : "idle")}
                     onPointerDown={() => setPressedApp('calendar')}
                     onPointerUp={() => setPressedApp(null)}
@@ -1340,7 +1336,7 @@ const Dock = memo(function Dock() {
                 )}
                 <motion.div 
                   className="dock-icon"
-                  variants={iconVariants}
+                  variants={ICON_VARIANTS}
                   animate={pressedApp === itemKey(app) ? "tap" : (isDragging && !app.is_pinned ? "idle" : (hoveredApp === itemKey(app) && !isDragging ? "hover" : "idle"))}
                   whileDrag="drag"
                   onPointerDown={() => setPressedApp(itemKey(app))}
@@ -1443,7 +1439,7 @@ const Dock = memo(function Dock() {
                       )}
                       <motion.div
                         className="dock-icon"
-                        variants={iconVariants}
+                        variants={ICON_VARIANTS}
                         animate={pressedApp === itemKey(app) ? "tap" : (isDragging && app.is_pinned ? "idle" : (hoveredApp === itemKey(app) && !isDragging ? "hover" : "idle"))}
                         whileDrag="drag"
                         onPointerDown={() => setPressedApp(itemKey(app))}
@@ -1542,7 +1538,7 @@ const Dock = memo(function Dock() {
                       )}
                       <motion.div
                         className="dock-icon"
-                        variants={iconVariants}
+                        variants={ICON_VARIANTS}
                         animate={pressedApp === itemKey(app) ? "tap" : (hoveredApp === itemKey(app) && !isDragging ? "hover" : "idle")}
                         whileDrag="drag"
                         onPointerDown={() => setPressedApp(itemKey(app))}

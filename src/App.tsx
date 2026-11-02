@@ -39,6 +39,7 @@ import {
   HardDrive,
   ArrowUpDown,
 } from "lucide-react";
+import { setVisibleInterval } from "./hooks/visibleInterval";
 
 // Timer chime, synthesized with Web Audio so there's no asset. The context is made on the
 // Start click so autoplay lets it play when the timer ends.
@@ -240,18 +241,12 @@ export const Visualizer = memo(function Visualizer({ isPlaying, bars = 5, height
   return (
     <div className="visualizer-horizontal" style={{ height: `${height}px`, width: `${bars * 6}px` }}>
       {audioData.map((value, i) => (
-        <motion.div
+        <div
           key={i}
           className="bar-horizontal"
-          animate={{
-            scaleY: isPlaying ? Math.max(0.2, value) : 0.1,
-            opacity: isPlaying ? 0.95 : 0.5
-          }}
-          transition={{
-            type: "spring",
-            stiffness: 600,
-            damping: 30,
-            mass: 0.5
+          style={{
+            transform: `scaleY(${isPlaying ? Math.max(0.2, value) : 0.1})`,
+            opacity: isPlaying ? 0.95 : 0.5,
           }}
         />
       ))}
@@ -341,6 +336,39 @@ const TitleMarquee = ({ title }: { title: string }) => {
 
 
 
+
+/**
+ * The notch clock, owning its own one-second state.
+ *
+ * The time used to live in `App`, so every second re-executed ~800 lines of
+ * JSX, the notch's width/height helpers and every mounted panel — the only
+ * continuous JavaScript work the app did while idle. Now only this span
+ * re-renders when the minute changes.
+ *
+ * The tick is scheduled against the wall clock rather than with a 1 s interval:
+ * a `setInterval` drifts and fires mid-second, so the displayed minute can
+ * lag behind the real one by up to a second.
+ */
+function TimeDisplay({ hour12 }: { hour12: boolean }) {
+  const format = () => new Date().toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12,
+  });
+  const [text, setText] = useState(format);
+
+  useEffect(() => {
+    let timer: number;
+    const tick = () => {
+      setText(format());
+      timer = window.setTimeout(tick, 1000 - (Date.now() % 1000));
+    };
+    timer = window.setTimeout(tick, 1000 - (Date.now() % 1000));
+    return () => clearTimeout(timer);
+  }, [hour12]);
+
+  return <>{text}</>;
+}
 
 function App() {
   const t = useT();
@@ -573,23 +601,12 @@ function App() {
     const observer = new ResizeObserver(updateRect);
     if (nectarRef.current) observer.observe(nectarRef.current);
 
-    let rafId: number;
-    const chaseStart = performance.now();
-    const chase = () => {
-      updateRect();
-      if (performance.now() - chaseStart < 700) {
-        rafId = requestAnimationFrame(chase);
-      }
-    };
-    rafId = requestAnimationFrame(chase);
-
-    const poll = setInterval(updateRect, 500);
+    const poll = setVisibleInterval(updateRect, 500);
 
     return () => {
       window.removeEventListener('resize', updateRect);
       observer.disconnect();
       clearInterval(poll);
-      cancelAnimationFrame(rafId);
     };
   }, [isExpanded, isHidden, windowLabel, scale]);
 
@@ -623,7 +640,10 @@ function App() {
         return false;
       };
 
+      let attempts = 0;
       const interval = setInterval(async () => {
+        attempts++;
+        if (attempts > 50 && attempts % 10 !== 0) return;
         if (await checkVisibility()) clearInterval(interval);
       }, 100);
 
@@ -1198,26 +1218,26 @@ function App() {
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
-      setTime(
-        now.toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: !timeFormat24h,
-        })
-      );
       if (settingsDualClockEnabled) {
+        setTime(
+          now.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: !timeFormat24h,
+          })
+        );
         setDualTime(formatZoneTime(now, dualClockZone, !timeFormat24h));
         setDualDayShift(zoneDayShift(now, dualClockZone));
       }
     };
 
     updateTime();
-    const interval = setInterval(updateTime, 1000);
+    const interval = setVisibleInterval(updateTime, 1000);
 
     // Toggle compact timer view every 5 seconds if running
     let timerToggleInterval: any;
     if ((isTimerRunning || stopwatch.running) && nectarMode !== 'calendar') {
-      timerToggleInterval = setInterval(() => {
+      timerToggleInterval = setVisibleInterval(() => {
         setIsCompactTimerVisible(prev => !prev);
       }, 5000);
     } else {
@@ -1308,7 +1328,7 @@ function App() {
   useEffect(() => {
     if (nectarMode !== 'command-center') return;
     void refreshWifiStatus();
-    const interval = setInterval(() => void refreshWifiStatus(), 5000);
+    const interval = setVisibleInterval(() => void refreshWifiStatus(), 5000);
     return () => clearInterval(interval);
   }, [nectarMode, refreshWifiStatus]);
 
@@ -1325,26 +1345,32 @@ function App() {
       .catch(() => { });
     invoke<number>("get_brightness").then(setCurrentBrightness).catch(() => { });
 
-    // Poll battery saver state every 5s (since we can't listen for changes)
-    const interval = setInterval(() => {
+    const interval = setVisibleInterval(() => {
       invoke<boolean>("get_battery_saver_state").then(setBatterySaverEnabled).catch(() => { });
-    }, 5000);
+    }, 15000);
     return () => clearInterval(interval);
   }, []);
 
-  // Poll system metrics for status widgets
   useEffect(() => {
+    interface SystemMetrics {
+      cpu: number;
+      ram: number;
+      disk_free_gb: number;
+      net_up: number;
+      net_down: number;
+    }
+
     const fetchMetrics = () => {
-      invoke<number>("get_cpu_usage").then(setCpuUsage).catch((e) => console.warn("CPU:", e));
-      invoke<number>("get_ram_usage").then(setRamUsage).catch((e) => console.warn("RAM:", e));
-      invoke<number>("get_disk_space").then(setDiskSpace).catch((e) => console.warn("Disk:", e));
-      invoke<[number, number]>("get_network_speed").then(([up, down]) => {
-        setNetUpSpeed(up);
-        setNetDownSpeed(down);
-      }).catch(() => {});
+      invoke<SystemMetrics>("get_system_metrics").then((m) => {
+        setCpuUsage(m.cpu);
+        setRamUsage(m.ram);
+        setDiskSpace(m.disk_free_gb);
+        setNetUpSpeed(m.net_up);
+        setNetDownSpeed(m.net_down);
+      }).catch((e) => console.warn("metrics:", e));
     };
     fetchMetrics();
-    const interval = setInterval(fetchMetrics, 3000);
+    const interval = setVisibleInterval(fetchMetrics, 3000);
     return () => clearInterval(interval);
   }, []);
 
@@ -1396,11 +1422,11 @@ function App() {
             }
             return prev;
           });
-        } else {
+        } else if (prev.title !== info.title || prev.artist !== info.artist) {
           setAlbumArtUrl(null);
         }
 
-        return info;
+        return info.artwork && info.artwork.length > 0 ? info : { ...info, artwork: prev.artwork };
       });
     });
 
@@ -1836,8 +1862,6 @@ function App() {
           borderTopRightRadius: isImpacted ? 0 : 18,
           borderBottomLeftRadius: isCalendarMode ? 28 : 18,
           borderBottomRightRadius: isCalendarMode ? 28 : 18,
-          filter: "blur(0px)",
-          pointerEvents: 'auto'
         }}
         onClick={(e) => {
           e.stopPropagation();
@@ -2205,7 +2229,7 @@ function App() {
                                       exit={{ rotateX: 90, opacity: 0 }}
                                       transition={{ type: "spring", stiffness: 600, damping: 30 }}
                                     >
-                                      {time}
+                                      <TimeDisplay hour12={!timeFormat24h} />
                                     </motion.span>
                                   )}
                                 </AnimatePresence>

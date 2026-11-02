@@ -5,8 +5,8 @@ import { Visualizer } from './App';
 import { useT } from './i18n';
 import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, MusicNoteIcon, SpeakerIcon, AudioOutputIcon, VolumeLowIcon, VolumeHighIcon } from './icons';
 import { ChevronRight } from 'lucide-react';
-
 import { MediaSourceButton, type MediaSession } from "./components/MediaSourceButton";
+import { setVisibleInterval } from "./hooks/visibleInterval";
 
 interface MediaInfo {
   title: string;
@@ -167,7 +167,7 @@ export function CompactMediaPlayer({
     };
     tick();
     if (!isPlaying) return;
-    const interval = setInterval(tick, 250);
+    const interval = setVisibleInterval(tick, 250);
     return () => clearInterval(interval);
   }, [isPlaying, durationMs]);
 

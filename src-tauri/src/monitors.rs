@@ -155,6 +155,7 @@ fn destroy_monitor_window(app: &AppHandle, label: &str) {
         let _ = win.destroy();
     }
     clear_window_state(label);
+    crate::memory_saver::trim_soon();
 }
 
 fn sync_kind(app: &AppHandle, kind: WindowKind, monitors: &[Monitor]) {

@@ -671,6 +671,7 @@ pub fn setup_audio_visualization(app_handle: AppHandle) {
 
                     let mut last_device_check = std::time::Instant::now();
                     let mut idle_since = std::time::Instant::now();
+                    let mut last_emit: Option<std::time::Instant> = None;
                     loop {
                         let idle = !ANY_MEDIA_PLAYING.load(Ordering::Relaxed);
                         if !idle {
@@ -793,7 +794,19 @@ pub fn setup_audio_visualization(app_handle: AppHandle) {
                                             output[band_idx] = output[band_idx].clamp(0.18, 1.0);
                                             prev_values[band_idx] = output[band_idx];
                                         }
-                                        let _ = app_handle.emit("audio-visualization", AudioVisualizationData { frequencies: output.to_vec() });
+                                        let due = last_emit.map_or(true, |t| t.elapsed().as_millis() >= 33);
+                                        if due {
+                                            last_emit = Some(std::time::Instant::now());
+                                            for (label, _) in app_handle.webview_windows() {
+                                                if crate::state::is_notch_label(&label) {
+                                                    let _ = app_handle.emit_to(
+                                                        label.as_str(),
+                                                        "audio-visualization",
+                                                        AudioVisualizationData { frequencies: output.to_vec() },
+                                                    );
+                                                }
+                                            }
+                                        }
                                         buffer_pos = 0;
                                     }
                                 }
@@ -867,6 +880,11 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                 if let Ok(hwnd1) = FindWindowA(class1, windows::core::PCSTR::null()) { let _ = ShowWindow(hwnd1, SW_HIDE); }
             };
 
+            const IDLE_POLL: std::time::Duration = std::time::Duration::from_millis(200);
+            const ACTIVE_POLL: std::time::Duration = std::time::Duration::from_millis(64);
+
+            let mut active_until = std::time::Instant::now();
+
             loop {
                 // Check for device change
                 if last_device_check.elapsed().as_secs() >= 2 {
@@ -889,7 +907,27 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                 }
 
                 if manager.is_none() { manager = GlobalSystemMediaTransportControlsSessionManager::RequestAsync().and_then(|op| op.get()).ok(); }
-                while let Ok(cmd) = rx.try_recv() {
+
+                let mut pending: Option<SystemCommand> = None;
+                let wait = if active_until.elapsed() < std::time::Duration::from_secs(2) {
+                    ACTIVE_POLL
+                } else {
+                    IDLE_POLL
+                };
+                match rx.recv_timeout(wait) {
+                    Ok(cmd) => {
+                        active_until = std::time::Instant::now();
+                        pending = Some(cmd);
+                    }
+                    Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {}
+                    Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
+                }
+
+                let mut commands: Vec<SystemCommand> = Vec::new();
+                if let Some(cmd) = pending { commands.push(cmd); }
+                while let Ok(cmd) = rx.try_recv() { commands.push(cmd); }
+                for cmd in commands {
+                    active_until = std::time::Instant::now();
                     // Only the volume commands need the audio endpoint, the rest must work with no output device.
                     {
                         match cmd {
@@ -1071,12 +1109,16 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                         // For position: emit if >1s difference (avoid spamming on every poll)
                         (*pos - current.position_ms).abs() > 1000
                     }) {
-                        let _ = handle_system.emit("media-update", current.clone());
+                        let art_is_new = last_emitted_info.as_ref().is_none_or(|(_, _, _, _, art, _, _)| art != &art_str);
+                        let mut payload = current.clone();
+                        if !art_is_new {
+                            payload.artwork = None;
+                        }
+                        let _ = handle_system.emit("media-update", payload);
                         ANY_MEDIA_PLAYING.store(current.is_playing, Ordering::Relaxed);
                         last_emitted_info = Some((current.title, current.artist, current.is_playing, current.has_media, art_str, current.position_ms, current.duration_ms));
                     }
                 }
-                std::thread::sleep(std::time::Duration::from_millis(64));
             }
         }
     });
@@ -1085,7 +1127,10 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
     std::thread::spawn(move || {
         let com_lib = match COMLibrary::new() { Ok(lib) => lib, Err(_) => return };
         let wmi_con = match WMIConnection::with_namespace_path("root\\WMI", com_lib) { Ok(con) => con, Err(_) => return };
-        let mut last_brightness = match wmi_con.query::<WmiMonitorBrightness>() { Ok(res) => res.first().map(|b| b.current_brightness as u32).unwrap_or(50), Err(_) => 50 };
+        let first = wmi_con.query::<WmiMonitorBrightness>();
+        let supported = first.as_ref().map(|r| !r.is_empty()).unwrap_or(false);
+        let poll = if supported { 1500 } else { 30_000 };
+        let mut last_brightness = match first.ok().and_then(|res| res.first().map(|b| b.current_brightness as u32)) { Some(v) => v, None => 50 };
         CURRENT_BRIGHTNESS.store(last_brightness, Ordering::Relaxed);
         loop {
             if get_now_ms() - LAST_BRIGHTNESS_CHANGE.load(Ordering::Relaxed) < 2000 { std::thread::sleep(std::time::Duration::from_millis(500)); continue; }
@@ -1095,7 +1140,7 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                     if brightness != last_brightness { last_brightness = brightness; CURRENT_BRIGHTNESS.store(brightness, Ordering::Relaxed); let _ = handle_brightness.emit("brightness-change", BrightnessChangeEvent { brightness }); }
                 }
             }
-            std::thread::sleep(std::time::Duration::from_millis(1500));
+            std::thread::sleep(std::time::Duration::from_millis(poll));
         }
     });
 
@@ -3273,6 +3318,7 @@ pub fn wire_window_events(app: &AppHandle, window: &tauri::WebviewWindow, kind: 
     let app_for_events = app.clone();
     let label_for_events = label.clone();
     window.on_window_event(move |e| {
+        crate::memory_saver::mark_interaction();
         match e {
             tauri::WindowEvent::Moved(_) | tauri::WindowEvent::Resized(_) => {
                 u();
@@ -3579,7 +3625,7 @@ unsafe extern "system" fn display_monitor_proc(
 
 pub fn start_window_style_guard(app: AppHandle) {
     std::thread::spawn(move || loop {
-        std::thread::sleep(std::time::Duration::from_millis(300));
+        std::thread::sleep(std::time::Duration::from_millis(1000));
         for (label, win) in app.webview_windows() {
             let is_notch = is_notch_label(&label);
             let is_dock = is_dock_label(&label);

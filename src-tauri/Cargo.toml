@@ -87,3 +87,12 @@ keyring = { version = "3", features = ["windows-native"] }
 rrule = "0.14"
 chrono-tz = "0.10"
 
+# Shrinking the binary shrinks the code pages the app and its WebView have to
+# fault in at startup, which is the one part of the footprint that is paid
+# before any window shows. The app is a long-running overlay, so startup cost
+# matters more than peak throughput.
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = true
+

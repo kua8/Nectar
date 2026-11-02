@@ -19,6 +19,7 @@ import {
   Thermometer,
   type LucideProps,
 } from "lucide-react";
+import { setVisibleInterval } from "./visibleInterval";
 
 // WMO weather interpretation codes
 // https://open-meteo.com/en/docs#weathervariables
@@ -412,7 +413,7 @@ export function useWeather(enabled: boolean) {
 
     doFetch(false);
 
-    const interval = setInterval(() => doFetch(false), REFRESH_INTERVAL_MS);
+    const interval = setVisibleInterval(() => doFetch(false), REFRESH_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [enabled, doFetch]);
 
