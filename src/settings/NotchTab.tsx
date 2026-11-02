@@ -2,6 +2,14 @@ import {
   PanelTop,
   Calendar,
   Music,
+  Pin,
+  Sparkle,
+  Activity,
+  CalendarDays,
+  Inbox,
+  History,
+  ListOrdered,
+  SlidersHorizontal,
   Minimize2,
   LayoutList,
   Palette,
@@ -22,6 +30,15 @@ import {
 import { DEFAULT_PANEL_ORDER, type CcLayout, type PanelId } from "../panelOrder";
 import { ControlCenterConfig } from "../components/ControlCenterConfig";
 import { OrderList } from "./OrderList";
+import type { ComponentType } from "react";
+
+const PANEL_ICONS: Record<string, ComponentType<{ size?: number; strokeWidth?: number }>> = {
+  "command-center": SlidersHorizontal,
+  status: Activity,
+  music: Music,
+  calendar: CalendarDays,
+  shelf: Inbox,
+};
 import { SettingRow } from "./SettingRow";
 import { SettingSection } from "./SettingSection";
 import { Dropdown } from "./Dropdown";
@@ -370,7 +387,7 @@ export function NotchTab({
               </label>
             </SettingRow>
 
-            <SettingRow icon={Circle} label={t("notch.compactGlow")} desc={t("notch.compactGlow.desc")}>
+            <SettingRow icon={Sparkle} label={t("notch.compactGlow")} desc={t("notch.compactGlow.desc")}>
               <label className="toggle-switch">
                 <input type="checkbox" checked={mediaCompactGlowEnabled} onChange={toggleCompactGlow} />
                 <span className="slider"></span>
@@ -381,31 +398,35 @@ export function NotchTab({
       </SettingSection>
 
       <SettingSection id="notch-panels" title={t("notch.section.panels")}>
-        <SettingRow icon={Circle} label={t("notch.panelControlCenter")} desc={t("notch.panelControlCenter.desc")}>
+        <SettingRow icon={SlidersHorizontal} label={t("notch.panelControlCenter")} desc={t("notch.panelControlCenter.desc")}>
               <label className="toggle-switch">
                 <input type="checkbox" checked={panelControlCenter} onChange={togglePanelControlCenter} />
                 <span className="slider"></span>
               </label>
             </SettingRow>
 
-        <SettingRow icon={Circle} label={t("notch.panelShelf")} desc={t("notch.panelShelf.desc")}>
+        <SettingRow icon={Inbox} label={t("notch.panelShelf")} desc={t("notch.panelShelf.desc")}>
               <label className="toggle-switch">
                 <input type="checkbox" checked={panelShelf} onChange={togglePanelShelf} />
                 <span className="slider"></span>
               </label>
             </SettingRow>
 
-        <SettingRow icon={Circle} label={t("notch.rememberMode")} desc={t("notch.rememberMode.desc")}>
+        <SettingRow icon={History} label={t("notch.rememberMode")} desc={t("notch.rememberMode.desc")}>
               <label className="toggle-switch">
                 <input type="checkbox" checked={rememberMode} onChange={toggleRememberMode} />
                 <span className="slider"></span>
               </label>
             </SettingRow>
 
-        <SettingRow icon={Circle} label={t("notch.panelOrder")} desc={t("notch.panelOrder.desc")} divider={false} stacked>
+        <SettingRow icon={ListOrdered} label={t("notch.panelOrder")} desc={t("notch.panelOrder.desc")} divider={false} stacked>
           <OrderList
             ids={panelOrder ?? DEFAULT_PANEL_ORDER}
             label={(id) => t(`panel.${id}`)}
+            icon={(id) => {
+              const Icon = PANEL_ICONS[id] ?? Circle;
+              return <Icon size={14} strokeWidth={2} />;
+            }}
             onReorder={(order) => reorderPanels(order as PanelId[])}
             onReset={panelOrder ? resetPanelOrder : undefined}
             resetLabel={t("notch.panelOrder.reset")}
@@ -430,7 +451,7 @@ export function NotchTab({
               </label>
             </SettingRow>
 
-        <SettingRow icon={Circle} label={t("notch.shelfPersist")} desc={t("notch.shelfPersist.desc")} divider={false}>
+        <SettingRow icon={Pin} label={t("notch.shelfPersist")} desc={t("notch.shelfPersist.desc")} divider={false}>
               <label className="toggle-switch">
                 <input type="checkbox" checked={shelfPersist} onChange={toggleShelfPersist} />
                 <span className="slider"></span>

@@ -142,7 +142,9 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  width: 100%;
+  /* Zero width with a full-width minimum: the row takes the card's width but never widens it */
+  width: 0;
+  min-width: 100%;
   box-sizing: border-box;
   padding: 6px 8px 2px;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
@@ -160,7 +162,6 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 180px;
 }
 
 .preview-media-title {
@@ -177,6 +178,7 @@ body {
 .preview-media-controls {
   display: flex;
   align-items: center;
+  flex: 0 0 auto;
   gap: 4px;
 }
 

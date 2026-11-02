@@ -570,5 +570,6 @@
   "dockmenu.showDesktop": "Show desktop",
   "notch.ccSliders": "Sliders",
   "cc.layout.volume": "Volume",
-  "cc.layout.brightness": "Brightness"
+  "cc.layout.brightness": "Brightness",
+  "cc.layout.available": "Available"
 }

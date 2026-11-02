@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent, CSSProperties } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Monitor, Eye, EyeOff, Circle, Search, Shuffle, MonitorCheck, CalendarDays, Maximize2, Keyboard, Sparkles, RotateCcw, LayoutGrid, Trash2, HardDrive, ChevronUp, TextSearch } from "lucide-react";
+import { Monitor, Eye, EyeOff, Square, Search, Shuffle, MonitorCheck, CalendarDays, Maximize2, Keyboard, Sparkles, RotateCcw, LayoutGrid, Trash2, HardDrive, ChevronUp, TextSearch } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { SettingSection } from "./SettingSection";
 import { Dropdown } from "./Dropdown";
@@ -395,7 +395,7 @@ export function DockTab({
           </SettingSection>
 
           <SettingSection id="dock-style" title={t("dock.section.style")}>
-            <SettingRow icon={Circle} label={t("dock.iconOnly")} desc={t("dock.iconOnly.desc")}>
+            <SettingRow icon={Square} label={t("dock.iconOnly")} desc={t("dock.iconOnly.desc")}>
               <label className="toggle-switch">
                 <input type="checkbox" checked={dockIconOnly} onChange={toggleDockIconOnly} />
                 <span className="slider"></span>

@@ -525,6 +525,7 @@
   "notch.ccSliders": "Kaydırıcılar",
   "cc.layout.volume": "Ses",
   "cc.layout.brightness": "Parlaklık",
+  "cc.layout.available": "Kullanılabilir",
   "dock.searchWith": "Arama Aracı",
   "dock.searchWith.windows": "Windows Arama",
   "dock.searchWith.windows.desc": "Windows Aramayı açar (Win+S)",

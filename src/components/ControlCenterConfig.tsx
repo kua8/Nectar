@@ -149,6 +149,7 @@ export function ControlCenterConfig({ value, onChange, onReset, customized }: Pr
         ))}
         {pool.length > 0 && (
           <div className="widget-config-pool">
+            <span className="widget-config-side">{t("cc.layout.available")}</span>
             <div className="widget-config-pool-chips">
               {pool.map((id) => <PoolChip key={id} id={id} onAdd={add} />)}
             </div>
