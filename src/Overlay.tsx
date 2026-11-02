@@ -11,6 +11,7 @@ import { Check, ChevronRight } from "lucide-react";
 import { AudioOutputIcon, MixerIcon, SpeakerIcon } from "./icons";
 import { useT } from "./i18n";
 import "./Overlay.css";
+import "./surfaces.css";
 import { initTheme } from "./theme";
 import { setVisibleInterval } from "./hooks/visibleInterval";
 

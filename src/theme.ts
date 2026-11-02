@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { applyBackdrop, enableBackdrop, usesBackdrop } from "./backdrop";
 
 // Convert a hex color string to rgba with a specified alpha
 function hexToRgba(hex: string, alpha: number): string {
@@ -56,7 +57,7 @@ export function hexToHsl(hex: string): HSL {
 }
 
 // Convert HSL back to Hex color string
-function hslToHex(h: number, s: number, l: number): string {
+export function hslToHex(h: number, s: number, l: number): string {
   s /= 100;
   l /= 100;
   const c = (1 - Math.abs(2 * l - 1)) * s;
@@ -86,6 +87,127 @@ function hslToHex(h: number, s: number, l: number): string {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 }
 
+export interface ThemePreset {
+  name: string;
+  color: string;
+  saturation: number;
+  brightness: number;
+}
+
+// Background hue comes from `color`; the same color is used as the accent.
+export const THEME_PRESETS: ThemePreset[] = [
+  { name: "Midnight", color: "#5e8bff", saturation: 0.45, brightness: 0.13 },
+  { name: "Ocean", color: "#2ec4d6", saturation: 0.6, brightness: 0.13 },
+  { name: "Forest", color: "#34c77b", saturation: 0.35, brightness: 0.12 },
+  { name: "Plum", color: "#c77dff", saturation: 0.3, brightness: 0.14 },
+  { name: "Ember", color: "#ff7a45", saturation: 0.45, brightness: 0.13 },
+  { name: "Latte", color: "#c0742d", saturation: 0.4, brightness: 0.88 },
+  { name: "Mist", color: "#0a84ff", saturation: 0.35, brightness: 0.92 },
+];
+
+export const DEFAULT_ACCENT_COLOR = "#0a84ff";
+
+export const THEME_STYLES = ["solid", "frosted", "liquid", "material"] as const;
+
+// Background opacity each style is designed around; picking a style sets it, the slider can still change it.
+export const STYLE_OPACITY: Record<string, number> = {
+  solid: 0.8,
+  frosted: 0.6,
+  liquid: 0.45,
+  material: 0.96,
+};
+
+const darkScheme = typeof window !== "undefined" && window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+
+// "auto" follows the Windows app mode (WebView2 reports it as prefers-color-scheme).
+function resolveMode(mode: string): string {
+  if (mode !== "auto") return mode;
+  return darkScheme && !darkScheme.matches ? "light" : "dark";
+}
+
+// Black or white, whichever reads better on the given color.
+function contrastText(hex: string): string {
+  const h = hex.replace("#", "");
+  const full = h.length === 3 ? h.split("").map((c) => c + c).join("") : h;
+  const channel = (i: number) => {
+    const v = (parseInt(full.substring(i, i + 2), 16) || 0) / 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  };
+  const luminance = 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
+  return luminance > 0.4 ? "#000000" : "#ffffff";
+}
+
+function isHex(color: string | null): color is string {
+  return !!color && /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(color);
+}
+
+const hsla = (h: number, s: number, l: number, a = 1) => `hsla(${h}, ${s}%, ${l}%, ${a})`;
+
+// Material You style tonal palette: tinted surfaces and a pastel (dark) or deep (light) primary.
+function applyMaterialPalette(root: HTMLElement, seed: string, light: boolean, op: number, opExpanded: number, opPanel: number) {
+  const { h, s } = hexToHsl(seed);
+  const tint = Math.min(s, 60);
+  const set = (name: string, value: string) => root.style.setProperty(name, value);
+  if (light) {
+    set("--nectar-bg", hsla(h, tint * 0.6, 95, op));
+    set("--nectar-bg-expanded", hsla(h, tint * 0.55, 92, opExpanded));
+    set("--nectar-bg-panel", hsla(h, tint * 0.55, 92, opPanel));
+    set("--nectar-text", hsla(h, 18, 12));
+    set("--nectar-text-muted", hsla(h, 12, 28, 0.75));
+    set("--nectar-border", hsla(h, 15, 30, 0.16));
+    set("--nectar-group-bg", hsla(h, 35, 45, 0.08));
+    set("--nectar-highlight", hsla(h, Math.max(s, 45), 38));
+    set("--nectar-on-highlight", "#ffffff");
+  } else {
+    set("--nectar-bg", hsla(h, tint * 0.35, 9, op));
+    set("--nectar-bg-expanded", hsla(h, tint * 0.35, 12, opExpanded));
+    set("--nectar-bg-panel", hsla(h, tint * 0.35, 12, opPanel));
+    set("--nectar-text", hsla(h, 25, 92));
+    set("--nectar-text-muted", hsla(h, 14, 78, 0.8));
+    set("--nectar-border", hsla(h, 18, 70, 0.16));
+    set("--nectar-group-bg", hsla(h, 35, 70, 0.08));
+    set("--nectar-highlight", hsla(h, Math.max(s, 55), 78));
+    set("--nectar-on-highlight", hsla(h, 55, 16));
+  }
+  set("--nectar-accent", seed);
+}
+
+let accentGeneration = 0;
+
+// Highlights (active pills, toggles, sliders, today) are monochrome unless an accent is chosen.
+// Material You always has one: it uses the accent, or the Windows accent, as its seed.
+async function applyAccent(
+  root: HTMLElement,
+  surface: string,
+  material: { op: number; opExpanded: number; opPanel: number; fallback: string } | null,
+  legacy: boolean
+) {
+  const generation = ++accentGeneration;
+  const accentMode = legacy ? "mono" : localStorage.getItem("nectar-theme-accent") || "mono";
+  let color: string | null = null;
+  if (accentMode === "custom") {
+    color = localStorage.getItem("nectar-theme-accent-color") || DEFAULT_ACCENT_COLOR;
+  } else if (accentMode === "system" || material) {
+    color = await invoke<string>("get_system_accent_color").catch(() => null);
+    if (generation !== accentGeneration) return;
+  }
+  if (material) {
+    const light = root.classList.contains("light-mode");
+    applyMaterialPalette(root, isHex(color) ? color : material.fallback, light, material.op, material.opExpanded, material.opPanel);
+    return;
+  }
+  if (!isHex(color)) {
+    // Monochrome: highlights use the text color, and text on them uses the opaque surface color
+    // (the translucent background would turn it grey on glass).
+    root.style.removeProperty("--nectar-highlight");
+    root.style.setProperty("--nectar-on-highlight", surface);
+    return;
+  }
+  root.style.setProperty("--nectar-accent", color);
+  root.style.setProperty("--nectar-highlight", color);
+  root.style.setProperty("--nectar-on-highlight", contrastText(color));
+}
+
 export async function applyTheme(
   mode: string,
   customColor: string,
@@ -94,6 +216,13 @@ export async function applyTheme(
   brightness?: number
 ) {
   const root = document.documentElement;
+  mode = resolveMode(mode);
+
+  // Legacy Mode keeps the classic look: no glass or Material You, and monochrome highlights.
+  const legacy = localStorage.getItem("nectar-legacy-mode") === "true";
+  const style = legacy ? "solid" : localStorage.getItem("nectar-theme-style") || "solid";
+  root.classList.remove(...THEME_STYLES.map((s) => `style-${s}`));
+  root.classList.add(`style-${(THEME_STYLES as readonly string[]).includes(style) ? style : "solid"}`);
 
   if (opacity === undefined || opacity === null) {
     const cachedOpacity = localStorage.getItem('nectar-theme-opacity');
@@ -112,10 +241,15 @@ export async function applyTheme(
 
   const op = opacity;
   const opExpanded = Math.min(1.0, opacity + 0.12);
+  // Large panels (calendar, command center) need a denser fill than the pill to stay readable on glass.
+  const opPanel = Math.max(opExpanded, 0.82);
+  let surface = '#000000';
 
   if (mode === 'light') {
+    surface = '#f5f5f7';
     root.style.setProperty('--nectar-bg', `rgba(255, 255, 255, ${op})`);
     root.style.setProperty('--nectar-bg-expanded', `rgba(245, 245, 247, ${opExpanded})`);
+    root.style.setProperty('--nectar-bg-panel', `rgba(245, 245, 247, ${opPanel})`);
     root.style.setProperty('--nectar-text', '#1c1c1e');
     root.style.setProperty('--nectar-text-muted', 'rgba(28, 28, 30, 0.65)');
     root.style.setProperty('--nectar-border', 'rgba(0, 0, 0, 0.12)');
@@ -132,9 +266,11 @@ export async function applyTheme(
     hsl.l = brightness * 100;
     const finalBgColor = hslToHex(hsl.h, hsl.s, hsl.l);
     const isLight = brightness > 0.55;
+    surface = finalBgColor;
 
     root.style.setProperty('--nectar-bg', hexToRgba(finalBgColor, op));
     root.style.setProperty('--nectar-bg-expanded', hexToRgba(finalBgColor, opExpanded));
+    root.style.setProperty('--nectar-bg-panel', hexToRgba(finalBgColor, opPanel));
     root.style.setProperty('--nectar-text', isLight ? '#1c1c1e' : '#ffffff');
     root.style.setProperty('--nectar-text-muted', isLight ? 'rgba(28, 28, 30, 0.65)' : 'rgba(255, 255, 255, 0.65)');
     root.style.setProperty('--nectar-border', isLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.12)');
@@ -158,9 +294,11 @@ export async function applyTheme(
       hsl.l = brightness * 100;
       const finalBgColor = hslToHex(hsl.h, hsl.s, hsl.l);
       const isLight = brightness > 0.55;
+      surface = finalBgColor;
 
       root.style.setProperty('--nectar-bg', hexToRgba(finalBgColor, op));
       root.style.setProperty('--nectar-bg-expanded', hexToRgba(finalBgColor, opExpanded));
+      root.style.setProperty('--nectar-bg-panel', hexToRgba(finalBgColor, opPanel));
       root.style.setProperty('--nectar-text', isLight ? '#1c1c1e' : '#ffffff');
       root.style.setProperty('--nectar-text-muted', isLight ? 'rgba(28, 28, 30, 0.65)' : 'rgba(255, 255, 255, 0.65)');
       root.style.setProperty('--nectar-border', isLight ? 'rgba(0, 0, 0, 0.12)' : 'rgba(255, 255, 255, 0.12)');
@@ -178,12 +316,13 @@ export async function applyTheme(
       }
     } catch (e) {
       console.error("Failed to apply adaptive theme:", e);
-      applyTheme('dark', customColor, op, saturation, brightness);
+      return applyTheme('dark', customColor, op, saturation, brightness);
     }
   } else {
     // default/dark
     root.style.setProperty('--nectar-bg', `rgba(0, 0, 0, ${op})`);
     root.style.setProperty('--nectar-bg-expanded', `rgba(0, 0, 0, ${opExpanded})`);
+    root.style.setProperty('--nectar-bg-panel', `rgba(0, 0, 0, ${opPanel})`);
     root.style.setProperty('--nectar-text', '#ffffff');
     root.style.setProperty('--nectar-text-muted', 'rgba(255, 255, 255, 0.6)');
     root.style.setProperty('--nectar-border', 'rgba(255, 255, 255, 0.1)');
@@ -195,9 +334,21 @@ export async function applyTheme(
     root.classList.add('theme-dark');
     root.classList.remove('theme-light', 'theme-custom', 'theme-adaptive');
   }
+
+  await Promise.all([
+    applyAccent(
+      root,
+      surface,
+      style === "material" ? { op, opExpanded, opPanel, fallback: isHex(customColor) ? customColor : DEFAULT_ACCENT_COLOR } : null,
+      legacy
+    ),
+    applyBackdrop(root, style),
+  ]);
 }
 
-export function initTheme() {
+// `backdrop`: this window draws the notch or dock, which show the wallpaper in the glass styles.
+export function initTheme(options: { backdrop?: boolean } = {}) {
+  if (options.backdrop) enableBackdrop();
   const syncMode = localStorage.getItem('nectar-theme-mode') || 'dark';
   const syncColor = localStorage.getItem('nectar-theme-color') || '#007aff';
   const syncOpacityVal = localStorage.getItem('nectar-theme-opacity');
@@ -218,12 +369,22 @@ export function initTheme() {
     const saturationVal = settings['nectar-theme-saturation'] ? parseFloat(String(settings['nectar-theme-saturation'])) : syncSaturation;
     const brightnessVal = settings['nectar-theme-brightness'] ? parseFloat(String(settings['nectar-theme-brightness'])) : syncBrightness;
 
+    let styleOrAccentChanged = false;
+    for (const key of ['nectar-theme-accent', 'nectar-theme-accent-color', 'nectar-theme-style', 'nectar-legacy-mode']) {
+      const val = settings[key];
+      if (val !== undefined && val !== null && String(val) !== localStorage.getItem(key)) {
+        localStorage.setItem(key, String(val));
+        styleOrAccentChanged = true;
+      }
+    }
+
     if (
       mode !== syncMode ||
       color !== syncColor ||
       opacityVal !== syncOpacity ||
       saturationVal !== syncSaturation ||
-      brightnessVal !== syncBrightness
+      brightnessVal !== syncBrightness ||
+      styleOrAccentChanged
     ) {
       localStorage.setItem('nectar-theme-mode', mode);
       localStorage.setItem('nectar-theme-color', color);
@@ -244,7 +405,18 @@ export function initTheme() {
     applyTheme(mode, color, opacity, saturation, brightness);
   };
 
-  const nectarThemeKeys = ['nectar-theme-mode', 'nectar-theme-color', 'nectar-theme-opacity', 'nectar-theme-saturation', 'nectar-theme-brightness'];
+  const nectarThemeKeys = [
+    'nectar-theme-mode',
+    'nectar-theme-color',
+    'nectar-theme-opacity',
+    'nectar-theme-saturation',
+    'nectar-theme-brightness',
+    'nectar-theme-accent',
+    'nectar-theme-accent-color',
+    'nectar-theme-style',
+    'nectar-legacy-mode',
+    'nectar-scale',
+  ];
 
   // Listen to setting changes broadcasted from settings window
   // (localStorage sync is handled by saveAndLocal in Settings.tsx; we just apply the theme)
@@ -255,16 +427,30 @@ export function initTheme() {
     }
   });
 
-  // Listen to system accent color updates in case of adaptive theme
-  const accentPromise = listen<string>('system-accent-changed', (event) => {
+  // Windows sends this for accent and other system setting changes
+  const accentPromise = listen<string>('system-accent-changed', () => {
     const currentMode = localStorage.getItem('nectar-theme-mode') || 'dark';
-    if (currentMode === 'adaptive') {
-      const opacity = parseFloat(localStorage.getItem('nectar-theme-opacity') || '0.80');
-      const saturation = parseFloat(localStorage.getItem('nectar-theme-saturation') || '0.50');
-      const brightness = parseFloat(localStorage.getItem('nectar-theme-brightness') || '0.15');
-      applyTheme('adaptive', event.payload, opacity, saturation, brightness);
+    if (
+      currentMode === 'adaptive' ||
+      currentMode === 'auto' ||
+      localStorage.getItem('nectar-theme-accent') === 'system' ||
+      localStorage.getItem('nectar-theme-style') === 'material' ||
+      usesBackdrop(localStorage.getItem('nectar-theme-style'))
+    ) {
+      applyThemeFromStorage();
     }
   });
+
+  // The wallpaper backdrop is lined up with the window's place on its monitor
+  const monitorsPromise = listen('monitors-changed', () => {
+    if (usesBackdrop(localStorage.getItem('nectar-theme-style'))) applyThemeFromStorage();
+  });
+
+  // Follow Windows light/dark in auto mode
+  const onSchemeChange = () => {
+    if ((localStorage.getItem('nectar-theme-mode') || 'dark') === 'auto') applyThemeFromStorage();
+  };
+  darkScheme?.addEventListener('change', onSchemeChange);
 
   // Listen to external edits (e.g. settings.json edited outside the app)
   // localStorage sync is handled by useSettingsSync hook; we just apply the theme
@@ -279,5 +465,7 @@ export function initTheme() {
     settingsPromise.then(f => f());
     accentPromise.then(f => f());
     externalPromise.then(f => f());
+    monitorsPromise.then(f => f());
+    darkScheme?.removeEventListener('change', onSchemeChange);
   };
 }
