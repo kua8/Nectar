@@ -63,6 +63,8 @@
   "notch.ambientGlow.desc": "Genişletilmiş albüm kapağının arkasında renkli ışıma",
   "notch.compactGlow": "Kompakt Işıma",
   "notch.compactGlow.desc": "Daraltılmış küçük resmin etrafında ışıma",
+  "notch.artworkTheme": "Albüm kapağından renk",
+  "notch.artworkTheme.desc": "Müzik panelini kapağın renkleriyle boyar.",
   "notch.weather.group": "Hava Durumu",
   "notch.weather": "Hava Durumu Bilgisi",
   "notch.weather.auto": "Konumu otomatik algıla (bulunamazsa bir şehir arayın)",

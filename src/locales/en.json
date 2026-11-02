@@ -63,6 +63,8 @@
   "notch.ambientGlow.desc": "Colored glow behind expanded album art",
   "notch.compactGlow": "Compact Glow",
   "notch.compactGlow.desc": "Glow around collapsed thumbnail",
+  "notch.artworkTheme": "Color from album art",
+  "notch.artworkTheme.desc": "Tint the music panel with the cover's colors.",
   "notch.weather.group": "Weather",
   "notch.weather": "Weather Status",
   "notch.weather.auto": "Auto-detect location (search a city if it can't be found)",

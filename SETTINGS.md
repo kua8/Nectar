@@ -133,6 +133,7 @@ Removing a link or disconnecting the account deletes its stored secret and cache
 | `nectar-media-compact-glow-enabled` | `"true"` / `"false"` | `"true"` | Glow effect around the collapsed compact thumbnail. |
 | `nectar-media-visualizer-enabled` | `"true"` / `"false"` | `"true"` | Audio visualizer bars in music mode. Also accepts `nectar-visualizer-enabled` (legacy alias). |
 | `nectar-media-album-art-enabled` | `"true"` / `"false"` | `"true"` | Show album artwork in the notch music display. |
+| `nectar-media-artwork-theme` | `"true"` / `"false"` | `"false"` | Tint the notch music panel with colors extracted from the album art. |
 
 ### Overlays
 
