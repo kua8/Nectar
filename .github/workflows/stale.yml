@@ -1,0 +1,25 @@
+name: Close issues waiting on a reply
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          any-of-labels: needs-info,feedback
+          exempt-issue-labels: keep-open,confirmed,roadmap,blocked,p0-critical,p1-high
+          days-before-stale: 1
+          days-before-close: 0
+          days-before-pr-stale: -1
+          days-before-pr-close: -1
+          close-issue-reason: not_planned
+          stale-issue-label: stale
+          close-issue-message: "Closing this for now because we haven't heard back. If you still see the problem, please open a new issue with a screenshot and Copy Diagnostics from Settings > About."
