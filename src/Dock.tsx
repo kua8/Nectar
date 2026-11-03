@@ -253,6 +253,7 @@ const Dock = memo(function Dock() {
     return raw;
   });
   const [dockPreviewEnabled, setDockPreviewEnabled] = useState(() => localStorage.getItem("nectar-dock-preview-enabled") !== "false");
+  const [hideDelay, setHideDelay] = useState(() => Number(localStorage.getItem("nectar-dock-hide-delay")) || 800);
   const [dockSearchEnabled, setDockSearchEnabled] = useState(() => localStorage.getItem("nectar-dock-search-enabled") !== "false");
   const [dockCalendarEnabled, setDockCalendarEnabled] = useState(() => localStorage.getItem("nectar-dock-calendar-enabled") !== "false");
   const [legacyMode, setLegacyMode] = useState(() => localStorage.getItem("nectar-legacy-mode") === "true");
@@ -328,10 +329,10 @@ const Dock = memo(function Dock() {
       setInteractionState('active');
     } else if (interactionState !== 'none') {
       setInteractionState('grace');
-      const timer = setTimeout(() => setInteractionState('none'), 800);
+      const timer = setTimeout(() => setInteractionState('none'), hideDelay);
       return () => clearTimeout(timer);
     }
-  }, [isAnyInteraction]);
+  }, [isAnyInteraction, hideDelay]);
 
   const isHidden = ((dockMode === 'smart' || dockMode === 'peek') && (isFullscreen || isShellSurfaceFocused)) ||
     (!startupAnimating && (
@@ -431,6 +432,8 @@ const Dock = memo(function Dock() {
 
       refreshDockMode();
 
+      setHideDelay(Number(getVal("nectar-dock-hide-delay", "800")) || 800);
+
       const preview = getVal("nectar-dock-preview-enabled", "true");
       setDockPreviewEnabled(preview === "true");
 
@@ -524,6 +527,7 @@ const Dock = memo(function Dock() {
       "nectar-dock-mode-by-monitor": refreshDockMode,
       "nectar-dock-monitor-mode": refreshDockMode,
       "nectar-dock-monitor-id": refreshDockMode,
+      "nectar-dock-hide-delay": (v) => setHideDelay(Number(v) || 800),
       "nectar-dock-preview-enabled": setDockPreviewEnabled,
       "nectar-dock-search-enabled": setDockSearchEnabled,
       "nectar-dock-calendar-enabled": setDockCalendarEnabled,
@@ -1336,7 +1340,7 @@ const Dock = memo(function Dock() {
                       <div className="preview-items">
                         {previewData.previews.map((prev, idx) => (
                           <div key={prev.hwnd} className="preview-item" onClick={() => invoke('focus_window', { hwnd: prev.hwnd })}>
-                            {prev.image ? <img src={prev.image} alt={`Preview ${idx}`} /> : <div className="preview-fallback">{app.icon ? <img src={app.icon} alt="" /> : <span>{app.name.charAt(0)}</span>}</div>}
+                            {prev.image ? <img src={prev.image} alt={`Preview ${idx}`} /> : <div className="preview-fallback">{app.icon ? <img src={app.icon} alt="" /> : <svg className="preview-fallback-glyph" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>}</div>}
                             <div className="preview-label">{app.icon && <img src={app.icon} alt="" />}<span>{prev.title || app.name}</span></div>
                             <button
                               className="preview-close-btn"
@@ -1441,7 +1445,7 @@ const Dock = memo(function Dock() {
                             <div className="preview-items">
                               {previewData.previews.map((prev, idx) => (
                                 <div key={prev.hwnd} className="preview-item" onClick={() => invoke('focus_window', { hwnd: prev.hwnd })}>
-                                  {prev.image ? <img src={prev.image} alt={`Preview ${idx}`} /> : <div className="preview-fallback">{app.icon ? <img src={app.icon} alt="" /> : <span>{app.name.charAt(0)}</span>}</div>}
+                                  {prev.image ? <img src={prev.image} alt={`Preview ${idx}`} /> : <div className="preview-fallback">{app.icon ? <img src={app.icon} alt="" /> : <svg className="preview-fallback-glyph" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>}</div>}
                                   <div className="preview-label">{app.icon && <img src={app.icon} alt="" />}<span>{prev.title || app.name}</span></div>
                                   <button
                                     className="preview-close-btn"
@@ -1539,7 +1543,7 @@ const Dock = memo(function Dock() {
                             <div className="preview-items">
                               {previewData.previews.map((prev, idx) => (
                                 <div key={prev.hwnd} className="preview-item" onClick={() => invoke('focus_window', { hwnd: prev.hwnd })}>
-                                  {prev.image ? <img src={prev.image} alt={`Preview ${idx}`} /> : <div className="preview-fallback">{app.icon ? <img src={app.icon} alt="" /> : <span>{app.name.charAt(0)}</span>}</div>}
+                                  {prev.image ? <img src={prev.image} alt={`Preview ${idx}`} /> : <div className="preview-fallback">{app.icon ? <img src={app.icon} alt="" /> : <svg className="preview-fallback-glyph" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>}</div>}
                                   <div className="preview-label">{app.icon && <img src={app.icon} alt="" />}<span>{prev.title || app.name}</span></div>
                                   <button
                                     className="preview-close-btn"

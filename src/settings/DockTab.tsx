@@ -8,6 +8,7 @@ import { Dropdown } from "./Dropdown";
 import type { MonitorInfo, MonitorMode } from "./types";
 import { usePerMonitor } from "./usePerMonitor";
 import { useT } from "../i18n";
+import { HideDelay } from "./HideDelay";
 
 const SEARCH_PROVIDERS = ["windows", "cmdpal", "ptrun", "raycast", "shortcut"];
 
@@ -240,6 +241,8 @@ export function DockTab({
                 />
               </SettingRow>
             )}
+
+            {dockMode !== "fixed" && <HideDelay />}
 
             <SettingRow icon={MonitorCheck} label={t("common.showOn")} desc={t("dock.showOn.desc")}>
               <Dropdown

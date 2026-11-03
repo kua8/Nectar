@@ -85,6 +85,8 @@
   "dock.behavior.peek.desc": "Stays hidden until you move the pointer to the bottom edge. Apps can use the full screen.",
   "dock.showOn.desc": "Choose which monitor(s) display the dock",
   "dock.monitor.desc": "Which display shows the dock",
+  "dock.hideDelay": "Hide delay",
+  "dock.hideDelay.desc": "How long the dock stays up after the cursor leaves, in Smart and Peek modes.",
   "dock.previews": "Show App Previews",
   "dock.previews.desc": "Show window thumbnails on hover",
   "dock.search": "Search Icon",

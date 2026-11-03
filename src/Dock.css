@@ -984,3 +984,7 @@ body {
 .dock-show-desktop:hover {
   background: rgba(255, 255, 255, 0.45);
 }
+
+.preview-fallback-glyph {
+  opacity: 0.5;
+}

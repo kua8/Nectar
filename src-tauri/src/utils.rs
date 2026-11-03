@@ -509,14 +509,6 @@ pub fn get_setting_str(_app: &tauri::AppHandle, key: &str) -> Option<String> {
 }
 
 /// Re-assert HWND_TOPMOST without activating the window.
-///
-/// Tauri's `set_always_on_top(true)` calls `SetWindowPos(HWND_TOPMOST)` without
-/// `SWP_NOACTIVATE`, which causes Windows to send `WM_ACTIVATE` to the WebView2 window.
-/// This activation message makes the WebView compositor briefly blank/hide the window,
-/// and can also strip the `WS_EX_NOACTIVATE` extended style.
-///
-/// This helper uses the raw Win32 call with the correct flags and re-stamps
-/// `WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW` to prevent both problems.
 pub fn re_assert_topmost(hwnd: HWND) {
     unsafe {
         use windows::Win32::UI::WindowsAndMessaging::{
@@ -593,7 +585,7 @@ pub fn capture_hwnd_to_base64(hwnd: HWND, max_width: u32, max_height: u32) -> Op
         let mut pixels = vec![0u8; (width * height * 4) as usize];
         let mut read_bits = |pixels: &mut Vec<u8>| {
             GetDIBits(hdc_mem, hbm_mem, 0, height as u32, Some(pixels.as_mut_ptr() as *mut _), &mut bmi, DIB_RGB_COLORS) != 0
-                && pixels.chunks_exact(4).any(|c| c[0] != 0 || c[1] != 0 || c[2] != 0)
+                && pixels.chunks_exact(4).step_by(7).filter(|c| c[0] != 0 || c[1] != 0 || c[2] != 0).count() * 50 > pixels.len() / 28
         };
 
         let mut captured = PrintWindow(hwnd, hdc_mem, 2) != 0 && read_bits(&mut pixels);
@@ -744,9 +736,6 @@ pub fn is_window_fullscreen(hwnd: HWND) -> bool {
     }
 }
 
-/// Resolves a bare exe name (notepad.exe, msedge) to a full path: App Paths registry, then the
-/// search path, then known install locations. Default pins need this, notepad.exe resolves to the
-/// Store package whose icon comes from the manifest.
 pub fn resolve_executable_path(name: &str) -> Option<String> {
     let trimmed = name.trim().trim_matches('"');
     if trimmed.is_empty() || trimmed.contains('\\') || trimmed.contains('/') { return None; }
