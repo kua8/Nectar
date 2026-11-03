@@ -573,6 +573,11 @@
   "cc.layout.brightness": "Brightness",
   "cc.layout.available": "Available",
   "overlays.edgeDelay": "Edge delay",
-  "overlays.edgeDelay.desc": "How long the cursor rests on the screen edge before the slider appears. An edge next to another monitor never triggers",
-  "overlays.edgeDelay.instant": "Instant"
+  "overlays.edgeDelay.desc": "How long the cursor rests on the screen edge before the slider appears",
+  "overlays.edgeDelay.instant": "Instant",
+  "overlays.volumeSide": "Volume slider side",
+  "overlays.brightnessSide": "Brightness slider side",
+  "overlays.side.desc": "Screen edge it appears on. The two sliders always use opposite sides",
+  "overlays.side.left": "Left",
+  "overlays.side.right": "Right"
 }

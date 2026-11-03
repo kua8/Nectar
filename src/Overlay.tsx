@@ -167,20 +167,26 @@ type PanelView = "mixer" | "devices";
 let lastKnownSessions: AudioSession[] = [];
 let lastKnownDevices: OutputDevice[] = [];
 
+type Side = "left" | "right";
+const asSide = (value: string | null, fallback: Side): Side => (value === "left" || value === "right" ? value : fallback);
+
 function VolumeNotch({
   volume,
   isMuted,
   onVolumeChange,
   mixerExpanded,
-  onMixerExpandedChange
+  onMixerExpandedChange,
+  side
 }: {
   volume: number;
   isMuted: boolean;
   onVolumeChange: (vol: number) => void;
   mixerExpanded: boolean;
   onMixerExpandedChange: (expanded: boolean) => void;
+  side: Side;
 }) {
   const t = useT();
+  const dir = side === "right" ? -1 : 1;
   const percentage = Math.round(volume * 100);
   const barRef = useRef<HTMLDivElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
@@ -417,15 +423,15 @@ function VolumeNotch({
 
   return (
     <motion.div
-      className="volume-notch-wrapper"
-      style={{ transformOrigin: "left center" }}
+      className={`volume-notch-wrapper${side === "right" ? " side-right" : ""}`}
+      style={{ transformOrigin: `${side} center` }}
       initial={{ scaleX: 0, scaleY: 0.5, opacity: 0, y: "-50%" }}
       animate={{ scaleX: 1, scaleY: 1, opacity: 1, y: "-50%" }}
       exit={
         mixerExpanded
           ? {
               // Retract as one piece, scaling X would squash the app list into the edge.
-              x: -64,
+              x: -64 * dir,
               opacity: 0,
               y: "-50%",
               transition: { duration: 0.22, ease: [0.32, 0.72, 0, 1] }
@@ -441,7 +447,7 @@ function VolumeNotch({
       transition={{ type: "spring", stiffness: 450, damping: 30, mass: 0.7 }}
     >
       <div className="volume-notch-flares" />
-      <SurfaceShape edge="left" flare={13} radius={18} />
+      <SurfaceShape edge={side} flare={13} radius={18} />
       <motion.div
         ref={shellRef}
         className="volume-notch"
@@ -455,9 +461,9 @@ function VolumeNotch({
             if (localStorage.getItem("nectar-notch-scroll-volume") !== "true") return;
             onVolumeChange(Math.min(1, Math.max(0, Math.round((volume + (e.deltaY < 0 ? 0.02 : -0.02)) * 100) / 100)));
           }}
-          initial={{ opacity: 0, x: -10 }}
+          initial={{ opacity: 0, x: -10 * dir }}
           animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -5, transition: { duration: 0.15 } }}
+          exit={{ opacity: 0, x: -5 * dir, transition: { duration: 0.15 } }}
           transition={{ delay: 0.05, duration: 0.2, ease: "easeOut" }}
         >
           <button
@@ -513,7 +519,7 @@ function VolumeNotch({
               animate={{ opacity: 1 }}
               exit={{
                 opacity: 0,
-                x: -18,
+                x: -18 * dir,
                 transition: {
                   x: { duration: 0.28, ease: [0.32, 0.72, 0, 1] },
                   opacity: { duration: 0.18, delay: 0.1 }
@@ -615,9 +621,11 @@ const SunIcon = ({ brightness }: { brightness: number }) => (
 function BrightnessNotch({
   brightness,
   onBrightnessChange,
+  side,
 }: {
   brightness: number;
   onBrightnessChange: (val: number) => void;
+  side: Side;
 }) {
   const barRef = useRef<HTMLDivElement>(null);
 
@@ -649,14 +657,14 @@ function BrightnessNotch({
 
   return (
     <motion.div
-      className="brightness-notch-wrapper"
-      style={{ transformOrigin: "right center" }}
+      className={`brightness-notch-wrapper${side === "left" ? " side-left" : ""}`}
+      style={{ transformOrigin: `${side} center` }}
       initial={{ scaleX: 0, scaleY: 0.5, opacity: 0, y: "-50%" }}
       animate={{ scaleX: 1, scaleY: 1, opacity: 1, y: "-50%" }}
       exit={{ scaleX: 0, scaleY: 0.8, opacity: 0, y: "-50%", transition: { duration: 0.2, ease: [0.32, 0.72, 0, 1] } }}
       transition={{ type: "spring", stiffness: 450, damping: 30, mass: 0.7 }}
     >
-      <SurfaceShape edge="right" flare={13} radius={18} />
+      <SurfaceShape edge={side} flare={13} radius={18} />
       <div className="brightness-notch">
         <motion.div
           className="brightness-notch-content-group"
@@ -664,9 +672,9 @@ function BrightnessNotch({
             if (localStorage.getItem("nectar-notch-scroll-volume") !== "true") return;
             onBrightnessChange(Math.min(100, Math.max(0, Math.round(brightness + (e.deltaY < 0 ? 2 : -2)))));
           }}
-          initial={{ opacity: 0, x: 10 }}
+          initial={{ opacity: 0, x: side === "right" ? 10 : -10 }}
           animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: 5, transition: { duration: 0.15 } }}
+          exit={{ opacity: 0, x: side === "right" ? 5 : -5, transition: { duration: 0.15 } }}
           transition={{ delay: 0.05, duration: 0.2, ease: "easeOut" }}
         >
           <div ref={barRef} className="brightness-notch-bar" onMouseDown={handleMouseDown} onTouchStart={handleBarInteraction} style={{ cursor: 'pointer' }}>
@@ -708,6 +716,8 @@ function OverlayApp() {
 
   // Brightness state
   const [brightness, setBrightness] = useState(50);
+  const [volumeSide, setVolumeSide] = useState<Side>(() => asSide(localStorage.getItem("nectar-volume-side"), "left"));
+  const [brightnessSide, setBrightnessSide] = useState<Side>(() => asSide(localStorage.getItem("nectar-brightness-side"), "right"));
   const [brightnessOverlayEnabled, setBrightnessOverlayEnabled] = useState(() => localStorage.getItem("nectar-brightness-overlay-enabled") !== "false");
   const [brightnessEdgeEnabled, setBrightnessEdgeEnabled] = useState(() => localStorage.getItem("nectar-brightness-edge-enabled") !== "false");
 
@@ -745,6 +755,8 @@ function OverlayApp() {
       if (settings && settings["nectar-brightness-overlay-enabled"] !== undefined) {
         setBrightnessOverlayEnabled(settings["nectar-brightness-overlay-enabled"] === "true");
       }
+      if (settings && settings["nectar-volume-side"] !== undefined) setVolumeSide(asSide(String(settings["nectar-volume-side"]), "left"));
+      if (settings && settings["nectar-brightness-side"] !== undefined) setBrightnessSide(asSide(String(settings["nectar-brightness-side"]), "right"));
       if (settings && settings["nectar-volume-overlay-enabled"] !== undefined) {
         setVolumeOverlayEnabled(settings["nectar-volume-overlay-enabled"] === "true");
       }
@@ -893,6 +905,8 @@ function OverlayApp() {
       "nectar-volume-edge-enabled": setVolumeEdgeEnabled,
       "nectar-brightness-overlay-enabled": setBrightnessOverlayEnabled,
       "nectar-brightness-edge-enabled": setBrightnessEdgeEnabled,
+      "nectar-volume-side": (v: string) => setVolumeSide(asSide(v, "left")),
+      "nectar-brightness-side": (v: string) => setBrightnessSide(asSide(v, "right")),
       "nectar-scale": setScale,
     }
   );
@@ -1073,6 +1087,7 @@ function OverlayApp() {
                 onVolumeChange={handleVolumeChange}
                 mixerExpanded={mixerExpanded}
                 onMixerExpandedChange={handleMixerExpandedChange}
+                side={volumeSide}
                 key="volume-island"
               />
             )}
@@ -1080,6 +1095,7 @@ function OverlayApp() {
               <BrightnessNotch
                 brightness={brightness}
                 onBrightnessChange={handleBrightnessChange}
+                side={brightnessSide}
                 key="brightness-island"
               />
             )}

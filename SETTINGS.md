@@ -149,7 +149,9 @@ Removing a link or disconnecting the account deletes its stored secret and cache
 | `nectar-volume-edge-enabled` | `"true"` / `"false"` | `"true"` | Trigger volume HUD by hovering the left screen edge. |
 | `nectar-brightness-overlay-enabled` | `"true"` / `"false"` | `"true"` | Show Nectar brightness HUD when brightness changes. |
 | `nectar-brightness-edge-enabled` | `"true"` / `"false"` | `"true"` | Trigger brightness HUD by hovering the right screen edge. |
-| `nectar-edge-delay` | number string (ms) | `"300"` | How long the cursor has to rest on the left or right screen edge before the volume or brightness HUD appears. `0` shows it instantly. An edge that touches another monitor never triggers, so moving the cursor across to the next screen does not open the HUD. |
+| `nectar-edge-delay` | number string (ms) | `"300"` | How long the cursor has to rest on the left or right screen edge before the volume or brightness HUD appears. `0` shows it instantly. Only the edge strip of the primary monitor counts, so being on another monitor never opens the HUD. |
+| `nectar-volume-side` | `"left"` / `"right"` | `"left"` | Screen edge the volume slider appears on. The brightness slider is moved to the opposite edge when both would share one. |
+| `nectar-brightness-side` | `"left"` / `"right"` | `"right"` | Screen edge the brightness slider appears on. |
 
 ### Appearance
 

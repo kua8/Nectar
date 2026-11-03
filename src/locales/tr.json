@@ -573,6 +573,11 @@
   "appearance.accentColor": "Özel Vurgu",
   "appearance.accentColor.desc": "Kendi vurgu renginizi seçin",
   "overlays.edgeDelay": "Kenar gecikmesi",
-  "overlays.edgeDelay.desc": "İmleç ekran kenarında bu kadar durunca kaydırıcı görünür. Başka bir monitörün yanındaki kenar hiç tetiklenmez",
-  "overlays.edgeDelay.instant": "Anında"
+  "overlays.edgeDelay.desc": "İmleç ekran kenarında bu kadar durunca kaydırıcı görünür",
+  "overlays.edgeDelay.instant": "Anında",
+  "overlays.volumeSide": "Ses kaydırıcısı tarafı",
+  "overlays.brightnessSide": "Parlaklık kaydırıcısı tarafı",
+  "overlays.side.desc": "Hangi ekran kenarında görünür. İki kaydırıcı her zaman karşı kenarları kullanır",
+  "overlays.side.left": "Sol",
+  "overlays.side.right": "Sağ"
 }

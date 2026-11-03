@@ -705,3 +705,85 @@ body,
 .light-mode .brightness-notch-bar {
     background: rgba(0, 0, 0, 0.12);
 }
+
+.volume-notch-wrapper.side-right {
+  left: auto;
+  right: 0;
+}
+
+.side-right .volume-notch {
+  border-radius: 18px 0 0 18px;
+  border: 1px solid var(--nectar-border, rgba(255, 255, 255, 0.1));
+  border-right: none;
+  border-top: none;
+  border-bottom: none;
+}
+
+.side-right .volume-notch-flares {
+  left: auto;
+  right: 0;
+}
+
+.side-right .volume-notch-flares::before,
+.side-right .volume-notch-flares::after {
+  left: auto;
+  right: 0;
+}
+
+.side-right .volume-notch-flares::before {
+  -webkit-mask-image: radial-gradient(circle at 0px 0px, transparent 12px, black 13px);
+  mask-image: radial-gradient(circle at 0px 0px, transparent 12px, black 13px);
+  background:
+    radial-gradient(circle at 0px 0px, transparent 12px, var(--nectar-border, rgba(255, 255, 255, 0.1)) 12.7px, var(--nectar-border, rgba(255, 255, 255, 0.1)) 13.3px, transparent 14px),
+    var(--nectar-bg, rgba(0, 0, 0, 0.8));
+}
+
+.side-right .volume-notch-flares::after {
+  -webkit-mask-image: radial-gradient(circle at 0px 13px, transparent 12px, black 13px);
+  mask-image: radial-gradient(circle at 0px 13px, transparent 12px, black 13px);
+  background:
+    radial-gradient(circle at 0px 13px, transparent 12px, var(--nectar-border, rgba(255, 255, 255, 0.1)) 12.7px, var(--nectar-border, rgba(255, 255, 255, 0.1)) 13.3px, transparent 14px),
+    var(--nectar-bg, rgba(0, 0, 0, 0.8));
+}
+
+.side-right .volume-notch-content-group {
+  align-self: flex-end;
+}
+
+.side-right .volume-mixer-panel {
+  left: auto;
+  right: 42px;
+}
+
+.brightness-notch-wrapper.side-left {
+  right: auto;
+  left: 0;
+}
+
+.side-left .brightness-notch {
+  border-radius: 0 18px 18px 0;
+  border: 1px solid var(--nectar-border, rgba(255, 255, 255, 0.1));
+  border-left: none;
+}
+
+.side-left .brightness-notch::before,
+.side-left .brightness-notch::after {
+  right: auto;
+  left: 0;
+}
+
+.side-left .brightness-notch::before {
+  -webkit-mask-image: radial-gradient(circle at 13px 0px, transparent 12px, black 13px);
+  mask-image: radial-gradient(circle at 13px 0px, transparent 12px, black 13px);
+  background:
+    radial-gradient(circle at 13px 0px, transparent 12px, var(--nectar-border, rgba(255, 255, 255, 0.1)) 12.7px, var(--nectar-border, rgba(255, 255, 255, 0.1)) 13.3px, transparent 14px),
+    var(--nectar-bg, rgba(0, 0, 0, 0.8));
+}
+
+.side-left .brightness-notch::after {
+  -webkit-mask-image: radial-gradient(circle at 13px 13px, transparent 12px, black 13px);
+  mask-image: radial-gradient(circle at 13px 13px, transparent 12px, black 13px);
+  background:
+    radial-gradient(circle at 13px 13px, transparent 12px, var(--nectar-border, rgba(255, 255, 255, 0.1)) 12.7px, var(--nectar-border, rgba(255, 255, 255, 0.1)) 13.3px, transparent 14px),
+    var(--nectar-bg, rgba(0, 0, 0, 0.8));
+}

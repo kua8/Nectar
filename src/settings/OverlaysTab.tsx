@@ -2,6 +2,7 @@ import { Volume2, Sun, ArrowLeftToLine, ArrowRightToLine } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { SettingSection } from "./SettingSection";
 import { EdgeDelay } from "./EdgeDelay";
+import { EdgeSides } from "./EdgeSides";
 import { useT } from "../i18n";
 
 interface OverlaysTabProps {
@@ -60,6 +61,8 @@ export function OverlaysTab({
             </label>
           </SettingRow>
         )}
+
+        <EdgeSides />
 
         {(volumeEdgeEnabled || brightnessEdgeEnabled) && <EdgeDelay />}
       </SettingSection>

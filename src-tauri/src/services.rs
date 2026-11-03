@@ -1800,8 +1800,6 @@ static MH_TOPBAR_EXPIRY_MS: AtomicI64 = AtomicI64::new(0);
 static MH_LEFT_EXPIRY_MS: AtomicI64 = AtomicI64::new(0);
 static MH_LEFT_ENTER_MS: AtomicI64 = AtomicI64::new(0);
 static MH_RIGHT_ENTER_MS: AtomicI64 = AtomicI64::new(0);
-static MH_LEFT_SHARED: AtomicBool = AtomicBool::new(false);
-static MH_RIGHT_SHARED: AtomicBool = AtomicBool::new(false);
 
 fn edge_dwell_met(entered: &AtomicI64, inside: bool, now: i64, dwell_ms: i64) -> bool {
     if !inside {
@@ -2048,7 +2046,9 @@ fn setup_volume_mixer_watchdog(app_handle: AppHandle) {
             .is_some_and(|m| {
                 let pos = m.position();
                 let size = m.size();
-                pt.x <= pos.x + 8 && pt.y >= pos.y && pt.y <= pos.y + size.height as i32
+                let on_right = crate::utils::get_setting_str(&app_handle, "nectar-volume-side").as_deref() == Some("right");
+                let in_band = if on_right { pt.x >= pos.x + size.width as i32 - 8 && pt.x <= pos.x + size.width as i32 } else { pt.x >= pos.x && pt.x <= pos.x + 8 };
+                in_band && pt.y >= pos.y && pt.y <= pos.y + size.height as i32
             });
         if !at_left_edge && MH_LAST_LEFT_EDGE_HOVER.swap(0, Ordering::Relaxed) != 0 {
             MH_LEFT_EXPIRY_MS.store(0, Ordering::Relaxed);
@@ -2154,19 +2154,6 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
                     let size = *monitor.size();
                     *MH_CACHED_MON_POS.lock().unwrap() = Some((pos.x, pos.y));
                     *MH_CACHED_MON_SIZE.lock().unwrap() = Some((size.width, size.height));
-                    let (mut left_shared, mut right_shared) = (false, false);
-                    for other in app_handle.available_monitors().unwrap_or_default() {
-                        let (op, os) = (*other.position(), *other.size());
-                        let overlaps = op.y < pos.y + size.height as i32 && op.y + os.height as i32 > pos.y;
-                        if overlaps && op.x + os.width as i32 == pos.x {
-                            left_shared = true;
-                        }
-                        if overlaps && op.x == pos.x + size.width as i32 {
-                            right_shared = true;
-                        }
-                    }
-                    MH_LEFT_SHARED.store(left_shared, Ordering::Relaxed);
-                    MH_RIGHT_SHARED.store(right_shared, Ordering::Relaxed);
                 }
                 if let Some(monitor) = crate::monitors::monitor_for_window_label(app_handle, crate::types::WindowKind::Dock, "dock") {
                     let pos = *monitor.position();
@@ -2442,15 +2429,26 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
             // The overlay zooms by nectar-scale, so the cards are bigger than 42x196 off the default scale.
             let overlay_nectar_scale = crate::utils::get_nectar_scale(app_handle);
 
-            // --- Left Edge (Volume) ---
-            if !fg_fs {
-                let at_left_edge = cursor.x <= (mon_x + 8) &&
-                                   cursor.y >= mon_y &&
-                                   cursor.y <= (mon_y + mon_h);
+            let side_of = |key: &str, default: &str| -> bool {
+                crate::utils::get_setting_str(app_handle, key).unwrap_or_else(|| default.to_string()) == "right"
+            };
+            let edge_dwell = crate::utils::get_setting_str(app_handle, "nectar-edge-delay")
+                .and_then(|v| v.parse::<i64>().ok())
+                .unwrap_or(300)
+                .clamp(0, 3000);
+            let volume_right = side_of("nectar-volume-side", "left");
+            let brightness_right = side_of("nectar-brightness-side", "right");
 
+            if !fg_fs {
+                let at_edge = |right: bool| {
+                    cursor.y >= mon_y && cursor.y <= (mon_y + mon_h)
+                        && if right { cursor.x >= (mon_x + mon_w - 8) && cursor.x <= mon_x + mon_w } else { cursor.x >= mon_x && cursor.x <= (mon_x + 8) }
+                };
+
+                let at_volume_edge = at_edge(volume_right);
                 // The collapsed card sticks out past the 8px edge band, keep the hover alive over it too
                 // or the HUD hides mid-click.
-                let over_card = !at_left_edge
+                let over_card = !at_volume_edge
                     && !in_mixer
                     && MH_LAST_LEFT_EDGE_HOVER.load(Ordering::Relaxed) != 0
                     && app_handle.primary_monitor().ok().flatten().is_some_and(|m| {
@@ -2459,61 +2457,41 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
                         let sc = m.scale_factor() * overlay_nectar_scale;
                         let nw = (42.0 * sc) as i32;
                         let nh = (196.0 * sc) as i32;
-                        let nx = mp.x;
+                        let nx = if volume_right { mp.x + ms.width as i32 - nw } else { mp.x };
                         let ny = mp.y + (ms.height as i32 / 2) - (nh / 2);
                         cursor.x >= nx && cursor.x <= nx + nw && cursor.y >= ny && cursor.y <= ny + nh
                     });
-
-                let edge_dwell = crate::utils::get_setting_str(app_handle, "nectar-edge-delay")
-                    .and_then(|v| v.parse::<i64>().ok())
-                    .unwrap_or(300)
-                    .clamp(0, 3000);
-                let left_confirmed = edge_dwell_met(&MH_LEFT_ENTER_MS, at_left_edge && !MH_LEFT_SHARED.load(Ordering::Relaxed), now, edge_dwell);
-                if left_confirmed || in_mixer || over_card {
+                let volume_enter = if volume_right { &MH_RIGHT_ENTER_MS } else { &MH_LEFT_ENTER_MS };
+                let volume_confirmed = edge_dwell_met(volume_enter, at_volume_edge, now, edge_dwell);
+                if volume_confirmed || in_mixer || over_card {
                     MH_LEFT_EXPIRY_MS.store(now + 500, Ordering::Relaxed);
                 }
-
-                let final_left_hover = now < MH_LEFT_EXPIRY_MS.load(Ordering::Relaxed);
+                let final_volume_hover = now < MH_LEFT_EXPIRY_MS.load(Ordering::Relaxed);
                 let prev = MH_LAST_LEFT_EDGE_HOVER.load(Ordering::Relaxed);
-                let new_val = if final_left_hover { 1 } else { 0 };
+                let new_val = if final_volume_hover { 1 } else { 0 };
                 if prev != new_val {
-                    let _ = app_handle.emit("volume-edge-hover", final_left_hover);
+                    let _ = app_handle.emit("volume-edge-hover", final_volume_hover);
                     MH_LAST_LEFT_EDGE_HOVER.store(new_val, Ordering::Relaxed);
                 }
-            } else {
-                let prev = MH_LAST_LEFT_EDGE_HOVER.load(Ordering::Relaxed);
-                if prev != 0 {
-                    let _ = app_handle.emit("volume-edge-hover", false);
-                    MH_LAST_LEFT_EDGE_HOVER.store(0, Ordering::Relaxed);
-                }
-            }
 
-            // --- Right Edge (Brightness) ---
-            if !fg_fs {
-                let at_right_edge = cursor.x >= (mon_x + mon_w - 8) &&
-                                    cursor.y >= mon_y &&
-                                    cursor.y <= (mon_y + mon_h);
-
-                let edge_dwell = crate::utils::get_setting_str(app_handle, "nectar-edge-delay")
-                    .and_then(|v| v.parse::<i64>().ok())
-                    .unwrap_or(300)
-                    .clamp(0, 3000);
-                if edge_dwell_met(&MH_RIGHT_ENTER_MS, at_right_edge && !MH_RIGHT_SHARED.load(Ordering::Relaxed), now, edge_dwell) {
+                let brightness_enter = if brightness_right { &MH_RIGHT_ENTER_MS } else { &MH_LEFT_ENTER_MS };
+                let brightness_band = at_edge(brightness_right) && brightness_right != volume_right;
+                if edge_dwell_met(brightness_enter, brightness_band, now, edge_dwell) {
                     MH_RIGHT_EXPIRY_MS.store(now + 500, Ordering::Relaxed);
                 }
-
-                let final_right_hover = now < MH_RIGHT_EXPIRY_MS.load(Ordering::Relaxed);
+                let final_brightness_hover = now < MH_RIGHT_EXPIRY_MS.load(Ordering::Relaxed);
                 let prev = MH_LAST_RIGHT_EDGE_HOVER.load(Ordering::Relaxed);
-                let new_val = if final_right_hover { 1 } else { 0 };
+                let new_val = if final_brightness_hover { 1 } else { 0 };
                 if prev != new_val {
-                    let _ = app_handle.emit("brightness-edge-hover", final_right_hover);
+                    let _ = app_handle.emit("brightness-edge-hover", final_brightness_hover);
                     MH_LAST_RIGHT_EDGE_HOVER.store(new_val, Ordering::Relaxed);
                 }
             } else {
-                let prev = MH_LAST_RIGHT_EDGE_HOVER.load(Ordering::Relaxed);
-                if prev != 0 {
+                if MH_LAST_LEFT_EDGE_HOVER.swap(0, Ordering::Relaxed) != 0 {
+                    let _ = app_handle.emit("volume-edge-hover", false);
+                }
+                if MH_LAST_RIGHT_EDGE_HOVER.swap(0, Ordering::Relaxed) != 0 {
                     let _ = app_handle.emit("brightness-edge-hover", false);
-                    MH_LAST_RIGHT_EDGE_HOVER.store(0, Ordering::Relaxed);
                 }
             }
 
