@@ -105,9 +105,6 @@ pub fn set_ignore_cursor_events(window: Window, ignore: bool) {
 #[tauri::command]
 pub async fn init_dock(app: AppHandle, mode: String) {
     // Backend guard: bail if dock is disabled in settings.
-    // The frontend already checks this, but settings.json may have a stale
-    // value if the write didn't complete before restart. Reading here too
-    // makes the dock reliably stay hidden regardless of frontend timing.
     let enabled = get_setting_str(&app, "nectar-dock-enabled")
         .unwrap_or_else(|| "true".to_string());
     if enabled != "true" {
@@ -142,8 +139,6 @@ pub async fn init_dock_window(app: &AppHandle, dock_win: tauri::WebviewWindow, m
         tauri::async_runtime::spawn(async move {
             for attempt in 0..20 {
                 // Wait for monitor and window dimensions to be available.
-                // Never use a hardcoded fallback — wrong values produce off-screen placement.
-                // Extract HWND as isize before any await (raw pointer is not Send).
                 let hwnd_val = dock_clone.hwnd().map(|h| h.0 as isize).unwrap_or(0);
                 let ph = dock_clone.outer_size().map(|s| s.height as i32).unwrap_or(0);
                 let monitor_info = crate::monitors::monitor_for_window_label(dock_clone.app_handle(), crate::types::WindowKind::Dock, dock_clone.label()).map(|m| {
@@ -2551,9 +2546,6 @@ pub fn clear_volume_mixer_rect() {
     }
 }
 
-/// Shared by the tray menu, the in-app Quit button, and the window CloseRequested
-/// handlers so that any shutdown path (including Task Manager's WM_CLOSE) behaves
-/// identically.
 pub fn restore_taskbar_and_exit(handle: &AppHandle) {
     SHUTTING_DOWN.store(true, Ordering::Relaxed);
     NATIVE_TASKBAR_HIDDEN.store(false, Ordering::SeqCst);
@@ -2852,6 +2844,11 @@ pub fn save_setting(app: AppHandle, key: String, value: serde_json::Value) -> Re
 
     if key == "nectar-scale" {
         re_register_appbars(&app, &settings);
+    }
+
+    if key == "nectar-agent-api" {
+        let on = matches!(settings[&key].as_str(), Some("true")) || settings[&key].as_bool() == Some(true);
+        std::thread::spawn(move || crate::agent_api::set_hooks(on));
     }
 
     if key == "nectar-language" {

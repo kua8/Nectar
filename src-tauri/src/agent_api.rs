@@ -321,9 +321,19 @@ fn sync_claude_hooks(enable: bool) {
     }
 }
 
+pub fn set_hooks(enable: bool) {
+    let is_build_output = std::env::current_exe().is_ok_and(|p| p.components().any(|c| c.as_os_str() == "target"));
+    if cfg!(debug_assertions) || is_build_output {
+        return;
+    }
+    if enable && !std::env::var_os("USERPROFILE").is_some_and(|d| PathBuf::from(d).join(".claude").is_dir()) {
+        return;
+    }
+    sync_claude_hooks(enable);
+}
+
 pub fn start(app: AppHandle) {
     let enabled = crate::utils::get_setting_str(&app, SETTING).as_deref() == Some("true");
-    std::thread::spawn(move || sync_claude_hooks(enabled));
     if !enabled {
         return;
     }
@@ -494,6 +504,17 @@ fn ask(args: &[String]) {
 pub fn run_cli(args: &[String]) -> Option<i32> {
     if args.get(1).map(String::as_str) != Some("agent") {
         return None;
+    }
+    match args.get(2).map(String::as_str) {
+        Some("install-hooks") => {
+            set_hooks(true);
+            return Some(0);
+        }
+        Some("remove-hooks") => {
+            set_hooks(false);
+            return Some(0);
+        }
+        _ => {}
     }
     if args.get(2).map(String::as_str) == Some("ask") {
         ask(&args[3..]);

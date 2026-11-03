@@ -101,6 +101,11 @@ fn remove_app_files_command(install_dir: &Path, all_users: bool) -> String {
 pub fn uninstall(install_dir: &Path, all_users: bool, shortcuts: &[PathBuf]) -> Result<(), String> {
     stop_running_nectar();
 
+    let exe = crate::payload::app_exe_path(install_dir);
+    if exe.is_file() {
+        crate::commands::run_agent_hooks(&exe, "remove-hooks");
+    }
+
     for s in shortcuts {
         let _ = std::fs::remove_file(s);
     }
