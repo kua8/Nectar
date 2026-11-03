@@ -87,6 +87,8 @@
   "dock.monitor.desc": "Which display shows the dock",
   "dock.previews": "Show App Previews",
   "dock.previews.desc": "Show window thumbnails on hover",
+  "dock.attention": "Notification Dots",
+  "dock.attention.desc": "Mark apps that want your attention, with the unread count when the app shows one",
   "dock.search": "Search Icon",
   "dock.search.desc": "Show a search button next to Start",
   "dock.searchWith": "Search With",

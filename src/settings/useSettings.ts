@@ -107,6 +107,7 @@ export function useSettings() {
   });
   const [dockEnabled, setDockEnabled] = useState(true);
   const [dockPreviewEnabled, setDockPreviewEnabled] = useState(true);
+  const [dockAttentionEnabled, setDockAttentionEnabled] = useState(true);
   const [dockSearchEnabled, setDockSearchEnabled] = useState(true);
   const [dockSearchProvider, setDockSearchProvider] = useState(
     () => localStorage.getItem("nectar-dock-search-provider") || "windows"
@@ -265,6 +266,7 @@ export function useSettings() {
       apply(getVal("nectar-brightness-edge-enabled"), setBrightnessEdgeEnabled, readBool);
       apply(getVal("nectar-dock-enabled"), setDockEnabled, readBool);
       apply(getVal("nectar-dock-preview-enabled"), setDockPreviewEnabled, readBool);
+      apply(getVal("nectar-dock-attention-enabled"), setDockAttentionEnabled, (v) => v !== "false");
       apply(getVal("nectar-dock-search-enabled"), setDockSearchEnabled, readBool);
       apply(getVal("nectar-dock-search-provider"), setDockSearchProvider, (v) => v);
       apply(getVal("nectar-dock-search-shortcut"), setDockSearchShortcut, (v) => v);
@@ -390,6 +392,7 @@ export function useSettings() {
     "nectar-dock-adaptive": setDockAdaptive,
     "nectar-dock-win-number-enabled": setDockWinNumberEnabled,
     "nectar-dock-preview-enabled": setDockPreviewEnabled,
+    "nectar-dock-attention-enabled": (v) => setDockAttentionEnabled(v !== false && v !== "false"),
     "nectar-dock-search-enabled": setDockSearchEnabled,
     "nectar-dock-search-provider": (v) => setDockSearchProvider(String(v)),
     "nectar-dock-search-shortcut": (v) => setDockSearchShortcut(String(v)),
@@ -737,6 +740,12 @@ export function useSettings() {
     const next = !dockPreviewEnabled;
     setDockPreviewEnabled(next);
     saveSetting("nectar-dock-preview-enabled", String(next));
+  };
+
+  const toggleDockAttention = () => {
+    const next = !dockAttentionEnabled;
+    setDockAttentionEnabled(next);
+    saveSetting("nectar-dock-attention-enabled", String(next));
   };
 
   const handleDockSearchProviderChange = (provider: string) => {
@@ -1243,6 +1252,8 @@ export function useSettings() {
     setDockModeValue,
     dockPreviewEnabled,
     toggleDockPreview,
+    dockAttentionEnabled,
+    toggleDockAttention,
     dockSearchEnabled,
     toggleDockSearch,
     dockSearchProvider,

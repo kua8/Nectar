@@ -41,7 +41,7 @@
 | What you get | How |
 | --- | --- |
 | **A notch that does things** | Music, a Control Center you arrange yourself, status, a calendar and a file shelf in one spring-animated island. |
-| **A dock that replaces your taskbar** | Mirrors your real taskbar, same pinned apps and order, with real icons and names. |
+| **A dock that replaces your taskbar** | Mirrors your real taskbar, same pinned apps and order, with real icons and names, and a dot on apps that want your attention. |
 | **Native where it counts** | The tray opens the real Windows flyout, and Quit ends an app like Task Manager's End task. |
 | **Out of your way** | Fixed, Smart or Peek modes, and both stay hidden over fullscreen games. |
 | **Made for your setup** | Every monitor, one monitor, or a specific one. Solid, glass or Material You styles with your own accent color. English and Turkish. Every option lives in a plain `settings.json`. |

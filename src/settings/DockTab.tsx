@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent, CSSProperties } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Monitor, Eye, EyeOff, Square, Search, Shuffle, MonitorCheck, CalendarDays, Maximize2, Keyboard, Sparkles, RotateCcw, LayoutGrid, Trash2, HardDrive, ChevronUp, TextSearch } from "lucide-react";
+import { Monitor, Eye, EyeOff, BellDot, Square, Search, Shuffle, MonitorCheck, CalendarDays, Maximize2, Keyboard, Sparkles, RotateCcw, LayoutGrid, Trash2, HardDrive, ChevronUp, TextSearch } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { SettingSection } from "./SettingSection";
 import { Dropdown } from "./Dropdown";
@@ -106,6 +106,8 @@ interface DockTabProps {
   setDockModeValue: (mode: string) => void;
   dockPreviewEnabled: boolean;
   toggleDockPreview: () => void;
+  dockAttentionEnabled: boolean;
+  toggleDockAttention: () => void;
   dockSearchEnabled: boolean;
   toggleDockSearch: () => void;
   dockSearchProvider: string;
@@ -152,6 +154,8 @@ export function DockTab({
   setDockModeValue,
   dockPreviewEnabled,
   toggleDockPreview,
+  dockAttentionEnabled,
+  toggleDockAttention,
   dockSearchEnabled,
   toggleDockSearch,
   dockSearchProvider,
@@ -303,6 +307,15 @@ export function DockTab({
                 <span className="slider"></span>
               </label>
             </SettingRow>
+
+            {!legacyMode && (
+              <SettingRow icon={BellDot} label={t("dock.attention")} desc={t("dock.attention.desc")}>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={dockAttentionEnabled} onChange={toggleDockAttention} />
+                  <span className="slider"></span>
+                </label>
+              </SettingRow>
+            )}
 
             <SettingRow icon={Search} label={t("dock.search")} desc={t("dock.search.desc")}>
               <label className="toggle-switch">
