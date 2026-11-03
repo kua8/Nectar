@@ -9,6 +9,7 @@ import type { MonitorInfo, MonitorMode } from "./types";
 import { usePerMonitor } from "./usePerMonitor";
 import { useT } from "../i18n";
 import { HideDelay } from "./HideDelay";
+import { PreviewDelay } from "./PreviewDelay";
 
 const SEARCH_PROVIDERS = ["windows", "cmdpal", "ptrun", "raycast", "shortcut"];
 
@@ -310,6 +311,8 @@ export function DockTab({
                 <span className="slider"></span>
               </label>
             </SettingRow>
+
+            {dockPreviewEnabled && <PreviewDelay />}
 
             {!legacyMode && (
               <SettingRow icon={BellDot} label={t("dock.attention")} desc={t("dock.attention.desc")}>

@@ -266,6 +266,7 @@ const Dock = memo(function Dock() {
     return raw;
   });
   const [dockPreviewEnabled, setDockPreviewEnabled] = useState(() => localStorage.getItem("nectar-dock-preview-enabled") !== "false");
+  const [previewDelay, setPreviewDelay] = useState(() => { const v = localStorage.getItem("nectar-dock-preview-delay"); return v === null ? 300 : Number(v) || 0; });
   const [hideDelay, setHideDelay] = useState(() => Number(localStorage.getItem("nectar-dock-hide-delay")) || 800);
   const [dockAttentionEnabled, setDockAttentionEnabled] = useState(() => localStorage.getItem("nectar-dock-attention-enabled") !== "false");
   const [attentionWindows, setAttentionWindows] = useState<Set<number>>(() => new Set());
@@ -448,6 +449,7 @@ const Dock = memo(function Dock() {
       refreshDockMode();
 
       setHideDelay(Number(getVal("nectar-dock-hide-delay", "800")) || 800);
+      setPreviewDelay(Number(getVal("nectar-dock-preview-delay", "300")) || 0);
 
       const preview = getVal("nectar-dock-preview-enabled", "true");
       setDockPreviewEnabled(preview === "true");
@@ -544,6 +546,7 @@ const Dock = memo(function Dock() {
       "nectar-dock-monitor-mode": refreshDockMode,
       "nectar-dock-monitor-id": refreshDockMode,
       "nectar-dock-hide-delay": (v) => setHideDelay(Number(v) || 800),
+      "nectar-dock-preview-delay": (v) => setPreviewDelay(Number(v) || 0),
       "nectar-dock-preview-enabled": setDockPreviewEnabled,
       "nectar-dock-attention-enabled": (v) => setDockAttentionEnabled(v !== false && v !== "false"),
       "nectar-dock-search-enabled": setDockSearchEnabled,
@@ -1074,7 +1077,7 @@ const Dock = memo(function Dock() {
             console.error("Failed to capture thumbnails:", e);
             setPreviewData(null);
           }
-        }, 300);
+        }, previewDelay);
       } else {
         setPreviewData(null);
       }
@@ -1083,7 +1086,7 @@ const Dock = memo(function Dock() {
     return () => {
       if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
     };
-  }, [hoveredApp, isDragging, dockItems, contextMenu]);
+  }, [hoveredApp, isDragging, dockItems, contextMenu, previewDelay]);
 
   const previewAppId = dockPreviewEnabled ? previewData?.id : undefined;
   useEffect(() => {

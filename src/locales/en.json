@@ -89,6 +89,8 @@
   "appearance.glassWallpaper.desc": "Frosted and Liquid show a blurred copy of your wallpaper behind the notch and dock, and the window behind them when there is one. Off keeps the plain tint. Animated wallpapers are not shown.",
   "notch.edgeDelay": "Edge delay",
   "notch.edgeDelay.desc": "How long the cursor has to rest on the top edge before the notch opens in Smart and Peek modes. Raise it if it opens while you use tabs or toolbars.",
+  "dock.previewDelay": "Preview delay",
+  "dock.previewDelay.desc": "How long the cursor rests on a dock icon before its window preview opens.",
   "dock.hideDelay": "Hide delay",
   "dock.hideDelay.desc": "How long the dock stays up after the cursor leaves, in Smart and Peek modes.",
   "dock.previews": "Show App Previews",

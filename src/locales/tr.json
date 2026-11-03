@@ -89,6 +89,8 @@
   "appearance.glassWallpaper.desc": "Frosted ve Liquid, çentik ve dock arkasında duvar kağıdının bulanık bir kopyasını, varsa arkadaki pencereyi gösterir. Kapalıyken düz renk kullanılır. Hareketli duvar kağıtları gösterilmez.",
   "notch.edgeDelay": "Kenar gecikmesi",
   "notch.edgeDelay.desc": "Smart ve Peek modlarında imleç üst kenarda ne kadar beklerse çentik açılır. Sekmeler veya araç çubuklarını kullanırken açılıyorsa artırın.",
+  "dock.previewDelay": "Önizleme gecikmesi",
+  "dock.previewDelay.desc": "İmleç bir dock simgesinin üzerinde ne kadar beklerse pencere önizlemesi açılır.",
   "dock.hideDelay": "Gizleme gecikmesi",
   "dock.hideDelay.desc": "Smart ve Peek modlarında imleç ayrıldıktan sonra dock'un ne kadar açık kalacağı.",
   "dock.previews": "Uygulama Önizlemeleri",
