@@ -763,6 +763,10 @@ function OverlayApp() {
     }).catch(console.error);
   }, []);
 
+  useEffect(() => {
+    invoke<number>("get_brightness").then((value) => setBrightness(value)).catch(() => {});
+  }, []);
+
   // Seed the HUD with the live volume, the worker's first event fires before we can listen.
   useEffect(() => {
     invoke<{ volume: number; is_muted: boolean }>("get_volume_state")
@@ -847,6 +851,7 @@ function OverlayApp() {
     const brightEdgePromise = listen<boolean>("brightness-edge-hover", (event) => {
       if (splashActiveRef.current || !brightnessOverlayEnabled || !brightnessEdgeEnabled) return;
       if (event.payload) {
+        invoke<number>("get_brightness").then((value) => setBrightness(value)).catch(() => {});
         setMode('brightness');
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
       } else {
