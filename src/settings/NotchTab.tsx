@@ -1,4 +1,5 @@
 import { AgentSounds } from "./AgentSounds";
+import { NotchEdgeDelay } from "./NotchEdgeDelay";
 import {
   PanelTop,
   Calendar,
@@ -223,6 +224,8 @@ export function NotchTab({
             />
           </SettingRow>
         )}
+
+        {notchMode !== "fixed" && <NotchEdgeDelay />}
 
         <SettingRow icon={MonitorCheck} label={t("common.showOn")} desc={t("notch.showOn.desc")}>
           <Dropdown

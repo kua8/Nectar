@@ -85,6 +85,8 @@
   "dock.behavior.peek.desc": "İmleci alt kenara götürene kadar gizli kalır. Pencereler tüm ekranı kullanabilir.",
   "dock.showOn.desc": "Dock'un hangi monitör(ler)de görüntüleneceğini seçin",
   "dock.monitor.desc": "Dock'u gösteren ekran",
+  "notch.edgeDelay": "Kenar gecikmesi",
+  "notch.edgeDelay.desc": "Smart ve Peek modlarında imleç üst kenarda ne kadar beklerse çentik açılır. Sekmeler veya araç çubuklarını kullanırken açılıyorsa artırın.",
   "dock.hideDelay": "Gizleme gecikmesi",
   "dock.hideDelay.desc": "Smart ve Peek modlarında imleç ayrıldıktan sonra dock'un ne kadar açık kalacağı.",
   "dock.previews": "Uygulama Önizlemeleri",
