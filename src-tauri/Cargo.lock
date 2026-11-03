@@ -2698,7 +2698,7 @@ dependencies = [
 
 [[package]]
 name = "nectar"
-version = "1.7.5"
+version = "1.7.6"
 dependencies = [
  "base64 0.22.1",
  "chrono",
