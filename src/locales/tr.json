@@ -85,6 +85,8 @@
   "dock.behavior.peek.desc": "İmleci alt kenara götürene kadar gizli kalır. Pencereler tüm ekranı kullanabilir.",
   "dock.showOn.desc": "Dock'un hangi monitör(ler)de görüntüleneceğini seçin",
   "dock.monitor.desc": "Dock'u gösteren ekran",
+  "appearance.glassWallpaper": "Camda duvar kağıdını göster",
+  "appearance.glassWallpaper.desc": "Frosted ve Liquid, çentik ve dock arkasında duvar kağıdının bulanık bir kopyasını, varsa arkadaki pencereyi gösterir. Kapalıyken düz renk kullanılır. Hareketli duvar kağıtları gösterilmez.",
   "notch.edgeDelay": "Kenar gecikmesi",
   "notch.edgeDelay.desc": "Smart ve Peek modlarında imleç üst kenarda ne kadar beklerse çentik açılır. Sekmeler veya araç çubuklarını kullanırken açılıyorsa artırın.",
   "dock.hideDelay": "Gizleme gecikmesi",

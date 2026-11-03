@@ -3,6 +3,7 @@ import { SettingRow } from "./SettingRow";
 import { SettingSection } from "./SettingSection";
 import { Dropdown } from "./Dropdown";
 import { useT } from "../i18n";
+import { GlassWallpaper } from "./GlassWallpaper";
 import { THEME_PRESETS, hexToHsl, hslToHex, type ThemePreset } from "../theme";
 
 const STYLES = ["solid", "frosted", "liquid", "material"];
@@ -105,6 +106,7 @@ export function AppearanceTab({
               ))}
             </div>
             <div className="setting-divider" />
+            {(themeStyle === "frosted" || themeStyle === "liquid") && <GlassWallpaper />}
           </>
         )}
 

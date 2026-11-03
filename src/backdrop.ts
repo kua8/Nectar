@@ -79,7 +79,7 @@ function clearBackdrop(root: HTMLElement) {
 
 export async function applyBackdrop(root: HTMLElement, style: string) {
   const current = ++generation;
-  if (!enabled || !usesBackdrop(style)) {
+  if (!enabled || !usesBackdrop(style) || localStorage.getItem("nectar-glass-wallpaper") !== "true") {
     clearBackdrop(root);
     return;
   }

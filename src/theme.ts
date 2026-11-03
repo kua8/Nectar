@@ -375,7 +375,7 @@ export function initTheme(options: { backdrop?: boolean } = {}) {
     const brightnessVal = settings['nectar-theme-brightness'] ? parseFloat(String(settings['nectar-theme-brightness'])) : syncBrightness;
 
     let styleOrAccentChanged = false;
-    for (const key of ['nectar-theme-accent', 'nectar-theme-accent-color', 'nectar-theme-style', 'nectar-legacy-mode']) {
+    for (const key of ['nectar-theme-accent', 'nectar-theme-accent-color', 'nectar-theme-style', 'nectar-glass-wallpaper', 'nectar-legacy-mode']) {
       const val = settings[key];
       if (val !== undefined && val !== null && String(val) !== localStorage.getItem(key)) {
         localStorage.setItem(key, String(val));
@@ -419,6 +419,7 @@ export function initTheme(options: { backdrop?: boolean } = {}) {
     'nectar-theme-accent',
     'nectar-theme-accent-color',
     'nectar-theme-style',
+    'nectar-glass-wallpaper',
     'nectar-legacy-mode',
     'nectar-scale',
   ];
