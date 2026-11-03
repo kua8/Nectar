@@ -11,7 +11,7 @@
 
 <p><strong>A notch and a dock for Windows.<br />Physics-animated, reactive, and built to replace your taskbar.</strong></p>
 
-[![Latest release](https://shieldcn.dev/badge/release-v1.7.6.svg?logo=lu:Tag)](https://github.com/kua8/Nectar/releases/latest)
+[![Latest release](https://shieldcn.dev/badge/release-v1.8.0.svg?logo=lu:Tag)](https://github.com/kua8/Nectar/releases/latest)
 [![Downloads](https://badges.kua8.lol/downloads.svg)](https://github.com/kua8/Nectar/releases)
 [![License](https://shieldcn.dev/github/license/kua8/Nectar.svg?logo=lu:Scale)](LICENSE)
 [![Platform](https://shieldcn.dev/badge/platform-Windows.svg?logo=ri:FaWindows)](https://www.microsoft.com/windows)
@@ -35,6 +35,10 @@
 <br />
 
 > **Disclaimer:** I'm a solo dev and I really DID NOT expect this sudden traction for Nectar. I really appreciate the recent support, and I'm trying my best to release fixes as quickly as possible to keep you all happy. But fixing one issue often causes another one. So moving forward I'll do weekly releases with stable builds, plus a pre-release for smaller fixes, and a toggle to decide which version of Nectar you run. This gives me time to search through all the bugs, find the most critical ones, and also have a private life. Thank you for understanding.
+
+> **Antivirus warnings:** We've been getting a lot of reports of Windows, Avast and Kaspersky marking Nectar's exe as a trojan or malware. This happens because Nectar isn't code-signed, and code signing certificates are pretty pricey. We're going to try to enroll in Kaspersky's [Allowlist program](https://www.kaspersky.com/partners/allowlist-program), which can take a while depending on how fast they are. Like I've said before, Nectar is open source: anyone can go through the code line by line and compile it themselves. I make no money from this project and there is no telemetry or tracking in it. There's a saying, "if it's free, you're the product", and that isn't the case here. I purely enjoy making small projects on the side.
+>
+> If you'd like to help, I'd appreciate any donations through the Buy Me a Coffee link at the bottom of this README or in the side panel. They go towards the signing certificate. If 15 people sent a dollar a month, it would help a lot.
 
 ## Features
 
