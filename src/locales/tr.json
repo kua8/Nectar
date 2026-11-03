@@ -571,5 +571,8 @@
   "appearance.accent.system": "Windows Vurgusu",
   "appearance.accent.custom": "Özel",
   "appearance.accentColor": "Özel Vurgu",
-  "appearance.accentColor.desc": "Kendi vurgu renginizi seçin"
+  "appearance.accentColor.desc": "Kendi vurgu renginizi seçin",
+  "overlays.edgeDelay": "Kenar gecikmesi",
+  "overlays.edgeDelay.desc": "İmleç ekran kenarında bu kadar durunca kaydırıcı görünür. Başka bir monitörün yanındaki kenar hiç tetiklenmez",
+  "overlays.edgeDelay.instant": "Anında"
 }

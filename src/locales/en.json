@@ -571,5 +571,8 @@
   "notch.ccSliders": "Sliders",
   "cc.layout.volume": "Volume",
   "cc.layout.brightness": "Brightness",
-  "cc.layout.available": "Available"
+  "cc.layout.available": "Available",
+  "overlays.edgeDelay": "Edge delay",
+  "overlays.edgeDelay.desc": "How long the cursor rests on the screen edge before the slider appears. An edge next to another monitor never triggers",
+  "overlays.edgeDelay.instant": "Instant"
 }

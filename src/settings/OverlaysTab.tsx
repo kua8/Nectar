@@ -1,6 +1,7 @@
 import { Volume2, Sun, ArrowLeftToLine, ArrowRightToLine } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { SettingSection } from "./SettingSection";
+import { EdgeDelay } from "./EdgeDelay";
 import { useT } from "../i18n";
 
 interface OverlaysTabProps {
@@ -52,13 +53,15 @@ export function OverlaysTab({
         </SettingRow>
 
         {brightnessOverlayEnabled && (
-          <SettingRow icon={ArrowRightToLine} label={t("overlays.edgeHover")} desc={t("overlays.edgeHover.right")} divider={false}>
+          <SettingRow icon={ArrowRightToLine} label={t("overlays.edgeHover")} desc={t("overlays.edgeHover.right")}>
             <label className="toggle-switch">
               <input type="checkbox" checked={brightnessEdgeEnabled} onChange={toggleBrightnessEdge} />
               <span className="slider"></span>
             </label>
           </SettingRow>
         )}
+
+        {(volumeEdgeEnabled || brightnessEdgeEnabled) && <EdgeDelay />}
       </SettingSection>
     </>
   );

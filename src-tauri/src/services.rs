@@ -1798,6 +1798,22 @@ static MH_LAST_RIGHT_EDGE_HOVER: AtomicI32 = AtomicI32::new(-1);
 static MH_DOCK_EXPIRY_MS: AtomicI64 = AtomicI64::new(0);
 static MH_TOPBAR_EXPIRY_MS: AtomicI64 = AtomicI64::new(0);
 static MH_LEFT_EXPIRY_MS: AtomicI64 = AtomicI64::new(0);
+static MH_LEFT_ENTER_MS: AtomicI64 = AtomicI64::new(0);
+static MH_RIGHT_ENTER_MS: AtomicI64 = AtomicI64::new(0);
+static MH_LEFT_SHARED: AtomicBool = AtomicBool::new(false);
+static MH_RIGHT_SHARED: AtomicBool = AtomicBool::new(false);
+
+fn edge_dwell_met(entered: &AtomicI64, inside: bool, now: i64, dwell_ms: i64) -> bool {
+    if !inside {
+        entered.store(0, Ordering::Relaxed);
+        return false;
+    }
+    let since = entered.load(Ordering::Relaxed);
+    if since == 0 {
+        entered.store(now, Ordering::Relaxed);
+    }
+    dwell_ms <= 0 || (since != 0 && now - since >= dwell_ms)
+}
 static MH_RIGHT_EXPIRY_MS: AtomicI64 = AtomicI64::new(0);
 static MH_LAST_MONITOR_UPDATE_MS: AtomicI64 = AtomicI64::new(0);
 static MH_CACHED_MON_POS: Mutex<Option<(i32, i32)>> = Mutex::new(None);
@@ -2138,6 +2154,19 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
                     let size = *monitor.size();
                     *MH_CACHED_MON_POS.lock().unwrap() = Some((pos.x, pos.y));
                     *MH_CACHED_MON_SIZE.lock().unwrap() = Some((size.width, size.height));
+                    let (mut left_shared, mut right_shared) = (false, false);
+                    for other in app_handle.available_monitors().unwrap_or_default() {
+                        let (op, os) = (*other.position(), *other.size());
+                        let overlaps = op.y < pos.y + size.height as i32 && op.y + os.height as i32 > pos.y;
+                        if overlaps && op.x + os.width as i32 == pos.x {
+                            left_shared = true;
+                        }
+                        if overlaps && op.x == pos.x + size.width as i32 {
+                            right_shared = true;
+                        }
+                    }
+                    MH_LEFT_SHARED.store(left_shared, Ordering::Relaxed);
+                    MH_RIGHT_SHARED.store(right_shared, Ordering::Relaxed);
                 }
                 if let Some(monitor) = crate::monitors::monitor_for_window_label(app_handle, crate::types::WindowKind::Dock, "dock") {
                     let pos = *monitor.position();
@@ -2435,7 +2464,12 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
                         cursor.x >= nx && cursor.x <= nx + nw && cursor.y >= ny && cursor.y <= ny + nh
                     });
 
-                if at_left_edge || in_mixer || over_card {
+                let edge_dwell = crate::utils::get_setting_str(app_handle, "nectar-edge-delay")
+                    .and_then(|v| v.parse::<i64>().ok())
+                    .unwrap_or(300)
+                    .clamp(0, 3000);
+                let left_confirmed = edge_dwell_met(&MH_LEFT_ENTER_MS, at_left_edge && !MH_LEFT_SHARED.load(Ordering::Relaxed), now, edge_dwell);
+                if left_confirmed || in_mixer || over_card {
                     MH_LEFT_EXPIRY_MS.store(now + 500, Ordering::Relaxed);
                 }
 
@@ -2460,7 +2494,11 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
                                     cursor.y >= mon_y &&
                                     cursor.y <= (mon_y + mon_h);
 
-                if at_right_edge {
+                let edge_dwell = crate::utils::get_setting_str(app_handle, "nectar-edge-delay")
+                    .and_then(|v| v.parse::<i64>().ok())
+                    .unwrap_or(300)
+                    .clamp(0, 3000);
+                if edge_dwell_met(&MH_RIGHT_ENTER_MS, at_right_edge && !MH_RIGHT_SHARED.load(Ordering::Relaxed), now, edge_dwell) {
                     MH_RIGHT_EXPIRY_MS.store(now + 500, Ordering::Relaxed);
                 }
 
