@@ -84,6 +84,7 @@ With **All Monitors** and more than one display, the **Per-Monitor Behavior** to
 | `nectar-weather-lon` | number string | (auto) | Longitude coordinate for weather. Set automatically when a city is selected. |
 | `nectar-weather-cached-temp` | number string | (none) | Cached temperature value shown before next API fetch. |
 | `nectar-weather-cached-condition` | string | (none) | Cached weather condition text (e.g. "Partly Cloudy"). |
+| `nectar-weather-ip-location` | JSON `{"lat":0,"lon":0,"city":""}` | (none) | The last location found from the IP address, kept so the weather still loads when the lookup fails. Set automatically. |
 | `nectar-temp-unit` | `"celsius"` / `"fahrenheit"` | `"celsius"` | Temperature display unit. |
 
 ### Modules
@@ -98,6 +99,9 @@ With **All Monitors** and more than one display, the **Per-Monitor Behavior** to
 | `nectar-dual-clock-zone` | IANA time zone string | `"UTC"` | Time zone of the second clock, for example `"Asia/Tokyo"`. Set by searching a city or time zone in Settings › Notch › Dual Clock. |
 | `nectar-dual-clock-label` | string | `"UTC"` | Name shown beside the second clock, for example `"Tokyo"`. |
 | `nectar-calendar-view` | `"day"` / `"week"` / `"month"` / `"agenda"` | `"month"` | Which view the notch calendar shows once a calendar source is connected. Set by the Day / Week / Month / Agenda switcher in the notch. |
+| `nectar-calendar-window-view` | `"day"` / `"week"` / `"month"` / `"agenda"` | `"month"` | Which view the Calendar window opens on. It remembers the last one you used. |
+| `nectar-calendar-hidden` | JSON array of strings | `[]` | Calendars you switched off in the Calendar window. Set by the window. |
+| `nectar-clock-tab` | `"timer"` / `"stopwatch"` | `"timer"` | Which tab the notch clock panel opens on. It remembers the last one you used. |
 | `nectar-music-mode-enabled` | `"true"` / `"false"` | `"true"` | Enable interactive music media widget. |
 | `nectar-music-compact-notch` | `"true"` / `"false"` | `"true"` | Show compact music display (visualizer + artwork) in collapsed notch. |
 
