@@ -205,6 +205,7 @@ fn main() {
             open_battery_saver_settings,
             get_system_accent_color,
             wallpaper::get_wallpaper_backdrop,
+            wallpaper::is_backdrop_covered,
             get_monitors,
             get_dock_mode_for_window,
             get_notch_mode_for_window,
