@@ -5,6 +5,7 @@ import {
   Pin,
   Sparkle,
   Activity,
+  Bot,
   CalendarDays,
   Inbox,
   History,
@@ -89,6 +90,8 @@ interface NotchTabProps {
   toggleCompactGlow: () => void;
   artworkThemeEnabled: boolean;
   toggleArtworkTheme: () => void;
+  agentApi: boolean;
+  toggleAgentApi: () => void;
   notchScrollVolume: boolean;
   toggleNotchScrollVolume: () => void;
   shelfPersist: boolean;
@@ -162,6 +165,8 @@ export function NotchTab({
   toggleCompactGlow,
   artworkThemeEnabled,
   toggleArtworkTheme,
+  agentApi,
+  toggleAgentApi,
   notchScrollVolume,
   toggleNotchScrollVolume,
   shelfPersist,
@@ -441,6 +446,15 @@ export function NotchTab({
           onReset={resetCcLayout}
           customized={Boolean(ccLayout.tiles || ccLayout.buttons || ccLayout.sliders)}
         />
+      </SettingSection>
+
+      <SettingSection id="notch-agents" title={t("notch.section.agents")}>
+        <SettingRow icon={Bot} label={t("notch.agentApi")} desc={t("notch.agentApi.desc")} divider={false}>
+          <label className="toggle-switch">
+            <input type="checkbox" checked={agentApi} onChange={toggleAgentApi} />
+            <span className="slider"></span>
+          </label>
+        </SettingRow>
       </SettingSection>
 
       <SettingSection id="notch-controls" title={t("notch.section.controls")}>

@@ -21,6 +21,7 @@ mod connections;
 mod audio_devices;
 mod i18n;
 mod shelf;
+mod agent_api;
 mod memory_saver;
 mod webview_args;
 mod on_demand_windows;
@@ -47,6 +48,11 @@ unsafe extern "system" fn ctrl_handler(ctrl_type: u32) -> BOOL {
 }
 
 fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(code) = agent_api::run_cli(&args) {
+        std::process::exit(code);
+    }
+
     if native_uninstall::requested() {
         native_uninstall::run();
         return;
@@ -248,6 +254,7 @@ fn main() {
             }
 
             crate::utils::init_settings_cache(app.handle());
+            agent_api::start(app.handle().clone());
 
             #[cfg(not(debug_assertions))]
             std::thread::spawn(crate::uninstall_registry::heal_uninstall_registration);

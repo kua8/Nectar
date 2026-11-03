@@ -25,6 +25,7 @@ import { NotchShelf, useShelf } from "./components/NotchShelf";
 import { parseCcLayout, parsePanelOrder, resolveCcLayout, type CcKind } from "./panelOrder";
 import { NotchProgressBorder } from "./components/NotchProgressBorder";
 import { SurfaceShape } from "./components/SurfaceShape";
+import { AgentStatus, type AgentActivity } from "./components/AgentStatus";
 import type { WidgetConfig } from "./components/StatusWidgetConfig";
 import {
   DEFAULT_DUAL_CLOCK_ZONE,
@@ -544,6 +545,7 @@ function App() {
   const [dndActive, setDndActive] = useState(false);
   const [dockEnabled, setDockEnabled] = useState(() => localStorage.getItem("nectar-dock-enabled") !== "false");
   const [isNotchHovered, setIsNotchHovered] = useState(false);
+  const [agentActivity, setAgentActivity] = useState<AgentActivity | null>(null);
 
   const [isEdgeHovered, setIsEdgeHovered] = useState(false);
   const [isOverlapped, setIsOverlapped] = useState(false);
@@ -1419,6 +1421,20 @@ function App() {
   useEffect(() => {
     const unlisten = listen<typeof mediaSessions>("media-sessions", (event) => setMediaSessions(event.payload ?? []));
     return () => { unlisten.then(fn => fn()); };
+  }, []);
+
+  useEffect(() => {
+    let clear: ReturnType<typeof setTimeout> | undefined;
+    const unlisten = listen<AgentActivity | null>("agent-activity", (event) => {
+      clearTimeout(clear);
+      const next = event.payload;
+      setAgentActivity(next);
+      if (next && next.state === "done") clear = setTimeout(() => setAgentActivity(null), 8000);
+    });
+    return () => {
+      clearTimeout(clear);
+      unlisten.then((fn) => fn());
+    };
   }, []);
 
   // Native Windows Media Controls - Listen for updates from background worker
@@ -2700,6 +2716,10 @@ function App() {
         </AnimatePresence>
 
         <SurfaceShape edge="top" flare={isImpacted ? 13 : 0} radius={isCalendarMode ? 28 : 18} edgeRadius={18} />
+
+        <AnimatePresence>
+          {agentActivity && !isHovered && <AgentStatus key="agent" activity={agentActivity} />}
+        </AnimatePresence>
 
         {showTimerProgressBar && (
           <NotchProgressBorder

@@ -579,5 +579,13 @@
   "overlays.brightnessSide": "Parlaklık kaydırıcısı tarafı",
   "overlays.side.desc": "Hangi ekran kenarında görünür. İki kaydırıcı her zaman karşı kenarları kullanır",
   "overlays.side.left": "Sol",
-  "overlays.side.right": "Sağ"
+  "overlays.side.right": "Sağ",
+  "agent.default": "Yapay zeka ajanı",
+  "agent.working": "Çalışıyor",
+  "agent.needs_input": "Girdi gerekiyor",
+  "agent.done": "Bitti",
+  "agent.error": "Hata",
+  "notch.section.agents": "Yapay zeka ajanları",
+  "notch.agentApi": "Ajan durumu",
+  "notch.agentApi.desc": "Bu bilgisayardaki yapay zeka ajanlarının durumunu çentiğin yanında göstermesine izin verir. Yeniden başlatınca geçerli olur"
 }

@@ -183,6 +183,8 @@ function SettingsApp() {
               toggleCompactGlow={settings.toggleCompactGlow}
               artworkThemeEnabled={settings.mediaArtworkThemeEnabled}
               toggleArtworkTheme={settings.toggleArtworkTheme}
+              agentApi={settings.agentApi}
+              toggleAgentApi={settings.toggleAgentApi}
               notchScrollVolume={settings.notchScrollVolume}
               toggleNotchScrollVolume={settings.toggleNotchScrollVolume}
               shelfPersist={settings.shelfPersist}

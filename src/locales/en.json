@@ -579,5 +579,13 @@
   "overlays.brightnessSide": "Brightness slider side",
   "overlays.side.desc": "Screen edge it appears on. The two sliders always use opposite sides",
   "overlays.side.left": "Left",
-  "overlays.side.right": "Right"
+  "overlays.side.right": "Right",
+  "agent.default": "AI agent",
+  "agent.working": "Working",
+  "agent.needs_input": "Needs input",
+  "agent.done": "Done",
+  "agent.error": "Error",
+  "notch.section.agents": "AI agents",
+  "notch.agentApi": "Agent status",
+  "notch.agentApi.desc": "Let AI agents on this computer show their status next to the notch. Applies after a restart"
 }
