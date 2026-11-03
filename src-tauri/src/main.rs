@@ -16,6 +16,7 @@ mod caldav;
 mod calendar_sync;
 mod ics;
 mod active_look;
+mod attention;
 mod launchers;
 mod connections;
 mod audio_devices;
@@ -216,6 +217,7 @@ fn main() {
             has_battery,
             open_battery_saver_settings,
             get_system_accent_color,
+            attention::get_attention_windows,
             wallpaper::get_wallpaper_backdrop,
             wallpaper::is_backdrop_covered,
             get_monitors,
@@ -318,6 +320,7 @@ fn main() {
             setup_mouse_hook(app.handle().clone());
             setup_display_change_monitor(app.handle().clone());
             setup_window_change_hook(app.handle().clone());
+            attention::start(app.handle().clone());
             {
                 let _ = crate::state::THUMBNAIL_CACHE.set(std::sync::Mutex::new(std::collections::HashMap::new()));
                 let _ = crate::state::FOCUS_TIMESTAMPS.set(std::sync::Mutex::new(std::collections::HashMap::new()));

@@ -425,6 +425,7 @@ body {
 }
 
 .dock-icon {
+  position: relative;
   width: 36px;
   height: 36px;
   display: flex;
@@ -510,6 +511,51 @@ body {
 
 .window-dots.multi .active-indicator {
   width: 20px;
+}
+
+/* An app flashed for attention (a dot) or shows an unread count in its title (the number) */
+.attention-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 10px;
+  height: 10px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: #ff453a;
+  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.35), 0 1px 3px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  animation: attention-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.attention-badge.has-count {
+  top: -6px;
+  right: -7px;
+  width: auto;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.light-mode .attention-badge {
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.85), 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+@keyframes attention-pop {
+  from {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .start-icon-inner {

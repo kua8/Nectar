@@ -11,6 +11,7 @@ import { useSettingsSync } from './hooks/useSettingsSync';
 import { useT } from './i18n';
 import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon } from './icons';
 import { setVisibleInterval } from "./hooks/visibleInterval";
+import { appAttention } from "./attention";
 
 interface AppInfo {
   name: string;
@@ -229,6 +230,18 @@ function sessionForApp(app: AppInfo, sessions: AppMediaSession[]): AppMediaSessi
   return sessions.find((s) => s.app_id.toLowerCase().replace(/\.exe$/, "").includes(exe));
 }
 
+// Window titles of an item, joined; unread counts live in them.
+const windowTitles = (app: AppInfo) => app.all_hwnds?.map(([, title]) => title).join("\n") ?? "";
+
+// Shown on apps that want attention, with the unread count when the app gives one.
+function AttentionBadge({ count }: { count: number }) {
+  return (
+    <span className={`attention-badge${count > 0 ? " has-count" : ""}`}>
+      {count > 99 ? "99+" : count > 0 ? count : null}
+    </span>
+  );
+}
+
 function WindowDots({ count }: { count: number }) {
   return (
     <div className={`window-dots${count > 1 ? " multi" : ""}`}>
@@ -254,6 +267,8 @@ const Dock = memo(function Dock() {
   });
   const [dockPreviewEnabled, setDockPreviewEnabled] = useState(() => localStorage.getItem("nectar-dock-preview-enabled") !== "false");
   const [hideDelay, setHideDelay] = useState(() => Number(localStorage.getItem("nectar-dock-hide-delay")) || 800);
+  const [dockAttentionEnabled, setDockAttentionEnabled] = useState(() => localStorage.getItem("nectar-dock-attention-enabled") !== "false");
+  const [attentionWindows, setAttentionWindows] = useState<Set<number>>(() => new Set());
   const [dockSearchEnabled, setDockSearchEnabled] = useState(() => localStorage.getItem("nectar-dock-search-enabled") !== "false");
   const [dockCalendarEnabled, setDockCalendarEnabled] = useState(() => localStorage.getItem("nectar-dock-calendar-enabled") !== "false");
   const [legacyMode, setLegacyMode] = useState(() => localStorage.getItem("nectar-legacy-mode") === "true");
@@ -436,6 +451,7 @@ const Dock = memo(function Dock() {
 
       const preview = getVal("nectar-dock-preview-enabled", "true");
       setDockPreviewEnabled(preview === "true");
+      setDockAttentionEnabled(getVal("nectar-dock-attention-enabled", "true") !== "false");
 
       const searchEnabled = getVal("nectar-dock-search-enabled", "true");
       setDockSearchEnabled(searchEnabled === "true");
@@ -529,6 +545,7 @@ const Dock = memo(function Dock() {
       "nectar-dock-monitor-id": refreshDockMode,
       "nectar-dock-hide-delay": (v) => setHideDelay(Number(v) || 800),
       "nectar-dock-preview-enabled": setDockPreviewEnabled,
+      "nectar-dock-attention-enabled": (v) => setDockAttentionEnabled(v !== false && v !== "false"),
       "nectar-dock-search-enabled": setDockSearchEnabled,
       "nectar-dock-calendar-enabled": setDockCalendarEnabled,
       "nectar-legacy-mode": setLegacyMode,
@@ -557,7 +574,7 @@ const Dock = memo(function Dock() {
       setActiveApps(prev => {
         const same = prev.length === running.length && prev.every((p, i) => {
           const r = running[i];
-          return p.path === r.path && p.name === r.name && p.hwnd === r.hwnd && p.is_running === r.is_running;
+          return p.path === r.path && p.name === r.name && p.hwnd === r.hwnd && p.is_running === r.is_running && windowTitles(p) === windowTitles(r);
         });
         return same ? prev : running;
       });
@@ -590,8 +607,15 @@ const Dock = memo(function Dock() {
     // Safety net: even if a window event is missed, converge on the real state
     const interval = setVisibleInterval(poll, 10000);
 
+    // Windows that flashed for attention; the backend drops them once they're activated or closed
+    invoke<number[]>('get_attention_windows').then(list => setAttentionWindows(new Set(list))).catch(() => {});
+    const unlistenAttention = listen<number[]>("app-attention", (event) => {
+      setAttentionWindows(new Set(event.payload));
+    });
+
     return () => {
       clearInterval(interval);
+      unlistenAttention.then(f => f());
       unlistenWindowChange.then(f => f());
       unlistenSettingsReset.then(f => f());
       unlistenIconCache.then(f => f());
@@ -891,6 +915,12 @@ const Dock = memo(function Dock() {
   }, [pinnedApps, activeApps, activeOrder]);
 
   const startItem = useMemo(() => dockItems.find(i => i.path === 'start') as AppInfo, [dockItems]);
+
+  const attentionBadge = (app: AppInfo) => {
+    if (!dockAttentionEnabled || legacyMode || !app.is_running) return null;
+    const { flashing, count } = appAttention(app, attentionWindows);
+    return flashing || count > 0 ? <AttentionBadge count={count} /> : null;
+  };
   const pinnedItems = useMemo(() => dockItems.filter(i => i.path !== 'start' && i.is_pinned), [dockItems]);
   const unpinnedItems = useMemo(() => dockItems.filter(i => !i.is_pinned), [dockItems]);
 
@@ -1388,6 +1418,7 @@ const Dock = memo(function Dock() {
                       <div className="fallback-icon">{app.name[0]}</div>
                     );
                   })()}
+                  {attentionBadge(app)}
                 </motion.div>
                   {app.is_running && <WindowDots count={app.all_hwnds?.length ?? 1} />}
                     </motion.div>
@@ -1489,6 +1520,7 @@ const Dock = memo(function Dock() {
                             <div className="fallback-icon">{app.name[0]}</div>
                           );
                         })()}
+                        {attentionBadge(app)}
                       </motion.div>
                       {app.is_running && <WindowDots count={app.all_hwnds?.length ?? 1} />}
                     </motion.div>
@@ -1588,6 +1620,7 @@ const Dock = memo(function Dock() {
                             <div className="fallback-icon">{app.name[0]}</div>
                           );
                         })()}
+                        {attentionBadge(app)}
                       </motion.div>
                       {app.is_running && <WindowDots count={app.all_hwnds?.length ?? 1} />}
                     </motion.div>

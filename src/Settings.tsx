@@ -226,6 +226,8 @@ function SettingsApp() {
               setDockModeValue={settings.setDockModeValue}
               dockPreviewEnabled={settings.dockPreviewEnabled}
               toggleDockPreview={settings.toggleDockPreview}
+              dockAttentionEnabled={settings.dockAttentionEnabled}
+              toggleDockAttention={settings.toggleDockAttention}
               dockSearchEnabled={settings.dockSearchEnabled}
               toggleDockSearch={settings.toggleDockSearch}
               dockSearchProvider={settings.dockSearchProvider}
