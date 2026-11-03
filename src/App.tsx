@@ -25,7 +25,7 @@ import { NotchShelf, useShelf } from "./components/NotchShelf";
 import { parseCcLayout, parsePanelOrder, resolveCcLayout, type CcKind } from "./panelOrder";
 import { NotchProgressBorder } from "./components/NotchProgressBorder";
 import { SurfaceShape } from "./components/SurfaceShape";
-import { AgentStatus, type AgentActivity } from "./components/AgentStatus";
+import { AgentLeft, AgentDot, type AgentActivity } from "./components/AgentStatus";
 import type { WidgetConfig } from "./components/StatusWidgetConfig";
 import {
   DEFAULT_DUAL_CLOCK_ZONE,
@@ -1816,6 +1816,8 @@ function App() {
   );
 
   // Calculate width dynamically based on enabled features
+  const agentWings = !!agentActivity && isNotchWindow && !isHovered && (nectarMode === 'status' || isMusicMode);
+
   const getDynamicWidth = () => {
     if (nectarMode === 'tour') return 380;
     if (nectarMode === 'shelf') return Math.max(300, Math.min(120 + shelf.items.length * 70, 460));
@@ -1831,7 +1833,7 @@ function App() {
     if (isMusicMode && isHovered) return mediaLayout === 'compact' ? 300 : 340;
     if ((showPowerPulse || showLowBatteryPulse || showUpdatePulse) && !isHovered) return 200;
 
-    let w = 140 + dualClockExtra;
+    let w = 140 + dualClockExtra + (agentWings ? (isMusicMode ? 60 : 84) : 0);
     if (isMusicMode) {
       if (settingsVisualizerEnabled && isPlaying) w += 30;
       if (settingsAlbumArtEnabled) w += 30;
@@ -2249,7 +2251,9 @@ function App() {
                           >
                             {/* Left: update activity (takes priority), visualizer (music), or weather (command-center, calendar) */}
                             <div className="side-content left">
-                              {updateAvailable && showUpdateIndicator ? (
+                              {agentWings && agentActivity ? (
+                                <AgentLeft activity={agentActivity} dot={isMusicMode} />
+                              ) : updateAvailable && showUpdateIndicator ? (
                                 <AnimatePresence>
                                   <motion.div
                                     key="update-activity"
@@ -2333,7 +2337,9 @@ function App() {
 
                             {/* Right: album art (music) or battery (command-center, calendar) */}
                             <div className="side-content right">
-                              {isMusicMode && settingsAlbumArtEnabled ? (
+                              {agentWings && !isMusicMode && agentActivity ? (
+                                <AgentDot activity={agentActivity} />
+                              ) : isMusicMode && settingsAlbumArtEnabled ? (
                                 <AnimatePresence mode="wait">
                                   <motion.div
                                     key="album-art"
@@ -2716,10 +2722,6 @@ function App() {
         </AnimatePresence>
 
         <SurfaceShape edge="top" flare={isImpacted ? 13 : 0} radius={isCalendarMode ? 28 : 18} edgeRadius={18} />
-
-        <AnimatePresence>
-          {agentActivity && !isHovered && <AgentStatus key="agent" activity={agentActivity} />}
-        </AnimatePresence>
 
         {showTimerProgressBar && (
           <NotchProgressBorder

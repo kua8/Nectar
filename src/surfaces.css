@@ -53,7 +53,7 @@
 }
 
 /* Material and light mode: plain fill, the outline replaces any rim or shadow */
-:root:is(.style-material, .light-mode) :is(.nectar, .dock, .volume-notch, .brightness-notch, .agent-card) {
+:root:is(.style-material, .light-mode) :is(.nectar, .dock, .volume-notch, .brightness-notch) {
     box-shadow: none !important;
 }
 
@@ -83,7 +83,7 @@
 
 /* ── Glass: the fill layer carries everything, the surface itself is clear ── */
 
-:root:is(.style-frosted, .style-liquid) :is(.nectar, .dock, .volume-notch, .brightness-notch, .agent-card) {
+:root:is(.style-frosted, .style-liquid) :is(.nectar, .dock, .volume-notch, .brightness-notch) {
     isolation: isolate;
     background: transparent !important;
     background-image: none !important;
