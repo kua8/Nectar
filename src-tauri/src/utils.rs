@@ -533,6 +533,26 @@ pub fn re_assert_topmost(hwnd: HWND) {
     }
 }
 
+fn mostly_painted(pixels: &[u8]) -> bool {
+    pixels.chunks_exact(4).step_by(7).filter(|c| c[0] != 0 || c[1] != 0 || c[2] != 0).count() * 50 > pixels.len() / 28
+}
+
+fn encode_thumbnail(mut pixels: Vec<u8>, width: u32, height: u32, max_width: u32, max_height: u32) -> Option<String> {
+    for chunk in pixels.chunks_exact_mut(4) {
+        chunk.swap(0, 2);
+        chunk[3] = 255;
+    }
+    let mut img = image::RgbaImage::from_raw(width, height, pixels)?;
+    if img.width() > max_width || img.height() > max_height {
+        let dyn_img = image::DynamicImage::ImageRgba8(img);
+        img = dyn_img.resize(max_width, max_height, image::imageops::FilterType::Triangle).into_rgba8();
+    }
+    let mut buf = std::io::Cursor::new(Vec::new());
+    image::write_buffer_with_format(&mut buf, &img, img.width(), img.height(), image::ColorType::Rgba8, image::ImageFormat::Png).ok()?;
+    use base64::Engine;
+    Some(format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(buf.into_inner())))
+}
+
 /// Captures an HWND to a base64-encoded PNG thumbnail, scaling it down if it exceeds max_width x max_height.
 pub fn capture_hwnd_to_base64(hwnd: HWND, max_width: u32, max_height: u32) -> Option<String> {
     unsafe {
@@ -547,6 +567,14 @@ pub fn capture_hwnd_to_base64(hwnd: HWND, max_width: u32, max_height: u32) -> Op
         extern "system" { pub fn PrintWindow(hwnd: HWND, hdcBlt: HDC, nFlags: u32) -> i32; }
 
         if !IsWindow(Some(hwnd)).as_bool() { return None; }
+
+        if let Some((pixels, w, h)) = crate::capture::capture_window_bgra(hwnd) {
+            if mostly_painted(&pixels) {
+                if let Some(png) = encode_thumbnail(pixels, w, h, max_width, max_height) {
+                    return Some(png);
+                }
+            }
+        }
 
         let mut rect = RECT::default();
         let _ = DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &mut rect as *mut _ as *mut _, std::mem::size_of::<RECT>() as u32);

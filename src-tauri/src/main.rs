@@ -3,6 +3,7 @@
 mod types;
 mod state;
 mod utils;
+mod capture;
 mod services;
 mod commands;
 mod monitors;
