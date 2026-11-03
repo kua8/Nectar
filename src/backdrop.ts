@@ -1,8 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
+import { setVisibleInterval } from "./hooks/visibleInterval";
 
-// The glass styles show a pre-blurred copy of the desktop wallpaper behind the notch and dock,
-// lined up with where they sit on screen (the windows are transparent, so nothing real can be
-// blurred). Where an app window is behind them, they still show the wallpaper.
 
 interface WallpaperBackdrop {
   image: string;
@@ -25,6 +23,9 @@ const VARS = ["--backdrop-image", "--backdrop-size", "--backdrop-x", "--backdrop
 
 let enabled = false;
 let generation = 0;
+let loaded = false;
+let covered = false;
+let watch: number | undefined;
 
 // Only the notch and dock draw a backdrop; other windows skip loading the wallpaper.
 export function enableBackdrop() {
@@ -53,7 +54,25 @@ function wallpaperRect(d: WallpaperBackdrop) {
   return { x: (mw - w) / 2, y: (mh - h) / 2, w, h };
 }
 
+function showBackdrop(root: HTMLElement) {
+  root.classList.toggle("has-backdrop", loaded && !covered);
+}
+
+// Asks whether an app window is behind the notch or dock, whichever this window draws.
+async function checkCovered(root: HTMLElement) {
+  const r = document.querySelector<HTMLElement>(".nectar, .dock")?.getBoundingClientRect();
+  if (!r || r.width < 1 || r.height < 1) return;
+  const rect = { x: r.x, y: r.y, width: r.width, height: r.height };
+  const next = await invoke<boolean>("is_backdrop_covered", { rect }).catch(() => covered);
+  if (!loaded || next === covered) return;
+  covered = next;
+  showBackdrop(root);
+}
+
 function clearBackdrop(root: HTMLElement) {
+  loaded = false;
+  window.clearInterval(watch);
+  watch = undefined;
   root.classList.remove("has-backdrop");
   for (const name of VARS) root.style.removeProperty(name);
 }
@@ -84,5 +103,8 @@ export async function applyBackdrop(root: HTMLElement, style: string) {
   // The notch hangs from the top of its window; the dock sits on the bottom of its window.
   root.style.setProperty("--backdrop-top", px(r.y - d.windowY));
   root.style.setProperty("--backdrop-bottom", `calc(100% + ${px(r.y + r.h - d.windowY - d.windowHeight)})`);
-  root.classList.add("has-backdrop");
+  loaded = true;
+  showBackdrop(root);
+  watch ??= setVisibleInterval(() => checkCovered(root), 600);
+  checkCovered(root);
 }

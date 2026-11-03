@@ -146,7 +146,8 @@
 /* ── Wallpaper backdrop (Frosted and Liquid on the notch and dock) ──
    backdrop.ts loads a pre-blurred copy of the wallpaper and sets --backdrop-*; it is drawn inside
    the fill layer, lined up with the screen, so the glass shows what is actually behind it. The
-   x position is relative to the centre, so the flares leave it unchanged. */
+   x position is relative to the centre, so the flares leave it unchanged. While an app window is
+   behind the surface, has-backdrop is dropped and the window shows through the tint. */
 
 :root.has-backdrop:is(.style-frosted, .style-liquid) :is(.nectar, .dock) {
     --glass-tint: color-mix(in srgb, var(--notch-bg, var(--nectar-bg, rgba(0, 0, 0, 0.8))) 62%, transparent);
