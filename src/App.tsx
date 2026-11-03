@@ -25,7 +25,8 @@ import { NotchShelf, useShelf } from "./components/NotchShelf";
 import { parseCcLayout, parsePanelOrder, resolveCcLayout, type CcKind } from "./panelOrder";
 import { NotchProgressBorder } from "./components/NotchProgressBorder";
 import { SurfaceShape } from "./components/SurfaceShape";
-import { AgentLeft, AgentDot, type AgentActivity } from "./components/AgentStatus";
+import { playAgentSound } from "./agentSounds";
+import { AgentLeft, AgentDot, AgentPanel, type AgentActivity } from "./components/AgentStatus";
 import type { WidgetConfig } from "./components/StatusWidgetConfig";
 import {
   DEFAULT_DUAL_CLOCK_ZONE,
@@ -546,6 +547,9 @@ function App() {
   const [dockEnabled, setDockEnabled] = useState(() => localStorage.getItem("nectar-dock-enabled") !== "false");
   const [isNotchHovered, setIsNotchHovered] = useState(false);
   const [agentActivity, setAgentActivity] = useState<AgentActivity | null>(null);
+  const lastAgentKey = useRef("");
+  const windowLabelRef = useRef("");
+  windowLabelRef.current = windowLabel;
 
   const [isEdgeHovered, setIsEdgeHovered] = useState(false);
   const [isOverlapped, setIsOverlapped] = useState(false);
@@ -556,11 +560,11 @@ function App() {
   const dockModeInitial = useRef(true);
   const notchModeInitial = useRef(true);
 
-  const [nectarMode, setNectarMode] = useState<'music' | 'calendar' | 'command-center' | 'status' | 'shelf' | 'tour'>('status');
+  const [nectarMode, setNectarMode] = useState<'music' | 'calendar' | 'command-center' | 'status' | 'shelf' | 'tour' | 'agent'>('status');
 
   const isAnyInteraction = isHovered || isNotchHovered || isEdgeHovered;
   const isHidden = ((notchMode === 'smart' || notchMode === 'peek') && isFullscreen) ||
-    (!startupAnimating && nectarMode !== 'tour' && (
+    (!startupAnimating && nectarMode !== 'tour' && !(agentActivity && isNotchWindow) && (
       (notchMode === 'smart' && isOverlapped && interactionState === 'none') ||
       (notchMode === 'peek' && interactionState === 'none' && !eventPeek)
     ));
@@ -1089,6 +1093,7 @@ function App() {
 
     const availableModes = availableNotchModes();
 
+    if (nectarMode === 'agent') { if (availableModes[0]) setNectarMode(availableModes[0]); return; }
     if (nectarMode === 'tour') return;
     const currentIndex = availableModes.indexOf(nectarMode);
     if (currentIndex === -1) return;
@@ -1428,7 +1433,12 @@ function App() {
     const unlisten = listen<AgentActivity | null>("agent-activity", (event) => {
       clearTimeout(clear);
       const next = event.payload;
-      setAgentActivity(next);
+      const key = next ? `${next.state}:${next.ask?.id ?? ""}` : "";
+      if (windowLabelRef.current === 'main' && next && key !== lastAgentKey.current && (next.state === 'needs_input' || next.state === 'done' || next.state === 'error')) {
+        playAgentSound(next.state);
+      }
+      lastAgentKey.current = key;
+      setAgentActivity((prev) => (next && prev?.ask && !next.ask && next.cancelled !== prev.ask.id && (next.state === 'working' || next.state === 'tool') ? prev : next));
       if (next && next.state === "done") clear = setTimeout(() => setAgentActivity(null), 8000);
     });
     return () => {
@@ -1675,6 +1685,7 @@ function App() {
       resetTimer();
       return;
     }
+    if (nectarMode === 'agent') { const first = availableNotchModes()[0]; if (first) setNectarMode(first); return; }
     if (nectarMode === 'tour') return;
     const modes = availableNotchModes();
     const index = modes.indexOf(nectarMode);
@@ -1799,6 +1810,10 @@ function App() {
     }
   }, [nectarMode, panelControlCenter, panelShelf]);
 
+  useEffect(() => {
+    if (nectarMode === 'agent' && !agentActivity) setNectarMode('status');
+  }, [nectarMode, agentActivity]);
+
   // Music mode shows any time we have media info (playing or paused) and music mode setting is enabled
   const isMusicMode = mediaInfo.has_media && nectarMode === 'music' && settingsMusicModeEnabled;
 
@@ -1816,10 +1831,12 @@ function App() {
   );
 
   // Calculate width dynamically based on enabled features
+  const agentNeedsYou = !!agentActivity && isNotchWindow;
   const agentWings = !!agentActivity && isNotchWindow && !isHovered && (nectarMode === 'status' || isMusicMode);
 
   const getDynamicWidth = () => {
     if (nectarMode === 'tour') return 380;
+    if (nectarMode === 'agent') return 340;
     if (nectarMode === 'shelf') return Math.max(300, Math.min(120 + shelf.items.length * 70, 460));
     if (isCalendarMode) return Math.max(settingsCalendarEnabled && showClockColumn ? 480 : settingsCalendarEnabled ? 310 : 270, 140 + dualClockExtra);
     if (nectarMode === 'command-center' && isHovered) {
@@ -1833,7 +1850,7 @@ function App() {
     if (isMusicMode && isHovered) return mediaLayout === 'compact' ? 300 : 340;
     if ((showPowerPulse || showLowBatteryPulse || showUpdatePulse) && !isHovered) return 200;
 
-    let w = 140 + dualClockExtra + (agentWings ? (isMusicMode ? 60 : 84) : 0);
+    let w = 140 + dualClockExtra + (agentWings ? (isMusicMode ? 24 : 56) : 0);
     if (isMusicMode) {
       if (settingsVisualizerEnabled && isPlaying) w += 30;
       if (settingsAlbumArtEnabled) w += 30;
@@ -1851,6 +1868,7 @@ function App() {
       return isImpacted ? 28.9 : 44.2;
     }
     if (nectarMode === 'tour') return 210;
+    if (nectarMode === 'agent') return agentActivity?.ask ? 184 : agentActivity?.detail ? 160 : 130;
     if (nectarMode === 'shelf') return shelf.items.length === 0 ? 96 : 156;
     if (nectarMode === 'calendar') return settingsCalendarEnabled ? (caldav.connected ? 350 : 310) : 262;
     if (nectarMode === 'command-center') {
@@ -1956,7 +1974,8 @@ function App() {
           setIsHovered(true);
           if (nectarMode !== 'tour' && nectarMode !== 'shelf') {
             const remembered = settingsRememberMode ? rememberedModeRef.current : null;
-            if (remembered && availableNotchModes().includes(remembered)) setNectarMode(remembered);
+            if (agentNeedsYou) setNectarMode('agent');
+            else if (remembered && availableNotchModes().includes(remembered)) setNectarMode(remembered);
             else setNectarMode(mediaInfo.has_media && isPlaying ? 'music' : 'status');
           }
         }}
@@ -1970,7 +1989,7 @@ function App() {
           const targetMode = mediaInfo.has_media && isPlaying && settingsMusicCompactNotch ? 'music' : 'status';
           if (nectarMode === 'music') {
             setNectarMode(targetMode);
-          } else if (nectarMode === 'command-center' || nectarMode === 'calendar' || nectarMode === 'status' || nectarMode === 'shelf') {
+          } else if (nectarMode === 'command-center' || nectarMode === 'calendar' || nectarMode === 'status' || nectarMode === 'shelf' || nectarMode === 'agent') {
             setNectarMode(targetMode);
           }
         }}
@@ -2676,6 +2695,31 @@ function App() {
                         closeTour();
                         if (id === 'control-center') setNectarMode('command-center');
                         else openSettingsWindow();
+                      }}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <AnimatePresence>
+                {nectarMode === 'agent' && agentActivity && (
+                  <motion.div
+                    key="agent-panel"
+                    className="agent-panel"
+                    onClick={e => e.stopPropagation()}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0, transition: { duration: 0.1 } }}
+                    transition={{ duration: 0.18, delay: 0.22 }}
+                  >
+                    <AgentPanel
+                      activity={agentActivity}
+                      onOpen={() => { if (agentActivity.window) invoke('focus_agent_window', { window: agentActivity.window }).catch(() => { }); }}
+                      onDismiss={() => { setAgentActivity(null); setNectarMode('status'); }}
+                      onAnswer={(allow) => {
+                        if (agentActivity.ask) invoke('agent_answer', { id: agentActivity.ask.id, allow }).catch(() => { });
+                        setAgentActivity({ ...agentActivity, state: 'working', ask: undefined });
+                        setNectarMode('status');
                       }}
                     />
                   </motion.div>

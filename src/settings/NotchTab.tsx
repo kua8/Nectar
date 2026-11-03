@@ -1,3 +1,4 @@
+import { AgentSounds } from "./AgentSounds";
 import {
   PanelTop,
   Calendar,
@@ -455,6 +456,7 @@ export function NotchTab({
             <span className="slider"></span>
           </label>
         </SettingRow>
+        <AgentSounds />
       </SettingSection>
 
       <SettingSection id="notch-controls" title={t("notch.section.controls")}>

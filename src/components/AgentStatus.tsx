@@ -1,16 +1,21 @@
 import { motion } from "framer-motion";
 import { useT } from "../i18n";
 
-export type AgentState = "working" | "needs_input" | "done" | "error";
+export type AgentState = "working" | "tool" | "needs_input" | "done" | "error";
 
 export interface AgentActivity {
   state: AgentState;
   name?: string;
   project?: string;
+  window?: number;
+  detail?: string;
+  ask?: { id: number; tool?: string; detail?: string };
+  cancelled?: number;
 }
 
 const MASCOT: Record<AgentState, string> = {
   working: "working",
+  tool: "working",
   needs_input: "needs-input",
   done: "done",
   error: "error",
@@ -48,6 +53,44 @@ export function AgentLeft({ activity, dot }: { activity: AgentActivity; dot: boo
     <>
       <AgentMascot activity={activity} />
       {dot && <AgentDot activity={activity} />}
+    </>
+  );
+}
+
+export function AgentPanel({ activity, onOpen, onDismiss, onAnswer }: { activity: AgentActivity; onOpen: () => void; onDismiss: () => void; onAnswer: (allow: boolean) => void }) {
+  const t = useT();
+  const { ask } = activity;
+  return (
+    <>
+      <div className="agent-panel-head">
+        <img className="agent-panel-mascot" src={`/mascot/${MASCOT[activity.state]}.svg`} alt="" draggable={false} />
+        <div className="agent-panel-text">
+          <b>{activity.name ?? t("agent.default")}</b>
+          <span>{activity.project ? `${t(`agent.${activity.state}`)} · ${activity.project}` : t(`agent.${activity.state}`)}</span>
+        </div>
+        <span className={`agent-dot ${activity.state}`} />
+      </div>
+      {ask && (
+        <div className="agent-ask">
+          {ask.tool && <b>{ask.tool}</b>}
+          {ask.detail && <code>{ask.detail}</code>}
+        </div>
+      )}
+      {!ask && activity.detail && (
+        <div className="agent-ask">
+          <span className="agent-ask-text">{activity.detail}</span>
+        </div>
+      )}
+      <div className="agent-panel-actions">
+        {ask ? (
+          <>
+            <button className="agent-btn primary" onClick={() => onAnswer(true)}>{t("agent.allow")}</button>
+            <button className="agent-btn" onClick={() => onAnswer(false)}>{t("agent.deny")}</button>
+          </>
+        ) : null}
+        <button className={`agent-btn${ask ? "" : " primary"}`} onClick={onOpen} disabled={!activity.window}>{t("agent.open")}</button>
+        {!ask && <button className="agent-btn" onClick={onDismiss}>{t("agent.dismiss")}</button>}
+      </div>
     </>
   );
 }

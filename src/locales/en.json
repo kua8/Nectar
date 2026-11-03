@@ -587,5 +587,17 @@
   "agent.error": "Error",
   "notch.section.agents": "AI agents",
   "notch.agentApi": "Agent status",
-  "notch.agentApi.desc": "Let AI agents on this computer show their status next to the notch. Applies after a restart"
+  "notch.agentApi.desc": "Let AI agents on this computer show their status next to the notch. Applies after a restart",
+  "agent.open": "Open",
+  "agent.dismiss": "Dismiss",
+  "agent.allow": "Allow",
+  "agent.deny": "Deny",
+  "agent.tool": "Running a tool",
+  "notch.agentSounds": "Agent sounds",
+  "notch.agentSounds.desc": "Play a sound when an agent needs input, finishes or fails",
+  "notch.agentSound.default": "Default sound",
+  "notch.agentSound.custom": "Your own sound",
+  "notch.agentSound.play": "Play",
+  "notch.agentSound.choose": "Choose file",
+  "notch.agentSound.reset": "Reset"
 }
