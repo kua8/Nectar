@@ -4,6 +4,7 @@ mod types;
 mod state;
 mod utils;
 mod capture;
+mod windows_accent;
 mod services;
 mod commands;
 mod monitors;
@@ -220,6 +221,9 @@ fn main() {
             get_system_accent_color,
             attention::get_attention_windows,
             wallpaper::get_wallpaper_backdrop,
+            sync_windows_accent,
+            restore_windows_accent,
+            windows_accent_backup_exists,
             wallpaper::is_backdrop_covered,
             get_monitors,
             get_dock_mode_for_window,

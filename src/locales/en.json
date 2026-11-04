@@ -85,6 +85,8 @@
   "dock.behavior.peek.desc": "Stays hidden until you move the pointer to the bottom edge. Apps can use the full screen.",
   "dock.showOn.desc": "Choose which monitor(s) display the dock",
   "dock.monitor.desc": "Which display shows the dock",
+  "appearance.syncWindowsAccent": "Sync Windows accent",
+  "appearance.syncWindowsAccent.desc": "Also use this accent color for Windows itself, like File Explorer highlights and focus borders. Nectar keeps a backup of your current Windows accent and puts it back when you turn this off.",
   "appearance.glassWallpaper": "Show wallpaper in glass",
   "appearance.glassWallpaper.desc": "Frosted and Liquid show a blurred copy of your wallpaper behind the notch and dock, and the window behind them when there is one. Off keeps the plain tint. Animated wallpapers are not shown.",
   "notch.edgeDelay": "Edge delay",

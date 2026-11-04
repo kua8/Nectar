@@ -85,6 +85,8 @@
   "dock.behavior.peek.desc": "İmleci alt kenara götürene kadar gizli kalır. Pencereler tüm ekranı kullanabilir.",
   "dock.showOn.desc": "Dock'un hangi monitör(ler)de görüntüleneceğini seçin",
   "dock.monitor.desc": "Dock'u gösteren ekran",
+  "appearance.syncWindowsAccent": "Windows vurgusunu eşitle",
+  "appearance.syncWindowsAccent.desc": "Bu vurgu rengini Windows için de kullanır, örneğin Dosya Gezgini vurguları ve odak kenarlıkları. Nectar mevcut Windows vurgunuzun yedeğini tutar ve bunu kapatınca geri yükler.",
   "appearance.glassWallpaper": "Camda duvar kağıdını göster",
   "appearance.glassWallpaper.desc": "Frosted ve Liquid, çentik ve dock arkasında duvar kağıdının bulanık bir kopyasını, varsa arkadaki pencereyi gösterir. Kapalıyken düz renk kullanılır. Hareketli duvar kağıtları gösterilmez.",
   "notch.edgeDelay": "Kenar gecikmesi",

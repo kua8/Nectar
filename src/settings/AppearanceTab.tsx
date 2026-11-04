@@ -3,6 +3,7 @@ import { SettingRow } from "./SettingRow";
 import { SettingSection } from "./SettingSection";
 import { Dropdown } from "./Dropdown";
 import { useT } from "../i18n";
+import { WindowsAccentSync } from "./WindowsAccentSync";
 import { GlassWallpaper } from "./GlassWallpaper";
 import { THEME_PRESETS, hexToHsl, hslToHex, type ThemePreset } from "../theme";
 
@@ -164,6 +165,7 @@ export function AppearanceTab({
         )}
 
         {!legacyMode && themeAccent === "custom" && (
+          <>
           <SettingRow icon={Droplet} label={t("appearance.accentColor")} desc={t("appearance.accentColor.desc")}>
             <div className="color-picker-row">
               <input
@@ -175,6 +177,8 @@ export function AppearanceTab({
               <span className="color-picker-label">{themeAccentColor.toUpperCase()}</span>
             </div>
           </SettingRow>
+          <WindowsAccentSync color={themeAccentColor} />
+          </>
         )}
 
         {showCustomColor && (

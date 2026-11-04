@@ -3581,6 +3581,21 @@ pub fn get_system_accent_color() -> Result<String, String> {
 }
 
 #[tauri::command]
+pub fn sync_windows_accent(app: AppHandle, hex: String) -> Result<(), String> {
+    crate::windows_accent::sync(&app, &hex)
+}
+
+#[tauri::command]
+pub fn restore_windows_accent(app: AppHandle) -> Result<(), String> {
+    crate::windows_accent::restore(&app)
+}
+
+#[tauri::command]
+pub fn windows_accent_backup_exists(app: AppHandle) -> bool {
+    crate::windows_accent::has_backup(&app)
+}
+
+#[tauri::command]
 pub fn export_settings(app: AppHandle) -> Result<String, String> {
     let path = app.path().app_config_dir().map_err(|e| e.to_string())?.join("settings.json");
     if let Ok(content) = std::fs::read_to_string(&path) {
