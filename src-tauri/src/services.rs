@@ -2383,6 +2383,12 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
                             }
                         }
 
+                        if is_click_interactive && !in_notch_hover && !left_button_held() && caption_buttons_under(cursor) {
+                            is_click_interactive = false;
+                            is_notch_hovered = false;
+                            MH_TOPBAR_EXPIRY_MS.store(0, Ordering::Relaxed);
+                        }
+
                         let final_notch_hover = is_notch_hovered || now < MH_TOPBAR_EXPIRY_MS.load(Ordering::Relaxed);
                         let prev = MH_LAST_TOP_EDGE_HOVER.load(Ordering::Relaxed);
                         let new_val = if final_notch_hover { 1 } else { 0 };
@@ -2556,6 +2562,71 @@ fn monitor_rect_for_hwnd(hwnd: HWND) -> Option<(i32, i32, i32, i32)> {
             None
         }
     }
+}
+
+struct CaptionProbe {
+    point: windows::Win32::Foundation::POINT,
+    own_pid: u32,
+    over_buttons: bool,
+}
+
+unsafe extern "system" fn caption_probe_proc(hwnd: HWND, lparam: windows::Win32::Foundation::LPARAM) -> windows::core::BOOL {
+    use windows::Win32::Foundation::RECT;
+    use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CAPTION_BUTTON_BOUNDS, DWMWA_CLOAKED};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetClassNameW, GetWindowLongW, GetWindowRect, GetWindowThreadProcessId, IsIconic, IsWindowVisible, GWL_EXSTYLE,
+        WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT,
+    };
+    let probe = &mut *(lparam.0 as *mut CaptionProbe);
+    if !IsWindowVisible(hwnd).as_bool() || IsIconic(hwnd).as_bool() {
+        return true.into();
+    }
+    let mut pid = 0u32;
+    GetWindowThreadProcessId(hwnd, Some(&mut pid));
+    if pid == probe.own_pid {
+        return true.into();
+    }
+    let ex = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
+    if ex & (WS_EX_TOOLWINDOW.0 | WS_EX_TRANSPARENT.0) != 0 {
+        return true.into();
+    }
+    let mut cloaked = 0u32;
+    if DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, &mut cloaked as *mut _ as *mut _, 4).is_ok() && cloaked != 0 {
+        return true.into();
+    }
+    let mut class = [0u16; 64];
+    let len = GetClassNameW(hwnd, &mut class).max(0) as usize;
+    if matches!(String::from_utf16_lossy(&class[..len]).as_str(), "Progman" | "WorkerW" | "Shell_TrayWnd" | "Shell_SecondaryTrayWnd") {
+        return true.into();
+    }
+    let mut wr = RECT::default();
+    if GetWindowRect(hwnd, &mut wr).is_err() {
+        return true.into();
+    }
+    let p = probe.point;
+    if p.x < wr.left || p.x >= wr.right || p.y < wr.top || p.y >= wr.bottom {
+        return true.into();
+    }
+    let mut cb = RECT::default();
+    let known = DwmGetWindowAttribute(hwnd, DWMWA_CAPTION_BUTTON_BOUNDS, &mut cb as *mut _ as *mut _, std::mem::size_of::<RECT>() as u32).is_ok()
+        && cb.right > cb.left && cb.bottom > cb.top;
+    probe.over_buttons = if known {
+        let (x, y) = (p.x - wr.left, p.y - wr.top);
+        x >= cb.left && x < cb.right && y >= cb.top && y < cb.bottom
+    } else {
+        p.y - wr.top < 40 && wr.right - p.x < 150
+    };
+    false.into()
+}
+
+/// True when the top-most app window under the cursor has its close, minimize or maximize buttons there.
+fn caption_buttons_under(point: windows::Win32::Foundation::POINT) -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::EnumWindows;
+    let mut probe = CaptionProbe { point, own_pid: std::process::id(), over_buttons: false };
+    unsafe {
+        let _ = EnumWindows(Some(caption_probe_proc), windows::Win32::Foundation::LPARAM(&mut probe as *mut _ as isize));
+    }
+    probe.over_buttons
 }
 
 fn hit_test_extra_dock_windows(app_handle: &AppHandle, cursor: windows::Win32::Foundation::POINT, now: i64, fg_fs: bool) {
