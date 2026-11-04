@@ -1073,9 +1073,8 @@ function App() {
 
   const handleWheel = (e: React.WheelEvent) => {
     const target = e.target as HTMLElement;
-    if (target.closest('.calendar-grid') || target.closest('.timer-column') || target.closest('.cal-scroll')) {
-      return;
-    }
+    const scroller = target.closest('.cal-scroll') as HTMLElement | null;
+    if (scroller && scroller.scrollHeight > scroller.clientHeight + 1) return;
 
     if (!isHovered) return;
 
