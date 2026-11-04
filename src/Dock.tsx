@@ -1088,6 +1088,42 @@ const Dock = memo(function Dock() {
     };
   }, [hoveredApp, isDragging, dockItems, contextMenu, previewDelay]);
 
+  const dockItemsRef = useRef(dockItems);
+  dockItemsRef.current = dockItems;
+
+  useEffect(() => {
+    let key: string | null = null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const clear = () => {
+      key = null;
+      if (timer) clearTimeout(timer);
+      timer = undefined;
+    };
+    const unlisten = getCurrentWebviewWindow().onDragDropEvent((event) => {
+      const payload = event.payload;
+      if (payload.type !== 'over') {
+        clear();
+        return;
+      }
+      const ratio = window.devicePixelRatio || 1;
+      const el = document.elementFromPoint(payload.position.x / ratio, payload.position.y / ratio)?.closest('[data-app-key]');
+      const next = el?.getAttribute('data-app-key') ?? null;
+      if (next === key) return;
+      clear();
+      if (!next) return;
+      key = next;
+      timer = setTimeout(() => {
+        const app = dockItemsRef.current.find((a) => itemKey(a) === next);
+        const hwnd = app?.hwnd ?? app?.all_hwnds?.[0]?.[0];
+        if (app?.is_running && hwnd) invoke('focus_window', { hwnd }).catch(() => {});
+      }, 650);
+    });
+    return () => {
+      clear();
+      unlisten.then((f) => f());
+    };
+  }, []);
+
   const previewAppId = dockPreviewEnabled ? previewData?.id : undefined;
   useEffect(() => {
     if (!previewAppId) {
@@ -1352,6 +1388,7 @@ const Dock = memo(function Dock() {
                   >
                     <motion.div
                       className="dock-icon-wrapper"
+                      data-app-key={itemKey(app)}
                       initial={ITEM_INITIAL}
                       animate={ITEM_ANIMATE}
                       exit={ITEM_EXIT}
@@ -1458,6 +1495,7 @@ const Dock = memo(function Dock() {
                   >
                     <motion.div
                       className="dock-icon-wrapper"
+                      data-app-key={itemKey(app)}
                       initial={{ opacity: 0, scale: 0 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0, transition: { duration: 0.12 } }}
@@ -1557,6 +1595,7 @@ const Dock = memo(function Dock() {
                   >
                     <motion.div
                       className="dock-icon-wrapper"
+                      data-app-key={itemKey(app)}
                       initial={ITEM_INITIAL}
                       animate={ITEM_ANIMATE}
                       exit={ITEM_EXIT}
