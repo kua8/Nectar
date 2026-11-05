@@ -1,6 +1,7 @@
 import { AgentSounds } from "./AgentSounds";
 import { NotchEdgeDelay } from "./NotchEdgeDelay";
 import { NetWidgetMode } from "./NetWidgetMode";
+import { NotchHotkey } from "./NotchHotkey";
 import {
   PanelTop,
   Calendar,
@@ -548,6 +549,10 @@ export function NotchTab({
             )}
           </div>
         )}
+      </SettingSection>
+
+      <SettingSection id="notch-hotkey" title={t("notch.hotkey.group")}>
+        <NotchHotkey />
       </SettingSection>
 
       <SettingSection id="notch-widgets" title={t("notch.widgets.group")}>

@@ -2851,6 +2851,10 @@ pub fn save_setting(app: AppHandle, key: String, value: serde_json::Value) -> Re
         std::thread::spawn(move || crate::agent_api::set_hooks(on));
     }
 
+    if key == "nectar-notch-hotkey" {
+        crate::hotkeys::reload();
+    }
+
     if key == "nectar-language" {
         crate::i18n::refresh_tray_labels(&app);
     }

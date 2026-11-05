@@ -20,6 +20,7 @@ mod ics;
 mod active_look;
 mod attention;
 mod launchers;
+mod hotkeys;
 mod connections;
 mod audio_devices;
 mod i18n;
@@ -258,6 +259,7 @@ fn main() {
             ics::ics_detect
         ])
         .setup(|app| {
+            hotkeys::start(app.handle().clone());
             init_taskbar_marker(app.handle());
             // Crash-recovery: if a previous session was force-killed while the native
             // taskbar was hidden, restore it now. Runs before the frontend re-hides it

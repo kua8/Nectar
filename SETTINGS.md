@@ -179,6 +179,7 @@ Removing a link or disconnecting the account deletes its stored secret and cache
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `nectar-net-widget-mode` | `"speed"` / `"status"` | `"speed"` | What the `net` status widget shows. **speed** = live upload and download speed. **status** = an icon for Wi-Fi, Ethernet or offline, with a tooltip. Set in Settings > Notch > Network widget. |
+| `nectar-notch-hotkey` | string | `""` | Global shortcut that hides the notch until pressed again, written like `"Ctrl+Alt+N"`: any of Win, Ctrl, Alt, Shift, then one key (same keys as `nectar-dock-search-shortcut`). Empty is off. If another program already uses the shortcut, Nectar logs it and the shortcut does nothing. Set in Settings > Notch > Shortcut by clicking the box and pressing the keys. The hidden state is not saved: the notch is back after a restart. |
 | `nectar-status-widgets` | JSON string | `{"left":["weather"],"right":["battery"]}` | Widget layout in collapsed notch. Available: `"weather"`, `"battery"`, `"cpu"`, `"ram"`, `"disk"`, `"net"`. The `"battery"` widget (and its low-battery/charging pulses) is automatically suppressed on desktops with no physical battery — detected via Windows' `PowerManager.BatteryStatus`, not the browser's Battery API (which fakes a permanent "100%, charging" reading on desktops). It's also silently dropped from a placed config on such machines, even if set manually or imported from a laptop's settings file. |
 
 Example:

@@ -893,6 +893,11 @@ input:checked + .slider:before {
   border-color: var(--nectar-highlight, var(--nectar-accent, #007aff));
 }
 
+.shortcut-recorder { display: flex; align-items: center; gap: 6px; }
+.shortcut-record { cursor: pointer; min-width: 120px; }
+.shortcut-record.recording { border-color: var(--nectar-highlight, var(--nectar-accent, #007aff)); opacity: 0.9; }
+.shortcut-clear { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border: 0; border-radius: 6px; background: none; color: var(--nectar-text, #fff); opacity: 0.55; cursor: pointer; }
+.shortcut-clear:hover { opacity: 1; background: var(--nectar-group-bg, rgba(255, 255, 255, 0.08)); }
 .shortcut-input.invalid {
   border-color: #ff453a;
 }

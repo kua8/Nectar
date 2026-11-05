@@ -558,6 +558,7 @@ function App() {
   const [isEdgeHovered, setIsEdgeHovered] = useState(false);
   const [isOverlapped, setIsOverlapped] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [hotkeyHidden, setHotkeyHidden] = useState(false);
   const [interactionState, setInteractionState] = useState<'active' | 'grace' | 'none'>('none');
   const nectarRef = useRef<HTMLDivElement>(null);
   const dockEnabledInitial = useRef(true);
@@ -567,7 +568,7 @@ function App() {
   const [nectarMode, setNectarMode] = useState<'music' | 'calendar' | 'command-center' | 'status' | 'shelf' | 'tour' | 'agent'>('status');
 
   const isAnyInteraction = isHovered || isNotchHovered || isEdgeHovered;
-  const isHidden = ((notchMode === 'smart' || notchMode === 'peek') && isFullscreen) ||
+  const isHidden = hotkeyHidden || ((notchMode === 'smart' || notchMode === 'peek') && isFullscreen) ||
     (!startupAnimating && nectarMode !== 'tour' && !(agentActivity && isNotchWindow) && (
       (notchMode === 'smart' && isOverlapped && interactionState === 'none') ||
       (notchMode === 'peek' && interactionState === 'none' && !eventPeek)
@@ -913,6 +914,12 @@ function App() {
       setIsEdgeHovered(event.payload);
     });
 
+    const unlistenHotkey = listen("notch-hotkey-toggle", () => {
+      setHotkeyHidden(prev => !prev);
+      setIsEdgeHovered(false);
+      setIsNotchHovered(false);
+    });
+
     const unlistenNotchFullscreen = thisWindow.listen<boolean>("notch-fullscreen", (event) => {
       setIsFullscreen(event.payload);
       if (event.payload) {
@@ -931,6 +938,7 @@ function App() {
       unlistenNotchOverlap.then(f => f());
       unlistenNotchEdgeHover.then(f => f());
       unlistenNotchFullscreen.then(f => f());
+      unlistenHotkey.then(f => f());
       unlistenSettingsReset.then(f => f());
       document.removeEventListener('contextmenu', preventContext);
     };

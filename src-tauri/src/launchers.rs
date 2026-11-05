@@ -98,7 +98,7 @@ fn key_for(name: &str) -> Option<VIRTUAL_KEY> {
 
 /// Presses a shortcut written like "Alt+Space" or "Ctrl+Shift+K": modifiers (Ctrl, Alt, Shift,
 /// Win) then exactly one key. Returns false if it can't be parsed.
-pub fn send_shortcut(spec: &str) -> bool {
+pub fn parse_shortcut(spec: &str) -> Option<(Vec<VIRTUAL_KEY>, VIRTUAL_KEY)> {
     let mut modifiers = Vec::new();
     let mut key = None;
     for part in spec.split('+').map(str::trim).filter(|p| !p.is_empty()) {
@@ -108,14 +108,19 @@ pub fn send_shortcut(spec: &str) -> bool {
             "shift" => modifiers.push(VK_LSHIFT),
             "win" | "windows" | "meta" | "super" => modifiers.push(VK_LWIN),
             _ if key.is_none() => key = Some(key_for(part)),
-            _ => return false,
+            _ => return None,
         }
     }
     // "Ctrl++" style specs don't split cleanly; a trailing "+" means the plus key itself
     if key.is_none() && spec.trim_end().ends_with("++") {
         key = Some(Some(VK_OEM_PLUS));
     }
-    let Some(Some(key)) = key else { return false };
+    let Some(Some(key)) = key else { return None };
+    Some((modifiers, key))
+}
+
+pub fn send_shortcut(spec: &str) -> bool {
+    let Some((modifiers, key)) = parse_shortcut(spec) else { return false };
 
     let input = |vk: VIRTUAL_KEY, up: bool| INPUT {
         r#type: INPUT_KEYBOARD,
