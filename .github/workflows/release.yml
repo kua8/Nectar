@@ -154,6 +154,23 @@ jobs:
           includeUpdaterJson: true
           updaterJsonPreferNsis: true
 
+      # The NSIS installer only feeds the updater, so it gets a name that does not look like the installer
+      - name: Rename the updater installer
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          OLD="nectar_${VERSION}_x64-setup.exe"
+          NEW="nectar_${VERSION}_x64-updater.exe"
+          mkdir -p updater-rename
+          gh release download "${{ github.ref_name }}" -p "$OLD" -p latest.json -D updater-rename --clobber
+          mv "updater-rename/$OLD" "updater-rename/$NEW"
+          sed -i "s|$OLD|$NEW|g" updater-rename/latest.json
+          grep -q "$NEW" updater-rename/latest.json
+          gh release upload "${{ github.ref_name }}" "updater-rename/$NEW" updater-rename/latest.json --clobber
+          gh release delete-asset "${{ github.ref_name }}" "$OLD" -y
+
       # tauri-action only uploads the NSIS installer (which now offers a
       # "just me" / "all users" choice via installMode: "both" in
       # tauri.conf.json). This adds a second, install-free artifact — the raw
