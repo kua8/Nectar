@@ -923,6 +923,40 @@ unsafe fn send_behind(hwnd: HWND) {
 }
 
 #[tauri::command]
+pub async fn bring_window_forward(hwnd: isize) {
+    tauri::async_runtime::spawn_blocking(move || unsafe {
+        use windows::Win32::System::Threading::GetCurrentThreadId;
+        use windows::Win32::System::Threading::AttachThreadInput;
+        use windows::Win32::UI::WindowsAndMessaging::{
+            BringWindowToTop, GetForegroundWindow, GetWindowLongW, GetWindowThreadProcessId, IsIconic, IsWindowVisible, SetWindowPos,
+            ShowWindow, GWL_EXSTYLE, HWND_NOTOPMOST, HWND_TOPMOST, SWP_NOMOVE, SWP_NOSIZE, SW_RESTORE, SW_SHOW, WS_EX_TOPMOST,
+        };
+        let hwnd = HWND(hwnd as *mut _);
+        if !IsWindowVisible(hwnd).as_bool() {
+            let _ = ShowWindow(hwnd, SW_SHOW);
+            let _ = ShowWindow(hwnd, SW_RESTORE);
+        } else if IsIconic(hwnd).as_bool() {
+            let _ = ShowWindow(hwnd, SW_RESTORE);
+        }
+
+        let mine = GetCurrentThreadId();
+        let front = GetWindowThreadProcessId(GetForegroundWindow(), None);
+        let attached = front != 0 && front != mine && AttachThreadInput(mine, front, true).as_bool();
+
+        force_set_foreground(hwnd);
+        let _ = BringWindowToTop(hwnd);
+        if (GetWindowLongW(hwnd, GWL_EXSTYLE) as u32 & WS_EX_TOPMOST.0) == 0 {
+            let _ = SetWindowPos(hwnd, Some(HWND_TOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+            let _ = SetWindowPos(hwnd, Some(HWND_NOTOPMOST), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+        }
+
+        if attached {
+            let _ = AttachThreadInput(mine, front, false);
+        }
+    });
+}
+
+#[tauri::command]
 pub async fn focus_window(hwnd: isize) {
     if is_repeat_click(hwnd) {
         return;

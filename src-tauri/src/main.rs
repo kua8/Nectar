@@ -187,6 +187,7 @@ fn main() {
             connections::bluetooth_devices,
             connections::bluetooth_unpair,
             focus_window,
+            bring_window_forward,
             focus_app_windows,
             close_window,
             end_task,

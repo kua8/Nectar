@@ -1275,7 +1275,7 @@ const Dock = memo(function Dock() {
       timer = setTimeout(() => {
         const app = dockItemsRef.current.find((a) => itemKey(a) === next);
         const hwnd = app?.hwnd ?? app?.all_hwnds?.[0]?.[0];
-        if (app?.is_running && hwnd) invoke('focus_window', { hwnd }).catch(() => {});
+        if (app?.is_running && hwnd) invoke('bring_window_forward', { hwnd }).catch(() => {});
       }, 650);
     };
     const unlistenDrop = getCurrentWebviewWindow().onDragDropEvent((event) => {
