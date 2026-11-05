@@ -2406,6 +2406,15 @@ img {
     gap: 6px;
 }
 
+.shelf-panel::before {
+    content: "";
+    position: absolute;
+    inset: 2px 8px 6px;
+    border: 1px dashed rgba(255, 255, 255, 0.16);
+    border-radius: 14px;
+    pointer-events: none;
+}
+
 .shelf-empty {
     margin: auto;
     padding: 10px 18px;
@@ -2422,6 +2431,8 @@ img {
     overflow-x: auto;
     padding: 2px 0;
 }
+
+.shelf-row.fits { overflow: visible; }
 
 .shelf-row::-webkit-scrollbar {
     display: none;

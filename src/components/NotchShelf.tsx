@@ -193,7 +193,7 @@ export function NotchShelf({ items, dropActive, onReorder, onRemove, onClear, on
         <div className="shelf-empty">{t("shelf.empty")}</div>
       ) : (
         <>
-          <Reorder.Group key={resetKey} as="div" axis="x" values={items} onReorder={onReorder} className="shelf-row">
+          <Reorder.Group key={resetKey} as="div" axis="x" values={items} onReorder={onReorder} className={`shelf-row${items.length <= 4 ? " fits" : ""}`}>
             <AnimatePresence initial={false}>
               {items.map((item) => {
                 const text = item.thumb ? null : previewText(item);
@@ -222,7 +222,8 @@ export function NotchShelf({ items, dropActive, onReorder, onRemove, onClear, on
                       }
                     }}
                     onDragEnd={() => { dragState.current = null; }}
-                    onTap={() => activate(item)}
+                    onTap={() => { if (item.kind === "text") activate(item); }}
+                    onDoubleClick={() => { if (item.kind === "file") activate(item); }}
                   >
                     <div className="shelf-thumb">
                       {item.thumb ? (
