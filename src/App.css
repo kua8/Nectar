@@ -1496,7 +1496,7 @@ img {
     width: 360px;
     height: 220px;
     object-fit: cover;
-    filter: blur(52px) saturate(3.5) contrast(1.1) brightness(1.4);
+    filter: blur(52px) saturate(2.6) contrast(1.05) brightness(0.9);
     transform: scale(1.8);
     opacity: 0.85;
 }
@@ -1509,7 +1509,7 @@ img {
     left: 0;
     right: 0;
     bottom: 0;
-    background: radial-gradient(ellipse at center, transparent 20%, rgba(0, 0, 0, 0.25) 50%, var(--notch-bg) 85%);
+    background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.3) 20%, rgba(0, 0, 0, 0.5) 50%, var(--notch-bg) 85%);
     pointer-events: none;
     z-index: 1;
 }
