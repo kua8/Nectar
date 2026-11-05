@@ -43,6 +43,9 @@ import {
   MemoryStick,
   HardDrive,
   ArrowUpDown,
+  Wifi,
+  WifiOff,
+  EthernetPort,
 } from "lucide-react";
 import { setVisibleInterval } from "./hooks/visibleInterval";
 
@@ -483,6 +486,7 @@ function App() {
   const [cpuUsage, setCpuUsage] = useState(0);
   const [ramUsage, setRamUsage] = useState(0);
   const [diskSpace, setDiskSpace] = useState(0);
+  const [netWidgetMode, setNetWidgetMode] = useState(() => localStorage.getItem("nectar-net-widget-mode") === "status" ? "status" : "speed");
   const [netUpSpeed, setNetUpSpeed] = useState(0);
   const [netDownSpeed, setNetDownSpeed] = useState(0);
   const [statusWidgets, setStatusWidgets] = useState<WidgetConfig>({ left: ["weather"], right: ["battery"] });
@@ -875,6 +879,8 @@ function App() {
       const scaleVal = getVal("nectar-scale");
       if (scaleVal !== null) setScale(parseFloat(scaleVal));
 
+      setNetWidgetMode(getVal("nectar-net-widget-mode") === "status" ? "status" : "speed");
+
       const widgetsVal = getVal("nectar-status-widgets");
       if (widgetsVal) {
         try {
@@ -970,6 +976,7 @@ function App() {
       "nectar-notch-mode-by-monitor": refreshNotchMode,
       "nectar-notch-monitor-mode": refreshNotchMode,
       "nectar-notch-monitor-id": refreshNotchMode,
+      "nectar-net-widget-mode": (value) => setNetWidgetMode(value === "status" ? "status" : "speed"),
       "nectar-status-widgets": (value) => {
         try {
           const parsed = JSON.parse(value);
@@ -1758,13 +1765,24 @@ function App() {
             <span className="label">{diskSpace}GB</span>
           </div>
         );
-      case "net":
+      case "net": {
+        if (netWidgetMode === "status") {
+          const online = wifiConnected || !!lanStatus?.connected;
+          const Icon = showLan ? EthernetPort : online ? Wifi : WifiOff;
+          const tipKey = showLan ? "widgets.net.ethernet" : online ? "widgets.net.wifi" : "widgets.net.offline";
+          return (
+            <div className="passive-feature" key="net" {...tip(t(tipKey))}>
+              <Icon size={12} strokeWidth={2} />
+            </div>
+          );
+        }
         return (
           <div className="passive-feature" key="net" {...tip(t("widgets.net.tip"))}>
             <ArrowUpDown size={12} strokeWidth={2} />
             <span className="label">↑{formatBytes(netUpSpeed)} ↓{formatBytes(netDownSpeed)}</span>
           </div>
         );
+      }
       default:
         return null;
     }

@@ -178,6 +178,7 @@ Removing a link or disconnecting the account deletes its stored secret and cache
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| `nectar-net-widget-mode` | `"speed"` / `"status"` | `"speed"` | What the `net` status widget shows. **speed** = live upload and download speed. **status** = an icon for Wi-Fi, Ethernet or offline, with a tooltip. Set in Settings > Notch > Network widget. |
 | `nectar-status-widgets` | JSON string | `{"left":["weather"],"right":["battery"]}` | Widget layout in collapsed notch. Available: `"weather"`, `"battery"`, `"cpu"`, `"ram"`, `"disk"`, `"net"`. The `"battery"` widget (and its low-battery/charging pulses) is automatically suppressed on desktops with no physical battery — detected via Windows' `PowerManager.BatteryStatus`, not the browser's Battery API (which fakes a permanent "100%, charging" reading on desktops). It's also silently dropped from a placed config on such machines, even if set manually or imported from a laptop's settings file. |
 
 Example:

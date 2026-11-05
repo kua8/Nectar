@@ -1,5 +1,6 @@
 import { AgentSounds } from "./AgentSounds";
 import { NotchEdgeDelay } from "./NotchEdgeDelay";
+import { NetWidgetMode } from "./NetWidgetMode";
 import {
   PanelTop,
   Calendar,
@@ -551,6 +552,7 @@ export function NotchTab({
 
       <SettingSection id="notch-widgets" title={t("notch.widgets.group")}>
         <StatusWidgetConfig value={statusWidgets} onChange={handleWidgetsChange} hasBattery={hasBattery} />
+        <NetWidgetMode />
       </SettingSection>
     </>
   );
