@@ -120,6 +120,7 @@ fn main() {
             shelf_text_file,
             pointer_over_notch,
             open_settings_window,
+            on_demand_windows::on_demand_window_ready,
             open_calendar_window,
             open_tray_window,
             open_tray_at_cursor,

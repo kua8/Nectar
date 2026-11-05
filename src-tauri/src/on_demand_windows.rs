@@ -1,5 +1,8 @@
 
+use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
+use std::time::Duration;
 
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
@@ -8,6 +11,20 @@ pub const CALENDAR: &str = "calendar";
 
 static SETTINGS_BUILDING: AtomicBool = AtomicBool::new(false);
 static CALENDAR_BUILDING: AtomicBool = AtomicBool::new(false);
+static WAITING_FOR_PAINT: Mutex<Option<HashSet<&'static str>>> = Mutex::new(None);
+
+const PAINT_WAIT: Duration = Duration::from_millis(2500);
+
+fn take_waiting(label: &str) -> bool {
+    let Ok(mut guard) = WAITING_FOR_PAINT.lock() else { return false };
+    guard.as_mut().is_some_and(|set| set.remove(label))
+}
+
+fn start_waiting(label: &'static str) {
+    if let Ok(mut guard) = WAITING_FOR_PAINT.lock() {
+        guard.get_or_insert_with(HashSet::new).insert(label);
+    }
+}
 
 struct Spec {
     label: &'static str,
@@ -116,7 +133,11 @@ pub fn open(app: &AppHandle, label: &str) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         if let Some(win) = build(&app, spec) {
-            present(&win);
+            start_waiting(spec.label);
+            tokio::time::sleep(PAINT_WAIT).await;
+            if take_waiting(spec.label) {
+                present(&win);
+            }
         }
         flag.store(false, Ordering::SeqCst);
     });
@@ -183,4 +204,13 @@ fn set_suspended(win: &WebviewWindow, suspend: bool) {
             let _ = core.Resume();
         }
     });
+}
+
+#[tauri::command]
+pub fn on_demand_window_ready(app: AppHandle, window: tauri::Window) {
+    if take_waiting(window.label()) {
+        if let Some(win) = app.get_webview_window(window.label()) {
+            present(&win);
+        }
+    }
 }
