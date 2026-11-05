@@ -353,6 +353,7 @@
   "connections.signal": "Signal {percent}%",
   "connections.wifi.title": "Wi-Fi networks",
   "connections.audio.title": "Output devices",
+  "connections.audio.apps": "Apps",
   "connections.bluetooth.title": "Bluetooth devices",
   "connections.wifi.empty": "No networks found",
   "connections.audio.empty": "No output devices",

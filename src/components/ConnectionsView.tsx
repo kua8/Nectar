@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ChevronLeft, Lock, X, Bluetooth, Check, Speaker } from "lucide-react";
 import { useT } from "../i18n";
@@ -41,6 +41,62 @@ function SignalBars({ signal }: { signal: number }) {
         <i key={bar} className={bar <= level ? "on" : ""} style={{ height: 3 + bar * 2.5 }} />
       ))}
     </span>
+  );
+}
+
+interface AudioSession {
+  pid: number;
+  name: string;
+  volume: number;
+  is_muted: boolean;
+}
+
+function AppVolumes() {
+  const t = useT();
+  const [sessions, setSessions] = useState<AudioSession[] | null>(null);
+  const dragging = useRef(false);
+
+  useEffect(() => {
+    const load = () => {
+      if (dragging.current) return;
+      invoke<AudioSession[]>("get_audio_sessions").then(setSessions).catch(() => setSessions((prev) => prev ?? []));
+    };
+    load();
+    const timer = setVisibleInterval(load, 2000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const setVolume = (pid: number, volume: number) => {
+    setSessions((prev) => prev?.map((s) => (s.pid === pid ? { ...s, volume, is_muted: volume === 0 } : s)) ?? prev);
+    invoke("set_app_volume", { pid, volume }).catch(() => {});
+  };
+
+  return (
+    <>
+      <div className="cv-section">{t("connections.audio.apps")}</div>
+      {sessions?.length === 0 && <div className="cv-hint">{t("overlay.mixer.empty")}</div>}
+      {sessions?.map((s) => (
+        <div key={s.pid} className="cv-row cv-app-row">
+          <span className="cv-name">{s.name}</span>
+          <div className="cc-classic-slider-track">
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={s.is_muted ? 0 : s.volume}
+              className="cc-classic-input"
+              onChange={(e) => setVolume(s.pid, parseFloat(e.target.value))}
+              onPointerDown={(e) => { e.stopPropagation(); dragging.current = true; }}
+              onPointerUp={() => { dragging.current = false; }}
+              onPointerCancel={() => { dragging.current = false; }}
+              onClick={(e) => e.stopPropagation()}
+            />
+            <div className="cc-classic-fill" style={{ width: `${(s.is_muted ? 0 : s.volume) * 100}%` }} />
+          </div>
+        </div>
+      ))}
+    </>
   );
 }
 
@@ -147,6 +203,8 @@ export function ConnectionsView({ kind, onBack, onOpenWindowsSettings }: Props) 
             {o.is_default ? <Check size={14} /> : <span className="cv-status">{busy === o.id ? t("connections.switching") : ""}</span>}
           </div>
         ))}
+
+        {kind === "audio" && <AppVolumes />}
 
         {kind === "wifi" && networks?.map((n) => (
           <div key={n.ssid}>

@@ -1088,7 +1088,7 @@ function App() {
 
   const handleWheel = (e: React.WheelEvent) => {
     const target = e.target as HTMLElement;
-    const scroller = target.closest('.cal-scroll') as HTMLElement | null;
+    const scroller = target.closest('.cal-scroll, .cv-list') as HTMLElement | null;
     if (scroller && scroller.scrollHeight > scroller.clientHeight + 1) return;
 
     if (!isHovered) return;

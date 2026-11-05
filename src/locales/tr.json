@@ -304,6 +304,7 @@
   "calsync.connect": "Bağlan",
   "connections.signal": "Sinyal %{percent}",
   "connections.wifi.title": "Wi-Fi ağları",
+  "connections.audio.apps": "Uygulamalar",
   "connections.audio.title": "Çıkış cihazları",
   "connections.bluetooth.title": "Bluetooth cihazları",
   "connections.wifi.empty": "Ağ bulunamadı",
