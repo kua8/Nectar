@@ -28,6 +28,7 @@ mod memory_saver;
 mod webview_args;
 mod on_demand_windows;
 mod wallpaper;
+mod live_preview;
 
 use tauri::Manager;
 use windows::Win32::System::Console::SetConsoleCtrlHandler;
@@ -207,6 +208,9 @@ fn main() {
             load_settings,
             reset_settings,
             capture_window_thumbnail,
+            set_live_thumbnails,
+            clear_live_thumbnails,
+            is_dwm_composition_enabled,
             get_wifi_status,
             set_wifi_state,
             get_bluetooth_state,
