@@ -91,8 +91,8 @@ try {
 $installerName = "Nectar-Setup-$Version.exe"
 Copy-Item (Join-Path $root "installer-app/src-tauri/target/release/nectar-installer.exe") (Join-Path $out $installerName)
 
-Copy-Item $setup $out
-$setupName = Split-Path $setup -Leaf
+$setupName = "nectar_${Version}_x64-updater.exe"
+Copy-Item $setup (Join-Path $out $setupName)
 $platform = [ordered]@{
     signature = (Get-Content "$setup.sig" -Raw).Trim()
     url       = "https://github.com/$repo/releases/download/$tag/$setupName"
