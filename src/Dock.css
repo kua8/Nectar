@@ -282,6 +282,50 @@ body {
   box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 
+.preview-surface {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-surface.has-live {
+  background: transparent !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+.preview-surface .preview-live-mount {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.preview-surface img.preview-thumb-img {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: contain;
+  object-position: center;
+  border-radius: 8px;
+  display: block;
+  transition: opacity 0.15s ease-out;
+}
+
+.preview-surface img.preview-thumb-img.is-live {
+  opacity: 0;
+  pointer-events: none;
+}
+
 
 
 .preview-fallback {

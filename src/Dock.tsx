@@ -250,6 +250,170 @@ function WindowDots({ count }: { count: number }) {
   );
 }
 
+interface DockPreviewTooltipProps {
+  app: AppInfo;
+  previews: { hwnd: number; title: string; image: string }[];
+  onClosePreview: (e: React.MouseEvent, hwnd: number) => void;
+  renderMedia: (app: AppInfo) => React.ReactNode;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+}
+
+function DockPreviewTooltip({
+  app,
+  previews,
+  onClosePreview,
+  renderMedia,
+  onMouseEnter,
+  onMouseLeave,
+}: DockPreviewTooltipProps) {
+  const t = useT();
+  const [liveHwnds, setLiveHwnds] = useState<Set<number>>(() => new Set());
+  const surfaceRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+
+  useLayoutEffect(() => {
+    let cancelled = false;
+    let rafId: number | null = null;
+    let t1: any = null;
+    let t2: any = null;
+
+    const syncThumbnails = async () => {
+      if (cancelled) return;
+      const dpr = window.devicePixelRatio || 1;
+      const targets: { hwnd: number; x: number; y: number; width: number; height: number }[] = [];
+
+      for (const p of previews) {
+        const el = surfaceRefs.current.get(p.hwnd);
+        if (el) {
+          const r = el.getBoundingClientRect();
+          if (r.width > 0 && r.height > 0) {
+            targets.push({
+              hwnd: p.hwnd,
+              x: Math.round(r.left * dpr),
+              y: Math.round(r.top * dpr),
+              width: Math.round(r.width * dpr),
+              height: Math.round(r.height * dpr),
+            });
+          }
+        }
+      }
+
+      if (targets.length > 0) {
+        try {
+          const active = await invoke<number[]>('set_live_thumbnails', { targets, clientAreaOnly: false });
+          if (cancelled) {
+            invoke('clear_live_thumbnails').catch(() => {});
+          } else if (active) {
+            setLiveHwnds(new Set(active));
+          }
+        } catch {}
+      }
+    };
+
+    rafId = requestAnimationFrame(() => {
+      syncThumbnails();
+      t1 = setTimeout(syncThumbnails, 75);
+      t2 = setTimeout(syncThumbnails, 160);
+    });
+
+    return () => {
+      cancelled = true;
+      if (rafId) cancelAnimationFrame(rafId);
+      if (t1) clearTimeout(t1);
+      if (t2) clearTimeout(t2);
+      invoke('clear_live_thumbnails').catch(() => {});
+    };
+  }, [previews]);
+
+  return (
+    <motion.div
+      className={`preview-tooltip ${previews.length > 1 ? 'multi' : ''}`}
+      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      transition={{ duration: 0.15 }}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
+      <div className="preview-items">
+        {previews.map((prev, idx) => {
+          const isLive = liveHwnds.has(prev.hwnd);
+          return (
+            <div
+              key={prev.hwnd}
+              className="preview-item"
+              onClick={() => invoke('focus_window', { hwnd: prev.hwnd })}
+            >
+              <div
+                className={`preview-surface ${isLive ? "has-live" : ""}`}
+                ref={(el) => {
+                  if (el) surfaceRefs.current.set(prev.hwnd, el);
+                  else surfaceRefs.current.delete(prev.hwnd);
+                }}
+              >
+                <div className="preview-live-mount" />
+                {prev.image ? (
+                  <img
+                    src={prev.image}
+                    alt={`Preview ${idx}`}
+                    className={`preview-thumb-img ${isLive ? 'is-live' : ''}`}
+                  />
+                ) : (
+                  !isLive && (
+                    <div className="preview-fallback">
+                      {app.icon ? (
+                        <img src={app.icon} alt="" />
+                      ) : (
+                        <svg
+                          className="preview-fallback-glyph"
+                          width="48"
+                          height="48"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <rect x="3" y="5" width="18" height="14" rx="2" />
+                          <line x1="3" y1="9" x2="21" y2="9" />
+                        </svg>
+                      )}
+                    </div>
+                  )
+                )}
+              </div>
+              <div className="preview-label">
+                {app.icon && <img src={app.icon} alt="" />}
+                <span>{prev.title || app.name}</span>
+              </div>
+              <button
+                className="preview-close-btn"
+                onClick={(e) => onClosePreview(e, prev.hwnd)}
+                data-tooltip={t("dockmenu.closeWindow")}
+              >
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      {renderMedia(app)}
+    </motion.div>
+  );
+}
+
 const Dock = memo(function Dock() {
   const t = useT();
   useEffect(() => {
@@ -1398,35 +1562,14 @@ const Dock = memo(function Dock() {
                     >
                 <AnimatePresence>
                   {dockPreviewEnabled && previewData && previewData.id === itemKey(app) && hoveredApp === itemKey(app) && (
-                    <motion.div 
-                      className={`preview-tooltip ${previewData.previews.length > 1 ? 'multi' : ''}`} 
-                      initial={{opacity: 0, y: 10, scale: 0.95}} 
-                      animate={{opacity: 1, y: 0, scale: 1}} 
-                      exit={{opacity: 0, scale: 0.95}} 
-                      transition={{duration: 0.15}}
+                    <DockPreviewTooltip
+                      app={app}
+                      previews={previewData.previews}
+                      onClosePreview={handleClosePreview}
+                      renderMedia={renderPreviewMedia}
                       onMouseEnter={() => { isPreviewHoveredRef.current = true; }}
                       onMouseLeave={() => { isPreviewHoveredRef.current = false; setHoveredApp(null); setPressedApp(null); }}
-                    >
-                      <div className="preview-items">
-                        {previewData.previews.map((prev, idx) => (
-                          <div key={prev.hwnd} className="preview-item" onClick={() => invoke('focus_window', { hwnd: prev.hwnd })}>
-                            {prev.image ? <img src={prev.image} alt={`Preview ${idx}`} /> : <div className="preview-fallback">{app.icon ? <img src={app.icon} alt="" /> : <svg className="preview-fallback-glyph" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>}</div>}
-                            <div className="preview-label">{app.icon && <img src={app.icon} alt="" />}<span>{prev.title || app.name}</span></div>
-                            <button
-                              className="preview-close-btn"
-                              onClick={(e) => handleClosePreview(e, prev.hwnd)}
-                              data-tooltip={t("dockmenu.closeWindow")}
-                            >
-                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
-                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                              </svg>
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                      {renderPreviewMedia(app)}
-                    </motion.div>
+                    />
                   )}
                 </AnimatePresence>
                 
@@ -1505,35 +1648,14 @@ const Dock = memo(function Dock() {
                     >
                       <AnimatePresence>
                         {dockPreviewEnabled && previewData && previewData.id === itemKey(app) && hoveredApp === itemKey(app) && (
-                          <motion.div
-                            className={`preview-tooltip ${previewData.previews.length > 1 ? 'multi' : ''}`}
-                            initial={{opacity: 0, y: 10, scale: 0.95}}
-                            animate={{opacity: 1, y: 0, scale: 1}}
-                            exit={{opacity: 0, scale: 0.95}}
-                            transition={{duration: 0.15}}
+                          <DockPreviewTooltip
+                            app={app}
+                            previews={previewData.previews}
+                            onClosePreview={handleClosePreview}
+                            renderMedia={renderPreviewMedia}
                             onMouseEnter={() => { isPreviewHoveredRef.current = true; }}
                             onMouseLeave={() => { isPreviewHoveredRef.current = false; setHoveredApp(null); setPressedApp(null); }}
-                          >
-                            <div className="preview-items">
-                              {previewData.previews.map((prev, idx) => (
-                                <div key={prev.hwnd} className="preview-item" onClick={() => invoke('focus_window', { hwnd: prev.hwnd })}>
-                                  {prev.image ? <img src={prev.image} alt={`Preview ${idx}`} /> : <div className="preview-fallback">{app.icon ? <img src={app.icon} alt="" /> : <svg className="preview-fallback-glyph" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>}</div>}
-                                  <div className="preview-label">{app.icon && <img src={app.icon} alt="" />}<span>{prev.title || app.name}</span></div>
-                                  <button
-                                    className="preview-close-btn"
-                                    onClick={(e) => handleClosePreview(e, prev.hwnd)}
-                                    data-tooltip={t("dockmenu.closeWindow")}
-                                  >
-                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
-                                      <line x1="18" y1="6" x2="6" y2="18"></line>
-                                      <line x1="6" y1="6" x2="18" y2="18"></line>
-                                    </svg>
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                            {renderPreviewMedia(app)}
-                          </motion.div>
+                          />
                         )}
                       </AnimatePresence>
                       {(!dockPreviewEnabled || (dockPreviewEnabled && hoveredApp === itemKey(app) && !previewData)) && (
@@ -1605,35 +1727,14 @@ const Dock = memo(function Dock() {
                     >
                       <AnimatePresence>
                         {dockPreviewEnabled && previewData && previewData.id === itemKey(app) && hoveredApp === itemKey(app) && (
-                          <motion.div
-                            className={`preview-tooltip ${previewData.previews.length > 1 ? 'multi' : ''}`}
-                            initial={{opacity: 0, y: 10, scale: 0.95}}
-                            animate={{opacity: 1, y: 0, scale: 1}}
-                            exit={{opacity: 0, scale: 0.95}}
-                            transition={{duration: 0.15}}
+                          <DockPreviewTooltip
+                            app={app}
+                            previews={previewData.previews}
+                            onClosePreview={handleClosePreview}
+                            renderMedia={renderPreviewMedia}
                             onMouseEnter={() => { isPreviewHoveredRef.current = true; }}
                             onMouseLeave={() => { isPreviewHoveredRef.current = false; setHoveredApp(null); setPressedApp(null); }}
-                          >
-                            <div className="preview-items">
-                              {previewData.previews.map((prev, idx) => (
-                                <div key={prev.hwnd} className="preview-item" onClick={() => invoke('focus_window', { hwnd: prev.hwnd })}>
-                                  {prev.image ? <img src={prev.image} alt={`Preview ${idx}`} /> : <div className="preview-fallback">{app.icon ? <img src={app.icon} alt="" /> : <svg className="preview-fallback-glyph" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>}</div>}
-                                  <div className="preview-label">{app.icon && <img src={app.icon} alt="" />}<span>{prev.title || app.name}</span></div>
-                                  <button
-                                    className="preview-close-btn"
-                                    onClick={(e) => handleClosePreview(e, prev.hwnd)}
-                                    data-tooltip={t("dockmenu.closeWindow")}
-                                  >
-                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
-                                      <line x1="18" y1="6" x2="6" y2="18"></line>
-                                      <line x1="6" y1="6" x2="18" y2="18"></line>
-                                    </svg>
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                            {renderPreviewMedia(app)}
-                          </motion.div>
+                          />
                         )}
                       </AnimatePresence>
 

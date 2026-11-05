@@ -4197,3 +4197,23 @@ pub async fn agent_sound_data(state: String) -> Option<String> {
 pub async fn agent_sound_custom() -> Vec<String> {
     AGENT_SOUND_STATES.iter().filter(|s| !agent_sound_files(s).is_empty()).map(|s| s.to_string()).collect()
 }
+
+#[tauri::command]
+pub fn set_live_thumbnails(
+    window: tauri::Window,
+    targets: Vec<crate::live_preview::LiveThumbnailTarget>,
+    client_area_only: Option<bool>,
+) -> Result<Vec<isize>, String> {
+    let dest_hwnd = window.hwnd().map_err(|e| e.to_string())?.0 as isize;
+    crate::live_preview::set_live_thumbnails(dest_hwnd, targets, client_area_only.unwrap_or(false))
+}
+
+#[tauri::command]
+pub fn clear_live_thumbnails() -> Result<(), String> {
+    crate::live_preview::clear_all_thumbnails()
+}
+
+#[tauri::command]
+pub fn is_dwm_composition_enabled() -> Result<bool, String> {
+    Ok(crate::live_preview::is_composition_enabled())
+}
