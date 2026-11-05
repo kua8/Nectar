@@ -1264,14 +1264,9 @@ const Dock = memo(function Dock() {
       if (timer) clearTimeout(timer);
       timer = undefined;
     };
-    const unlisten = getCurrentWebviewWindow().onDragDropEvent((event) => {
-      const payload = event.payload;
-      if (payload.type !== 'over') {
-        clear();
-        return;
-      }
+    const over = (x: number, y: number) => {
       const ratio = window.devicePixelRatio || 1;
-      const el = document.elementFromPoint(payload.position.x / ratio, payload.position.y / ratio)?.closest('[data-app-key]');
+      const el = document.elementFromPoint(x / ratio, y / ratio)?.closest('[data-app-key]');
       const next = el?.getAttribute('data-app-key') ?? null;
       if (next === key) return;
       clear();
@@ -1282,10 +1277,20 @@ const Dock = memo(function Dock() {
         const hwnd = app?.hwnd ?? app?.all_hwnds?.[0]?.[0];
         if (app?.is_running && hwnd) invoke('focus_window', { hwnd }).catch(() => {});
       }, 650);
+    };
+    const unlistenDrop = getCurrentWebviewWindow().onDragDropEvent((event) => {
+      const payload = event.payload;
+      if (payload.type === 'over') over(payload.position.x, payload.position.y);
+      else clear();
     });
+    const unlistenOver = listen<{ x: number; y: number }>('dock-file-drag', (event) => over(event.payload.x, event.payload.y));
+    const unlistenEnd = listen('dock-file-drag-end', clear);
+    invoke('setup_shelf_drop').catch(() => {});
     return () => {
       clear();
-      unlisten.then((f) => f());
+      unlistenDrop.then((f) => f());
+      unlistenOver.then((f) => f());
+      unlistenEnd.then((f) => f());
     };
   }, []);
 
