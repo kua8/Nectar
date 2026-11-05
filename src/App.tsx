@@ -1994,7 +1994,7 @@ function App() {
       return isImpacted ? 28.9 : 44.2;
     }
     if (nectarMode === 'agent') return agentActivity?.ask ? 184 : agentActivity?.detail ? 160 : 130;
-    if (nectarMode === 'shelf') return shelf.items.length === 0 ? 96 : 156;
+    if (nectarMode === 'shelf') return shelf.items.length === 0 ? 96 : 176;
     if (nectarMode === 'calendar') return settingsCalendarEnabled ? (caldav.connected ? 350 : 310) : 262;
     if (nectarMode === 'command-center') {
       if (!isHovered) return 36;

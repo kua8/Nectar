@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { startDrag } from "@crabnebula/tauri-plugin-drag";
 import { AnimatePresence, Reorder } from "framer-motion";
+import { Trash2 } from "lucide-react";
 import { useT } from "../i18n";
 
 export type ShelfItem = {
@@ -249,7 +250,10 @@ export function NotchShelf({ items, dropActive, onReorder, onRemove, onClear, on
               })}
             </AnimatePresence>
           </Reorder.Group>
-          <button className="shelf-clear" onClick={onClear}>{t("shelf.clear")}</button>
+          <button className="shelf-clear" onClick={onClear}>
+            <Trash2 size={12} strokeWidth={2} />
+            {t("shelf.clear")}
+          </button>
         </>
       )}
     </div>
