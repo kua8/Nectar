@@ -1,7 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef, memo } from 'react';
 import { motion, AnimatePresence, Reorder } from 'framer-motion';
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
+import { emit, listen } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import './Dock.css';
 import './surfaces.css';
@@ -414,6 +414,8 @@ function DockPreviewTooltip({
     </motion.div>
   );
 }
+
+const tourDockAction = () => { emit('tour-dock-action').catch(() => {}); };
 
 const Dock = memo(function Dock() {
   const t = useT();
@@ -920,6 +922,7 @@ const Dock = memo(function Dock() {
     if (e.button !== 1) return;
     e.preventDefault();
     e.stopPropagation();
+    tourDockAction();
     handleNewInstance(app);
   };
 
@@ -946,6 +949,7 @@ const Dock = memo(function Dock() {
   const handleContextMenu = (e: React.MouseEvent, app: AppInfo | null) => {
     e.stopPropagation();
     e.preventDefault();
+    tourDockAction();
     setHoveredApp(null);
     setPreviewData(null);
     setContextMenuHeight(0);
@@ -1143,6 +1147,7 @@ const Dock = memo(function Dock() {
   };
 
   const handleDragEnd = () => {
+    tourDockAction();
     setIsDragging(false);
     setPressedApp(null);
     invoke('save_pinned_apps', { apps: pinnedApps }).catch(console.error);
@@ -1235,6 +1240,7 @@ const Dock = memo(function Dock() {
             const currentHovered = hoveredAppRef.current;
             if (captured.length > 0 && currentHovered === itemKey(app)) {
               setPreviewData({ id: itemKey(app), previews: captured });
+              tourDockAction();
             } else if (currentHovered === itemKey(app)) {
               setPreviewData(null);
             }
@@ -1272,6 +1278,7 @@ const Dock = memo(function Dock() {
       clear();
       if (!next) return;
       key = next;
+      tourDockAction();
       timer = setTimeout(() => {
         const app = dockItemsRef.current.find((a) => itemKey(a) === next);
         const hwnd = app?.hwnd ?? app?.all_hwnds?.[0]?.[0];

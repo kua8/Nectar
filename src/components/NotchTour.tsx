@@ -1,69 +1,69 @@
-import type { ReactNode } from "react";
-import { Sparkles, SlidersHorizontal, PanelBottom, Settings2 } from "lucide-react";
 import { useT } from "../i18n";
 
-interface Step {
-  icon: ReactNode;
+export interface TourStepDef {
   key: string;
-  action?: { id: "control-center" | "settings" };
+  signal?: "panel" | "slider" | "cc" | "shelf" | "dock" | "mode";
+  need?: number;
 }
 
-const STEPS: Step[] = [
-  {
-    icon: <Sparkles size={18} />,
-    key: "welcome",
-  },
-  {
-    icon: <SlidersHorizontal size={18} />,
-    key: "controlCenter",
-    action: { id: "control-center" },
-  },
-  {
-    icon: <PanelBottom size={18} />,
-    key: "dock",
-  },
-  {
-    icon: <Settings2 size={18} />,
-    key: "customize",
-    action: { id: "settings" },
-  },
+export const TOUR_STEPS: TourStepDef[] = [
+  { key: "welcome" },
+  { key: "panels", signal: "panel", need: 3 },
+  { key: "sliders", signal: "slider", need: 2 },
+  { key: "controlCenter", signal: "cc", need: 1 },
+  { key: "shelf", signal: "shelf", need: 1 },
+  { key: "dock", signal: "dock", need: 1 },
+  { key: "modes", signal: "mode", need: 1 },
+  { key: "customize" },
 ];
+
+type ActionId = "control-center" | "settings";
 
 interface Props {
   step: number;
+  done: boolean;
+  dockEnabled: boolean;
   onStep: (next: number) => void;
   onClose: () => void;
-  onAction: (id: "control-center" | "settings") => void;
+  onAction: (id: ActionId) => void;
 }
 
-export function NotchTour({ step, onStep, onClose, onAction }: Props) {
+const ACTIONS: Record<string, ActionId> = { controlCenter: "control-center", customize: "settings" };
+
+export function NotchTour({ step, done, dockEnabled, onStep, onClose, onAction }: Props) {
   const t = useT();
-  const current = STEPS[step];
-  const last = step === STEPS.length - 1;
+  const current = TOUR_STEPS[step];
+  const last = step === TOUR_STEPS.length - 1;
+  const action = ACTIONS[current.key];
+  const tryIt = !!current.signal && (current.key !== "dock" || dockEnabled);
 
   return (
-    <div className="tour-content" onClick={(e) => e.stopPropagation()}>
+    <div className="tour-bar" onClick={(e) => e.stopPropagation()}>
       <div className="tour-head">
-        <span className="tour-icon">{current.icon}</span>
+        <span className="tour-count">{step + 1}/{TOUR_STEPS.length}</span>
         <span className="tour-title">{t(`tour.${current.key}.title`)}</span>
         <button className="tour-skip" onClick={onClose}>{t("tour.skip")}</button>
       </div>
       <p className="tour-text">{t(`tour.${current.key}.text`)}</p>
       <div className="tour-foot">
         <span className="tour-dots">
-          {STEPS.map((_, i) => (
+          {TOUR_STEPS.map((_, i) => (
             <i key={i} className={i === step ? "on" : ""} />
           ))}
         </span>
-        {current.action && (
-          <button className="tour-btn ghost" onClick={() => onAction(current.action!.id)}>
+        {action && (
+          <button className="tour-btn ghost" onClick={() => onAction(action)}>
             {t(`tour.${current.key}.action`)}
           </button>
         )}
         {step > 0 && (
           <button className="tour-btn ghost" onClick={() => onStep(step - 1)}>{t("common.back")}</button>
         )}
-        <button className="tour-btn" onClick={() => (last ? onClose() : onStep(step + 1))}>
+        <button
+          className={`tour-btn${tryIt ? (done ? " ready" : " waiting") : ""}`}
+          disabled={tryIt && !done}
+          onClick={() => (last ? onClose() : onStep(step + 1))}
+        >
           {last ? t("tour.done") : t("tour.next")}
         </button>
       </div>

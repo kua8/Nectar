@@ -1498,7 +1498,7 @@ img {
     object-fit: cover;
     filter: blur(52px) saturate(2.6) contrast(1.05) brightness(0.9);
     transform: scale(1.8);
-    opacity: 0.85;
+    opacity: 0.72;
 }
 
 /* Gradient overlay to smoothly fade the image to the notch's background color without using buggy WebView2 mask-image */
@@ -2327,7 +2327,8 @@ img {
 .cc-pill-tile.active .cc-pill-more:hover { opacity: 1; background: rgba(0, 0, 0, 0.12); }
 .widget-tip { position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 20; padding: 5px 10px; border-radius: 6px; background: rgba(0, 0, 0, 0.85); color: white; font-size: 11px; font-weight: 500; white-space: nowrap; pointer-events: none; animation: widget-tip-in 0.12s ease-out 0.25s backwards; }
 @keyframes widget-tip-in { from { opacity: 0; } to { opacity: 1; } }
-.tour-content { position: absolute; top: 36px; left: 0; width: 100%; height: calc(100% - 36px); box-sizing: border-box; z-index: 2; padding: 8px 18px 14px; display: flex; flex-direction: column; gap: 8px; color: var(--nectar-text, rgba(255, 255, 255, 0.9)); pointer-events: auto; }
+.tour-bar { position: absolute; top: calc(100% + 12px); left: 50%; transform: translateX(-50%); width: 400px; box-sizing: border-box; padding: 12px 18px 14px; display: flex; flex-direction: column; gap: 8px; z-index: 5; border-radius: 18px; background: var(--nectar-bg-expanded, rgba(0, 0, 0, 0.92)); border: 1px solid var(--nectar-border, rgba(255, 255, 255, 0.14)); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); color: var(--nectar-text, rgba(255, 255, 255, 0.9)); pointer-events: auto; white-space: normal; }
+.tour-count { font-size: 10px; opacity: 0.55; font-variant-numeric: tabular-nums; }
 .tour-head { display: flex; align-items: center; gap: 8px; }
 .tour-icon { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: var(--nectar-group-bg, rgba(255, 255, 255, 0.1)); flex-shrink: 0; }
 .tour-title { flex: 1; font-size: 13px; font-weight: 600; }
@@ -2341,6 +2342,8 @@ img {
 .tour-btn { height: 26px; border: 0; border-radius: 8px; padding: 0 14px; font-size: 12px; font-weight: 600; cursor: pointer; background: var(--nectar-text, rgba(255, 255, 255, 0.92)); color: var(--nectar-bg-expanded, #000); }
 .tour-btn.ghost { background: var(--nectar-group-bg, rgba(255, 255, 255, 0.1)); color: inherit; font-weight: 500; }
 .tour-btn:hover { filter: brightness(0.9); }
+.tour-btn.waiting:disabled { background: var(--nectar-group-bg, rgba(255, 255, 255, 0.1)); color: inherit; opacity: 0.45; cursor: not-allowed; filter: none; }
+.tour-btn.ready { background: #30d158; color: #052e12; transition: background 0.2s ease; }
 .volume-end-btn { display: flex; align-items: center; justify-content: center; border: 0; background: none; color: inherit; padding: 2px; border-radius: 6px; cursor: pointer; }
 .volume-end-btn:hover { background: rgba(255, 255, 255, 0.1); }
 .cc-classic-slider-label.clickable { cursor: pointer; border-radius: 6px; }
@@ -2429,7 +2432,7 @@ img {
     gap: 8px;
     max-width: 100%;
     overflow-x: auto;
-    padding: 2px 0;
+    padding: 8px 10px 4px;
 }
 
 .shelf-row.fits { overflow: visible; }
@@ -2567,15 +2570,21 @@ img {
 }
 
 .shelf-clear {
-    border: none;
-    background: none;
-    color: rgba(255, 255, 255, 0.5);
-    font-size: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.78);
+    padding: 3px 14px;
+    font-size: 11px;
+    font-weight: 500;
     cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
 .shelf-clear:hover {
-    color: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: #fff;
 }
 
 .media-source-btn {

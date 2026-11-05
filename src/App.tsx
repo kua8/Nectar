@@ -18,7 +18,7 @@ import { NotchCalendar } from "./components/NotchCalendar";
 import { NotchClock, StopwatchReadout } from "./components/NotchClock";
 import { MediaSourceButton, type MediaSession } from "./components/MediaSourceButton";
 import { ConnectionsView } from "./components/ConnectionsView";
-import { NotchTour } from "./components/NotchTour";
+import { NotchTour, TOUR_STEPS } from "./components/NotchTour";
 import { useStopwatch } from "./hooks/useStopwatch";
 import { t as translate, useT } from "./i18n";
 import { NotchShelf, useShelf } from "./components/NotchShelf";
@@ -565,11 +565,12 @@ function App() {
   const dockModeInitial = useRef(true);
   const notchModeInitial = useRef(true);
 
-  const [nectarMode, setNectarMode] = useState<'music' | 'calendar' | 'command-center' | 'status' | 'shelf' | 'tour' | 'agent'>('status');
+  const [nectarMode, setNectarMode] = useState<'music' | 'calendar' | 'command-center' | 'status' | 'shelf' | 'agent'>('status');
+  const [tourActive, setTourActive] = useState(false);
 
   const isAnyInteraction = isHovered || isNotchHovered || isEdgeHovered;
   const isHidden = hotkeyHidden || ((notchMode === 'smart' || notchMode === 'peek') && isFullscreen) ||
-    (!startupAnimating && nectarMode !== 'tour' && !(agentActivity && isNotchWindow) && (
+    (!startupAnimating && !tourActive && !(agentActivity && isNotchWindow) && (
       (notchMode === 'smart' && isOverlapped && interactionState === 'none') ||
       (notchMode === 'peek' && interactionState === 'none' && !eventPeek)
     ));
@@ -602,11 +603,15 @@ function App() {
     const updateRect = () => {
       if (nectarRef.current && isNotchWindow) {
         const rect = nectarRef.current.getBoundingClientRect();
+        const card = tourActive ? document.querySelector('.tour-bar')?.getBoundingClientRect() : undefined;
+        const left = card ? Math.min(rect.left, card.left) : rect.left;
+        const right = card ? Math.max(rect.right, card.right) : rect.right;
+        const bottom = card ? Math.max(rect.bottom, card.bottom) : rect.bottom;
         const next = {
-          x: Math.round(rect.x),
+          x: Math.round(left),
           y: Math.round(rect.y),
-          width: Math.round(rect.width),
-          height: Math.round(rect.height)
+          width: Math.round(right - left),
+          height: Math.round(bottom - rect.y)
         };
         const key = `${next.x},${next.y},${next.width},${next.height}`;
         if (key === lastSent) return;
@@ -627,7 +632,7 @@ function App() {
       observer.disconnect();
       clearInterval(poll);
     };
-  }, [isExpanded, isHidden, windowLabel, scale]);
+  }, [isExpanded, isHidden, windowLabel, scale, tourActive]);
 
   useEffect(() => {
     if (!windowLabel) return;
@@ -1030,13 +1035,79 @@ function App() {
   const [tourStep, setTourStep] = useState(0);
   const tourAutoStartedRef = useRef(false);
 
+  const nectarModeRef = useRef(nectarMode);
+  nectarModeRef.current = nectarMode;
+  const tourLiveRef = useRef({ volume: 0.5, brightness: 50, wifi: false, bluetooth: true, notchMode: 'smart', dockMode: 'smart' });
+  tourLiveRef.current = { volume, brightness: currentBrightness, wifi: wifiEnabled, bluetooth: bluetoothEnabled, notchMode, dockMode };
+  const tourSnapshotRef = useRef<{ mode: 'music' | 'calendar' | 'command-center' | 'status'; volume: number; brightness: number; wifi: boolean; bluetooth: boolean; notchMode: string; dockMode: string } | null>(null);
+  const [tourDone, setTourDone] = useState<Set<string>>(() => new Set());
+  const tourCountsRef = useRef<Record<string, number>>({});
+  const tourStepRef = useRef(0);
+  tourStepRef.current = tourStep;
+  const tourActiveRef = useRef(false);
+  tourActiveRef.current = tourActive;
+
+  const tourSignal = useCallback((kind: string) => {
+    if (!tourActiveRef.current) return;
+    const def = TOUR_STEPS[tourStepRef.current];
+    if (!def || def.signal !== kind) return;
+    tourCountsRef.current[kind] = (tourCountsRef.current[kind] ?? 0) + 1;
+    if (tourCountsRef.current[kind] >= (def.need ?? 1)) {
+      setTourDone((prev) => (prev.has(def.key) ? prev : new Set(prev).add(def.key)));
+    }
+  }, []);
+  const tourSignalRef = useRef(tourSignal);
+  tourSignalRef.current = tourSignal;
+
   const startTour = useCallback(() => {
+    const current = nectarModeRef.current;
+    const live = tourLiveRef.current;
+    tourSnapshotRef.current = {
+      mode: current === 'music' || current === 'calendar' || current === 'command-center' ? current : 'status',
+      ...live,
+    };
+    tourCountsRef.current = {};
+    setTourDone(new Set());
     setTourStep(0);
-    setNectarMode('tour');
+    setIsHovered(true);
+    setNectarMode('status');
+    setTourActive(true);
   }, []);
 
   const closeTour = useCallback(() => {
-    setNectarMode('status');
+    const snap = tourSnapshotRef.current;
+    tourSnapshotRef.current = null;
+    if (snap) {
+      const live = tourLiveRef.current;
+      if (Math.abs(live.volume - snap.volume) > 0.001) {
+        setVolume(snap.volume);
+        invoke("set_volume", { volume: snap.volume }).catch(() => {});
+      }
+      if (Math.abs(live.brightness - snap.brightness) > 0.5) {
+        setCurrentBrightness(snap.brightness);
+        invoke("set_brightness", { brightness: snap.brightness }).catch(() => {});
+      }
+      if (live.wifi !== snap.wifi) invoke("set_wifi_state", { enabled: snap.wifi }).catch(() => {});
+      if (live.bluetooth !== snap.bluetooth) {
+        setBluetoothEnabled(snap.bluetooth);
+        invoke("set_bluetooth_state", { enabled: snap.bluetooth }).catch(() => {});
+      }
+      if (live.notchMode !== snap.notchMode) {
+        setNotchMode(snap.notchMode);
+        invoke("set_notch_mode_for_window", { mode: snap.notchMode })
+          .then(() => invoke("change_notch_mode", { mode: snap.notchMode }))
+          .catch(() => {});
+      }
+      if (live.dockMode !== snap.dockMode) {
+        setDockMode(snap.dockMode);
+        localStorage.setItem("nectar-dock-mode", snap.dockMode);
+        invoke("save_setting", { key: "nectar-dock-mode", value: snap.dockMode }).catch(() => {});
+        invoke("change_dock_mode", { mode: snap.dockMode }).catch(() => {});
+      }
+    }
+    setNectarMode(snap?.mode ?? 'status');
+    setCcView('main');
+    setTourActive(false);
     localStorage.setItem("nectar-tour-seen", "1");
     invoke("save_setting", { key: "nectar-tour-seen", value: "1" }).catch(console.error);
   }, []);
@@ -1048,6 +1119,34 @@ function App() {
     const timer = setTimeout(startTour, 1500);
     return () => clearTimeout(timer);
   }, [windowLabel, settingsLegacyMode, isReady, isExpanded, startTour]);
+
+  useEffect(() => {
+    if (ccView !== 'main') tourSignalRef.current('cc');
+  }, [ccView]);
+
+  useEffect(() => {
+    if (!tourActive || windowLabel !== 'main') return;
+    const win = getCurrentWebviewWindow();
+    let original: number | null = null;
+    let cancelled = false;
+    (async () => {
+      const [size, factor] = await Promise.all([win.innerSize(), win.scaleFactor()]);
+      if (cancelled) return;
+      original = size.height / factor;
+      await invoke("set_window_height", { height: Math.max(original, 720) });
+    })().catch(() => {});
+    return () => {
+      cancelled = true;
+      if (original !== null) invoke("set_window_height", { height: original }).catch(() => {});
+    };
+  }, [tourActive, windowLabel]);
+
+  useEffect(() => {
+    if (windowLabel !== 'main') return;
+    const unlisten = listen("shelf-drag-enter", () => tourSignalRef.current('shelf'));
+    const unlistenDock = listen("tour-dock-action", () => tourSignalRef.current('dock'));
+    return () => { unlisten.then(f => f()); unlistenDock.then(f => f()); };
+  }, [windowLabel]);
 
   useEffect(() => {
     if (windowLabel !== 'main') return;
@@ -1108,7 +1207,6 @@ function App() {
     const availableModes = availableNotchModes();
 
     if (nectarMode === 'agent') { if (availableModes[0]) setNectarMode(availableModes[0]); return; }
-    if (nectarMode === 'tour') return;
     const currentIndex = availableModes.indexOf(nectarMode);
     if (currentIndex === -1) return;
 
@@ -1116,6 +1214,7 @@ function App() {
     const nextMode = availableModes[nextIndex];
     manualMusicRef.current = nextMode === 'music';
     setNectarMode(nextMode);
+    tourSignal('panel');
   };
 
 
@@ -1568,6 +1667,7 @@ function App() {
     // set_volume unmutes for any non-zero level.
     setIsMuted(newVol === 0);
     sendVolume(newVol);
+    tourSignalRef.current('slider');
   }, [sendVolume]);
 
 
@@ -1625,6 +1725,7 @@ function App() {
   const handleBrightnessChange = useCallback((newVal: number) => {
     setCurrentBrightness(newVal);
     sendBrightness(newVal);
+    tourSignalRef.current('slider');
   }, [sendBrightness]);
 
   const openSettingsWindow = useCallback(async () => {
@@ -1646,6 +1747,7 @@ function App() {
     e.stopPropagation();
     const nextMode = dockMode === "fixed" ? "smart" : dockMode === "smart" ? "peek" : "fixed";
     setDockMode(nextMode);
+    tourSignalRef.current('mode');
     localStorage.setItem("nectar-dock-mode", nextMode);
     invoke("save_setting", { key: "nectar-dock-mode", value: nextMode }).catch(console.error);
     try {
@@ -1659,6 +1761,7 @@ function App() {
     e.stopPropagation();
     const nextMode = notchMode === "fixed" ? "smart" : notchMode === "smart" ? "peek" : "fixed";
     setNotchMode(nextMode);
+    tourSignalRef.current('mode');
     try {
       await invoke("set_notch_mode_for_window", { mode: nextMode });
       await invoke("change_notch_mode", { mode: nextMode });
@@ -1700,7 +1803,6 @@ function App() {
       return;
     }
     if (nectarMode === 'agent') { const first = availableNotchModes()[0]; if (first) setNectarMode(first); return; }
-    if (nectarMode === 'tour') return;
     const modes = availableNotchModes();
     const index = modes.indexOf(nectarMode);
     if (index === -1 || modes.length < 2) return;
@@ -1860,7 +1962,6 @@ function App() {
   const agentWings = !!agentActivity && isNotchWindow && !isHovered && (nectarMode === 'status' || isMusicMode);
 
   const getDynamicWidth = () => {
-    if (nectarMode === 'tour') return 380;
     if (nectarMode === 'agent') return 340;
     if (nectarMode === 'shelf') return Math.max(300, Math.min(120 + shelf.items.length * 70, 460));
     if (isCalendarMode) return Math.max(settingsCalendarEnabled && showClockColumn ? 480 : settingsCalendarEnabled ? 310 : 270, 140 + dualClockExtra);
@@ -1892,7 +1993,6 @@ function App() {
     if (!isExpanded || isHidden) {
       return isImpacted ? 28.9 : 44.2;
     }
-    if (nectarMode === 'tour') return 210;
     if (nectarMode === 'agent') return agentActivity?.ask ? 184 : agentActivity?.detail ? 160 : 130;
     if (nectarMode === 'shelf') return shelf.items.length === 0 ? 96 : 156;
     if (nectarMode === 'calendar') return settingsCalendarEnabled ? (caldav.connected ? 350 : 310) : 262;
@@ -1997,7 +2097,7 @@ function App() {
         onHoverStart={() => {
           clearTimeout(shelfCollapseTimer.current);
           setIsHovered(true);
-          if (nectarMode !== 'tour' && nectarMode !== 'shelf') {
+          if (nectarMode !== 'shelf') {
             const remembered = settingsRememberMode ? rememberedModeRef.current : null;
             if (agentNeedsYou) setNectarMode('agent');
             else if (remembered && availableNotchModes().includes(remembered)) setNectarMode(remembered);
@@ -2005,6 +2105,7 @@ function App() {
           }
         }}
         onHoverEnd={() => {
+          if (tourActive) return;
           if (nectarMode === 'shelf' && shelfHoldsOpen()) {
             deferShelfCollapse();
             return;
@@ -2709,7 +2810,7 @@ function App() {
               </AnimatePresence>
 
               <AnimatePresence>
-                {nectarMode === 'tour' && (
+                {tourActive && (
                   <motion.div
                     key="tour"
                     initial={{ opacity: 0 }}
@@ -2719,6 +2820,8 @@ function App() {
                   >
                     <NotchTour
                       step={tourStep}
+                      done={tourDone.has(TOUR_STEPS[tourStep].key)}
+                      dockEnabled={dockEnabled}
                       onStep={setTourStep}
                       onClose={closeTour}
                       onAction={(id) => {
