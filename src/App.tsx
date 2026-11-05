@@ -2156,7 +2156,7 @@ function App() {
                           </div>
                           <div className="header-visualizer-wrap">
                             <MediaSourceButton sessions={mediaSessions} />
-                            <button className="music-calendar-btn" onClick={cycleNotchMode} title={t("music.nextPanel")} aria-label={t("music.nextPanel")}>
+                            <button className="music-calendar-btn" onClick={cycleNotchMode} {...tip(t("music.nextPanel"))} aria-label={t("music.nextPanel")}>
                               <ChevronRight size={16} strokeWidth={1.75} />
                             </button>
                             <div className="header-visualizer">
@@ -2223,7 +2223,9 @@ function App() {
                         </div>
 
                         <div className="volume-slider-container" onWheel={handleVolumeWheel}>
-                          <VolumeLowIcon size={14} style={{ opacity: 0.65 }} />
+                          <button className="volume-end-btn" onClick={(e) => { e.stopPropagation(); handleVolumeChange(0); }} onPointerDown={(e) => e.stopPropagation()} aria-label={t("cc.volume")}>
+                            <VolumeLowIcon size={14} style={{ opacity: 0.65 }} />
+                          </button>
                           <div className="slider-track-premium">
                             <input
                               type="range"
@@ -2238,7 +2240,9 @@ function App() {
                             />
                             <div className="slider-progress-fill" style={{ width: `${displayVolume * 100}%` }} />
                           </div>
-                          <VolumeHighIcon size={16} style={{ opacity: 0.65 }} />
+                          <button className="volume-end-btn" onClick={(e) => { e.stopPropagation(); handleVolumeChange(1); }} onPointerDown={(e) => e.stopPropagation()} aria-label={t("cc.volume")}>
+                            <VolumeHighIcon size={16} style={{ opacity: 0.65 }} />
+                          </button>
                         </div>
                       </div>
 
@@ -2490,6 +2494,7 @@ function App() {
                         kind={ccView}
                         onBack={() => setCcView('main')}
                         onOpenWindowsSettings={() => { invoke(ccView === 'wifi' ? 'open_wifi_settings' : ccView === 'audio' ? 'open_sound_settings' : 'open_bluetooth_settings'); }}
+                        tip={tip}
                       />
                     )}
 
@@ -2511,7 +2516,7 @@ function App() {
                           <span className="cc-pill-status">{showLan ? t('connections.connected') : wifiStatus === null ? '…' : !wifiEnabled ? t('common.off') : wifiConnected ? t('connections.connected') : t('cc.notConnected')}</span>
                         </div>
                         {!settingsLegacyMode && !showLan && (
-                          <span className="cc-pill-more" title={t("cc.networks")} onClick={(e) => { e.stopPropagation(); setCcView('wifi'); }}>›</span>
+                          <span className="cc-pill-more" {...tip(t("cc.networks"))} onClick={(e) => { e.stopPropagation(); setCcView('wifi'); }}>›</span>
                         )}
                       </div>
 
@@ -2545,7 +2550,7 @@ function App() {
                           <span className="cc-pill-status">{bluetoothEnabled ? t('common.on') : t('common.off')}</span>
                         </div>
                         {!settingsLegacyMode && (
-                          <span className="cc-pill-more" title={t("cc.devices")} onClick={(e) => { e.stopPropagation(); setCcView('bluetooth'); }}>›</span>
+                          <span className="cc-pill-more" {...tip(t("cc.devices"))} onClick={(e) => { e.stopPropagation(); setCcView('bluetooth'); }}>›</span>
                         )}
                       </div>
 
@@ -2623,7 +2628,7 @@ function App() {
                       <div className="cc-classic-slider-row" style={ccStyle("sliders", "volume")} onWheel={handleVolumeWheel}>
                         <div
                           className={`cc-classic-slider-label${settingsLegacyMode ? '' : ' clickable'}`}
-                          title={settingsLegacyMode ? undefined : t('cc.outputDevice')}
+                          {...(settingsLegacyMode ? {} : tip(t('cc.outputDevice')))}
                           onClick={settingsLegacyMode ? undefined : (e) => { e.stopPropagation(); setCcView('audio'); }}
                         >
                           <VolumeLowIcon style={{ opacity: 0.5 }} />

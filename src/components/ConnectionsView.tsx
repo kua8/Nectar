@@ -28,6 +28,7 @@ interface Props {
   kind: "wifi" | "bluetooth" | "audio";
   onBack: () => void;
   onOpenWindowsSettings: () => void;
+  tip?: (text: string | undefined) => Record<string, unknown>;
 }
 
 const REFRESH_MS = 6000;
@@ -100,7 +101,7 @@ function AppVolumes() {
   );
 }
 
-export function ConnectionsView({ kind, onBack, onOpenWindowsSettings }: Props) {
+export function ConnectionsView({ kind, onBack, onOpenWindowsSettings, tip = () => ({}) }: Props) {
   const [networks, setNetworks] = useState<WifiNetwork[] | null>(null);
   const [devices, setDevices] = useState<BluetoothDeviceInfo[] | null>(null);
   const [outputs, setOutputs] = useState<OutputDevice[] | null>(null);
@@ -224,7 +225,7 @@ export function ConnectionsView({ kind, onBack, onOpenWindowsSettings }: Props) 
               {n.known && !n.connected && (
                 <button
                   className="cv-icon-btn"
-                  title={t("connections.forget")}
+                  {...tip(t("connections.forget"))}
                   onClick={(e) => { e.stopPropagation(); void run(n.ssid, () => invoke("wifi_forget", { ssid: n.ssid })); }}
                 >
                   <X size={12} />
@@ -260,7 +261,7 @@ export function ConnectionsView({ kind, onBack, onOpenWindowsSettings }: Props) 
                 {t("connections.removeConfirm")}
               </button>
             ) : (
-              <button className="cv-icon-btn" title={t("connections.removeDevice")} onClick={() => setConfirmRemove(d.id)}>
+              <button className="cv-icon-btn" {...tip(t("connections.removeDevice"))} onClick={() => setConfirmRemove(d.id)}>
                 <X size={12} />
               </button>
             )}
