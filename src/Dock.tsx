@@ -250,6 +250,8 @@ function WindowDots({ count }: { count: number }) {
   );
 }
 
+let liveThumbnailGeneration = 0;
+
 interface DockPreviewTooltipProps {
   app: AppInfo;
   previews: { hwnd: number; title: string; image: string }[];
@@ -272,6 +274,7 @@ function DockPreviewTooltip({
   const surfaceRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
   useLayoutEffect(() => {
+    const generation = ++liveThumbnailGeneration;
     let cancelled = false;
     let rafId: number | null = null;
     let t1: any = null;
@@ -301,9 +304,7 @@ function DockPreviewTooltip({
       if (targets.length > 0) {
         try {
           const active = await invoke<number[]>('set_live_thumbnails', { targets, clientAreaOnly: false });
-          if (cancelled) {
-            invoke('clear_live_thumbnails').catch(() => {});
-          } else if (active) {
+          if (!cancelled && active) {
             setLiveHwnds(new Set(active));
           }
         } catch {}
@@ -321,7 +322,7 @@ function DockPreviewTooltip({
       if (rafId) cancelAnimationFrame(rafId);
       if (t1) clearTimeout(t1);
       if (t2) clearTimeout(t2);
-      invoke('clear_live_thumbnails').catch(() => {});
+      if (generation === liveThumbnailGeneration) invoke('clear_live_thumbnails').catch(() => {});
     };
   }, [previews]);
 
