@@ -9,6 +9,8 @@ const LOCALES: &[(&str, &str)] = &[
     ("tr", include_str!("../../src/locales/tr.json")),
     ("de", include_str!("../../src/locales/de.json")),
     ("ar", include_str!("../../src/locales/ar.json")),
+    ("es", include_str!("../../src/locales/es.json")),
+    ("fr", include_str!("../../src/locales/fr.json")),
 ];
 
 type Messages = HashMap<String, String>;
