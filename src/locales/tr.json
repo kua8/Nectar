@@ -107,6 +107,8 @@
   "dock.hideDelay.desc": "Smart ve Peek modlarında imleç ayrıldıktan sonra dock'un ne kadar açık kalacağı.",
   "dock.previews": "Uygulama Önizlemeleri",
   "dock.previews.desc": "Üzerine gelindiğinde pencere küçük resimlerini göster",
+  "dock.attention": "Bildirim noktaları",
+  "dock.attention.desc": "Dikkatini isteyen uygulamaları işaretler, uygulama okunmamış sayısı gösteriyorsa onu da gösterir",
   "dock.search": "Arama Simgesi",
   "dock.search.desc": "Başlat'ın yanında bir arama düğmesi göster",
   "dock.calendar": "Takvim Simgesi",

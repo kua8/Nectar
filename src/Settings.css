@@ -266,7 +266,7 @@ body {
 .setting-divider {
   height: 1px;
   background: var(--nectar-border, rgba(255, 255, 255, 0.05));
-  margin-left: 54px;
+  margin-inline-start: 54px;
 }
 
 .setting-icon-bg {
@@ -316,7 +316,7 @@ body {
 .setting-divider {
   height: 1px;
   background: var(--nectar-border, rgba(255, 255, 255, 0.06));
-  margin-left: 52px; /* Align with text */
+  margin-inline-start: 52px; /* Align with text */
 }
 
 /* Custom iOS Style Toggle Switch */

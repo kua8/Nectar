@@ -7,20 +7,37 @@ type Messages = Record<string, string>;
 export const LANGUAGES: Record<string, { name: string }> = {
   en: { name: "English" },
   tr: { name: "Türkçe" },
+  de: { name: "Deutsch" },
+  ar: { name: "العربية" },
 };
+
+const RTL_LANGUAGES = new Set(["ar"]);
+const MIRRORED_PAGES = ["settings", "calendar"];
+
+function applyDirection(lang: string) {
+  const root = document.documentElement;
+  root.lang = lang;
+  const mirrored = RTL_LANGUAGES.has(lang) && MIRRORED_PAGES.some((p) => location.pathname.includes(p));
+  root.dir = mirrored ? "rtl" : "ltr";
+}
 
 const LAZY_LOCALES: Record<string, () => Promise<{ default: Messages }>> = {
   tr: () => import("./locales/tr.json"),
+  de: () => import("./locales/de.json"),
+  ar: () => import("./locales/ar.json"),
 };
 
 const loaded: Record<string, Messages> = { en: en as Messages };
+let loadedVersion = 0;
 
 function loadIfNeeded(lang: string) {
+  applyDirection(lang);
   if (loaded[lang] || !LAZY_LOCALES[lang]) return;
   loaded[lang] = {};
   LAZY_LOCALES[lang]()
     .then((mod) => {
       loaded[lang] = mod.default as Messages;
+      loadedVersion++;
       listeners.forEach((l) => l());
     })
     .catch(() => {
@@ -104,7 +121,7 @@ function subscribe(listener: () => void) {
 
 /** Re-renders the calling component when the language changes; returns the translate function. */
 export function useT() {
-  useSyncExternalStore(subscribe, readPreference);
+  useSyncExternalStore(subscribe, () => `${readPreference()}:${loadedVersion}`);
   return t;
 }
 

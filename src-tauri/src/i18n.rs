@@ -7,6 +7,8 @@ use tauri::{AppHandle, Wry};
 const LOCALES: &[(&str, &str)] = &[
     ("en", include_str!("../../src/locales/en.json")),
     ("tr", include_str!("../../src/locales/tr.json")),
+    ("de", include_str!("../../src/locales/de.json")),
+    ("ar", include_str!("../../src/locales/ar.json")),
 ];
 
 type Messages = HashMap<String, String>;

@@ -337,6 +337,7 @@ pub fn start(app: AppHandle) {
     if !enabled {
         return;
     }
+    std::thread::spawn(|| set_hooks(true));
     let Some(token) = random_token() else { return };
     let Ok(listener) = TcpListener::bind(SocketAddr::from((Ipv4Addr::LOCALHOST, 0))) else { return };
     let Ok(addr) = listener.local_addr() else { return };
