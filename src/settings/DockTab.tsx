@@ -68,6 +68,8 @@ interface DockTabProps {
   toggleDockRecycle: () => void;
   dockDrives: string[];
   toggleDockDrive: (letter: string) => void;
+  hiddenDockApps: { id: string; name: string }[];
+  restoreHiddenDockApp: (id: string) => void;
   dockIconOnly: boolean;
   toggleDockIconOnly: () => void;
   dockAdaptive: boolean;
@@ -116,6 +118,8 @@ export function DockTab({
   toggleDockRecycle,
   dockDrives,
   toggleDockDrive,
+  hiddenDockApps,
+  restoreHiddenDockApp,
   dockIconOnly,
   toggleDockIconOnly,
   dockAdaptive,
@@ -351,6 +355,16 @@ export function DockTab({
             )}
 
           </SettingSection>
+
+          {hiddenDockApps.length > 0 && (
+            <SettingSection id="dock-hidden" title={t("dock.hidden.title")}>
+              {hiddenDockApps.map((h) => (
+                <SettingRow key={h.id} icon={EyeOff} label={h.name} desc={t("dock.hidden.desc")}>
+                  <button className="agent-sound-btn" onClick={() => restoreHiddenDockApp(h.id)}>{t("dock.hidden.restore")}</button>
+                </SettingRow>
+              ))}
+            </SettingSection>
+          )}
 
           <SettingSection id="dock-style" title={t("dock.section.style")}>
             <SettingRow icon={Square} label={t("dock.iconOnly")} desc={t("dock.iconOnly.desc")}>

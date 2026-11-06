@@ -250,6 +250,8 @@ function SettingsApp() {
               toggleDockRecycle={settings.toggleDockRecycle}
               dockDrives={settings.dockDrives}
               toggleDockDrive={settings.toggleDockDrive}
+              hiddenDockApps={settings.hiddenDockApps}
+              restoreHiddenDockApp={settings.restoreHiddenDockApp}
               dockIconOnly={settings.dockIconOnly}
               toggleDockIconOnly={settings.toggleDockIconOnly}
               dockAdaptive={settings.dockAdaptive}

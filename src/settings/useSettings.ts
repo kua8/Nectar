@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { parseCcLayout, parsePanelOrder, type CcLayout, type PanelId } from "../panelOrder";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, emit } from "@tauri-apps/api/event";
-import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { getVersion } from "@tauri-apps/api/app";
 import type { UpdateCheckResult } from "../updater";
 import { useSettingsSync } from "../hooks/useSettingsSync";
@@ -17,6 +16,19 @@ function saveSetting(key: string, value: string) {
 
 function readBool(val: string | null): boolean {
   return val === "true";
+}
+
+export interface HiddenDockApp { id: string; name: string }
+
+function parseHiddenApps(val: unknown): HiddenDockApp[] {
+  try {
+    const parsed = typeof val === "string" ? JSON.parse(val) : val;
+    return Array.isArray(parsed)
+      ? parsed.filter((h): h is HiddenDockApp => !!h && typeof h.id === "string" && typeof h.name === "string")
+      : [];
+  } catch {
+    return [];
+  }
 }
 
 function parseDrives(val: string | null): string[] {
@@ -142,6 +154,7 @@ export function useSettings() {
     () => localStorage.getItem("nectar-dock-recycle-enabled") === "true"
   );
   const [dockDrives, setDockDrives] = useState<string[]>(() => parseDrives(localStorage.getItem("nectar-dock-drives")));
+  const [hiddenDockApps, setHiddenDockApps] = useState<HiddenDockApp[]>(() => parseHiddenApps(localStorage.getItem("nectar-dock-hidden-apps")));
   const [dockIconOnly, setDockIconOnly] = useState(
     () => localStorage.getItem("nectar-dock-icon-only") === "true"
   );
@@ -282,6 +295,7 @@ export function useSettings() {
       apply(getVal("nectar-cc-layout"), setCcLayout, (v) => parseCcLayout(v));
       apply(getVal("nectar-dock-recycle-enabled"), setDockRecycle, readBool);
       apply(getVal("nectar-dock-drives"), setDockDrives, parseDrives);
+      apply(getVal("nectar-dock-hidden-apps"), setHiddenDockApps, parseHiddenApps);
       apply(getVal("nectar-dock-icon-only"), setDockIconOnly, readBool);
       apply(getVal("nectar-start-icon"), setStartIcon, (v) => v);
       apply(getVal("nectar-dock-adaptive"), setDockAdaptive, readBool);
@@ -342,7 +356,7 @@ export function useSettings() {
   useEffect(() => {
     loadAllSettings();
 
-    isEnabled()
+    invoke<boolean>("get_autostart")
       .then(setAutostart)
       .catch(() => {});
 
@@ -389,6 +403,7 @@ export function useSettings() {
     "nectar-cc-layout": (v) => setCcLayout(parseCcLayout(v === null ? null : String(v))),
     "nectar-dock-recycle-enabled": setDockRecycle,
     "nectar-dock-drives": (v) => setDockDrives(parseDrives(v)),
+    "nectar-dock-hidden-apps": (v) => setHiddenDockApps(parseHiddenApps(v)),
     "nectar-dock-icon-only": setDockIconOnly,
     "nectar-start-icon": setStartIcon,
     "nectar-dock-adaptive": setDockAdaptive,
@@ -553,14 +568,9 @@ export function useSettings() {
   // ── Autostart ──
   const toggleAutostart = async () => {
     try {
-      const currentlyEnabled = await isEnabled();
-      if (currentlyEnabled) {
-        await disable();
-        setAutostart(false);
-      } else {
-        await enable();
-        setAutostart(true);
-      }
+      const next = !(await invoke<boolean>("get_autostart"));
+      await invoke("set_autostart", { enabled: next });
+      setAutostart(next);
     } catch (err) {}
   };
 
@@ -835,6 +845,12 @@ export function useSettings() {
     const next = dockDrives.includes(letter) ? dockDrives.filter((d) => d !== letter) : [...dockDrives, letter].sort();
     setDockDrives(next);
     saveSetting("nectar-dock-drives", JSON.stringify(next));
+  };
+
+  const restoreHiddenDockApp = (id: string) => {
+    const next = hiddenDockApps.filter((h) => h.id !== id);
+    setHiddenDockApps(next);
+    saveSetting("nectar-dock-hidden-apps", JSON.stringify(next));
   };
 
   const toggleDockCalendar = () => {
@@ -1293,6 +1309,8 @@ export function useSettings() {
     toggleDockRecycle,
     dockDrives,
     toggleDockDrive,
+    hiddenDockApps,
+    restoreHiddenDockApp,
     dockIconOnly,
     toggleDockIconOnly,
     startIcon,

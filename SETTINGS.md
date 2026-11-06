@@ -36,6 +36,7 @@ Edit `settings.json` with any text editor while Nectar is running. Changes are a
 | `nectar-dock-show-desktop-corner` | `"true"` / `"false"` | `"false"` | Show a thin bar at the right end of the dock that shows the desktop (Win+D) when clicked, and do the same for a click in the very bottom-right corner of the screen (a 6 px square on the dock's monitor, not while a fullscreen app is in front). |
 | `nectar-dock-recycle-enabled` | `"true"` / `"false"` | `"false"` | Show the Recycle Bin in the dock. Hidden in Legacy Mode. |
 | `nectar-dock-drives` | JSON array, e.g. `["C","D"]` | `[]` | Drive letters to show as dock buttons that open the drive in Explorer. Hidden in Legacy Mode. |
+| `nectar-dock-hidden-apps` | JSON array of `{"id","name"}` | `[]` | Running apps hidden from the dock with Hide from Dock in the right-click menu. Restore them in Settings > Dock. |
 | `nectar-dock-icon-only` | `"true"` / `"false"` | `"false"` | Minimal icon-only style (no background/padding around icons). |
 | `nectar-start-icon` | `"default"` / `"windows"` / `custom:<data URI>` | `"default"` | Start button icon in the dock: the Nectar logo, the Windows logo, or an uploaded image (`custom:` followed by its data URI). |
 | `nectar-dock-adaptive` | `"true"` / `"false"` | `"false"` | Fixed dock only. Stretch the dock to full width like a traditional taskbar while a window is maximized, and contract back when it's restored. |

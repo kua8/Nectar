@@ -112,12 +112,15 @@ pub async fn init_dock(app: AppHandle, mode: String) {
             let _ = dock_win.hide();
             crate::state::set_flag(crate::state::dock_appbar_registered(), "dock", false);
         }
+        crate::startup::settle("dock disabled");
         return;
     }
 
     if let Some(dock_win) = app.get_webview_window("dock") {
         init_dock_window(&app, dock_win, &mode).await;
     }
+    crate::startup::mark("dock shown");
+    crate::startup::settle("dock shown");
 }
 
 pub async fn init_dock_window(app: &AppHandle, dock_win: tauri::WebviewWindow, mode: &str) {

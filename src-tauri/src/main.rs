@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod startup;
 mod types;
 mod state;
 mod utils;
@@ -99,6 +100,7 @@ fn main() {
         if let Some(h) = h_mutex { let _ = SINGLE_INSTANCE_MUTEX_HANDLE.set(h.0 as isize); }
     }
 
+    startup::begin();
     setup_brightness_worker();
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -165,6 +167,8 @@ fn main() {
             set_notch_hidden,
             set_dock_dragging,
             get_active_windows,
+            startup::get_autostart,
+            startup::set_autostart,
             get_app_icon,
             get_installed_apps,
             save_pinned_apps,
@@ -261,6 +265,7 @@ fn main() {
             ics::ics_detect
         ])
         .setup(|app| {
+            startup::mark("setup started");
             hotkeys::start(app.handle().clone());
             init_taskbar_marker(app.handle());
             // Crash-recovery: if a previous session was force-killed while the native
@@ -350,6 +355,11 @@ fn main() {
             setup_audio_visualization(app.handle().clone());
             setup_settings_watcher(app.handle().clone());
             memory_saver::start_reclaim_worker(app.handle().clone());
+            {
+                let ah = app.handle().clone();
+                std::thread::spawn(move || startup::migrate(&ah));
+            }
+            startup::mark("setup finished");
 
             // Listen for second-instance signal to open settings
             if let Some(&h_event) = SINGLE_INSTANCE_EVENT_HANDLE.get() {

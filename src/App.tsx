@@ -830,11 +830,9 @@ function App() {
       if (windowLabel === 'main') {
         const firstRun = localStorage.getItem("nectar-first-run") === null;
         if (firstRun) {
-          import("@tauri-apps/plugin-autostart").then(({ enable, isEnabled }) => {
-            isEnabled().then(enabled => {
-              if (!enabled) enable().catch(() => { });
-            });
-          });
+          invoke<boolean>("get_autostart").then(enabled => {
+            if (!enabled) invoke("set_autostart", { enabled: true }).catch(() => { });
+          }).catch(() => { });
           localStorage.setItem("nectar-first-run", "done");
         }
         const rawDockMode = getVal("nectar-dock-mode", "smart") as string;

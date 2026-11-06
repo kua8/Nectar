@@ -90,6 +90,19 @@ const isIdentifier = (p: string) => !p.includes('/') && !p.includes('\\');
 const isNectarWindow = (app: { name: string; path: string }) =>
   app.path.toLowerCase().includes('nectar.exe') || app.name.toLowerCase() === 'nectar';
 
+interface HiddenApp { id: string; name: string }
+
+function parseHiddenApps(val: unknown): HiddenApp[] {
+  try {
+    const parsed = typeof val === "string" ? JSON.parse(val) : val;
+    return Array.isArray(parsed)
+      ? parsed.filter((h): h is HiddenApp => !!h && typeof h.id === "string" && typeof h.name === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
 function parseDrives(val: string | null): string[] {
   try {
     const parsed = JSON.parse(val ?? "[]");
@@ -445,6 +458,7 @@ const Dock = memo(function Dock() {
   const [dockShowDesktop, setDockShowDesktop] = useState(() => localStorage.getItem("nectar-dock-show-desktop-corner") === "true");
   const [dockRecycle, setDockRecycle] = useState(() => localStorage.getItem("nectar-dock-recycle-enabled") === "true");
   const [dockDrives, setDockDrives] = useState<string[]>(() => parseDrives(localStorage.getItem("nectar-dock-drives")));
+  const [hiddenApps, setHiddenApps] = useState<HiddenApp[]>(() => parseHiddenApps(localStorage.getItem("nectar-dock-hidden-apps")));
   const [dockIconOnly, setDockIconOnly] = useState(() => localStorage.getItem("nectar-dock-icon-only") === "true");
   const [dockAdaptive, setDockAdaptive] = useState(() => localStorage.getItem("nectar-dock-adaptive") === "true");
   const [startIcon, setStartIcon] = useState(() => localStorage.getItem("nectar-start-icon") || "default");
@@ -634,6 +648,7 @@ const Dock = memo(function Dock() {
       setDockShowDesktop(getVal("nectar-dock-show-desktop-corner", "false") === "true");
       setDockRecycle(getVal("nectar-dock-recycle-enabled", "false") === "true");
       setDockDrives(parseDrives(getVal("nectar-dock-drives", "[]")));
+      setHiddenApps(parseHiddenApps(getVal("nectar-dock-hidden-apps", "[]")));
 
       const iconOnly = getVal("nectar-dock-icon-only", "false");
       setDockIconOnly(iconOnly === "true");
@@ -724,6 +739,7 @@ const Dock = memo(function Dock() {
       "nectar-dock-show-desktop-corner": setDockShowDesktop,
       "nectar-dock-recycle-enabled": setDockRecycle,
       "nectar-dock-drives": (v) => setDockDrives(parseDrives(v)),
+      "nectar-dock-hidden-apps": (v) => setHiddenApps(parseHiddenApps(v)),
       "nectar-dock-icon-only": setDockIconOnly,
       "nectar-dock-adaptive": setDockAdaptive,
       "nectar-start-icon": setStartIcon,
@@ -1081,10 +1097,21 @@ const Dock = memo(function Dock() {
 
     const unpinned = activeOrder
       .map(id => activeApps.find(a => appIdentity(a.path, a.executable, a.name) === id))
-      .filter((a): a is AppInfo => !!a && !matchedRunningKeys.has(appIdentity(a.path, a.executable, a.name)));
+      .filter((a): a is AppInfo => !!a && !matchedRunningKeys.has(appIdentity(a.path, a.executable, a.name)) && !hiddenApps.some(h => h.id === appIdentity(a.path, a.executable, a.name)));
 
     return [...pinned, ...unpinned];
-  }, [pinnedApps, activeApps, activeOrder]);
+  }, [pinnedApps, activeApps, activeOrder, hiddenApps]);
+
+  const hideFromDock = (app: AppInfo) => {
+    const id = appIdentity(app.path, app.executable, app.name);
+    if (hiddenApps.some(h => h.id === id)) return;
+    const next = [...hiddenApps, { id, name: app.name }];
+    setHiddenApps(next);
+    const value = JSON.stringify(next);
+    localStorage.setItem("nectar-dock-hidden-apps", value);
+    invoke("save_setting", { key: "nectar-dock-hidden-apps", value }).catch(console.error);
+    closeMenu();
+  };
 
   const startItem = useMemo(() => dockItems.find(i => i.path === 'start') as AppInfo, [dockItems]);
 
@@ -1832,6 +1859,11 @@ const Dock = memo(function Dock() {
               <div className="menu-item" onClick={() => togglePin(contextMenu.app!)}>
                 {contextMenu.app.is_pinned ? t("dockmenu.unpin") : t("dockmenu.pin")}
               </div>
+              {!contextMenu.app.is_pinned && contextMenu.app.is_running && contextMenu.app.path !== 'start' && (
+                <div className="menu-item" onClick={() => hideFromDock(contextMenu.app!)}>
+                  {t("dockmenu.hide")}
+                </div>
+              )}
               {contextMenu.app.is_pinned && contextMenu.app.path !== 'start' && (
                 <>
                   <div className="menu-divider" />
