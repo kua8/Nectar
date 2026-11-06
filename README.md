@@ -193,6 +193,7 @@ See the [open issues](https://github.com/kua8/Nectar/issues) for requests and kn
 
 Nectar is free and open source. If it makes your desktop nicer, you can support its development.
 
+[![Sponsor](https://img.shields.io/badge/Sponsor-EA4AAA?style=for-the-badge&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/kua8)
 [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/kua8)
 
 ## License
