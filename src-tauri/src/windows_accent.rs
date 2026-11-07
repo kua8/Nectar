@@ -176,7 +176,7 @@ pub fn sync(app: &AppHandle, hex: &str) -> Result<(), String> {
     for ((k, n, _), v) in VALUES.iter().zip(new_values.iter()) {
         write_value(k, n, v);
     }
-    broadcast();
+    std::thread::spawn(broadcast);
     Ok(())
 }
 
@@ -190,6 +190,6 @@ pub fn restore(app: &AppHandle) -> Result<(), String> {
         }
     }
     let _ = std::fs::remove_file(&path);
-    broadcast();
+    std::thread::spawn(broadcast);
     Ok(())
 }

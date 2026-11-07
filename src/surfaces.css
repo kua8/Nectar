@@ -122,6 +122,15 @@
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6), inset 0 0 0 999px rgba(255, 255, 255, 0.33);
 }
 
+/* The notch hangs from the top edge of the screen, so it has no top sheen line */
+:root.style-frosted .nectar > .surface-fill {
+    box-shadow: inset 0 0 0 999px rgba(255, 255, 255, 0.13);
+}
+
+:root.style-frosted.light-mode .nectar > .surface-fill {
+    box-shadow: inset 0 0 0 999px rgba(255, 255, 255, 0.33);
+}
+
 /* Liquid: clear body, sheen and depth. The notch hangs from the top edge and the dock sits on the
    bottom edge, so each catches the light on the side facing away from the screen. */
 :root.style-liquid .surface-fill {
@@ -225,7 +234,7 @@
 }
 
 .light-mode .notch-ambient-glow::after {
-    background: radial-gradient(ellipse at center, transparent 25%, rgba(255, 255, 255, 0.3) 55%, var(--notch-bg, var(--nectar-bg)) 88%);
+    background: radial-gradient(ellipse at center, transparent 25%, rgba(255, 255, 255, 0.3) 55%, rgba(255, 255, 255, 0.5) 100%);
 }
 
 :root:is(.style-frosted, .style-liquid) .dock:not(.dock-icon-only) .dock-icon {

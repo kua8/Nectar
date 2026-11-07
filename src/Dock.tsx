@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef, memo } from 'react';
-import { motion, AnimatePresence, Reorder } from 'framer-motion';
+import { motion, AnimatePresence, Reorder, useIsPresent } from 'framer-motion';
 import { invoke } from '@tauri-apps/api/core';
 import { emit, listen } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
@@ -89,6 +89,17 @@ const isIdentifier = (p: string) => !p.includes('/') && !p.includes('\\');
 
 const isNectarWindow = (app: { name: string; path: string }) =>
   app.path.toLowerCase().includes('nectar.exe') || app.name.toLowerCase() === 'nectar';
+
+const NECTAR_MENU_IDS = ["calendar", "settings", "taskmgr", "restart", "clearicons", "quit"];
+
+function parseMenuItems(val: unknown): string[] {
+  try {
+    const parsed = typeof val === "string" ? JSON.parse(val) : val;
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => NECTAR_MENU_IDS.includes(id)) : NECTAR_MENU_IDS;
+  } catch {
+    return NECTAR_MENU_IDS;
+  }
+}
 
 interface HiddenApp { id: string; name: string }
 
@@ -255,9 +266,18 @@ function AttentionBadge({ count }: { count: number }) {
   );
 }
 
-function WindowDots({ count }: { count: number }) {
+function WindowDots({ count, mode }: { count: number; mode: string }) {
+  if (mode === "dots") {
+    return (
+      <div className="window-dots dots">
+        {Array.from({ length: Math.min(Math.max(count, 1), 4) }, (_, i) => (
+          <div key={i} className="window-dot" />
+        ))}
+      </div>
+    );
+  }
   return (
-    <div className={`window-dots${count > 1 ? " multi" : ""}`}>
+    <div className={`window-dots${mode === "bar" && count > 1 ? " multi" : ""}`}>
       <div className="active-indicator" />
     </div>
   );
@@ -265,13 +285,36 @@ function WindowDots({ count }: { count: number }) {
 
 let liveThumbnailGeneration = 0;
 
+const PREVIEW_MAX_WIDTH = 260;
+const PREVIEW_MAX_HEIGHT = 170;
+const PREVIEW_DEFAULT_RATIO = 16 / 10;
+
+function imageRatio(src: string): Promise<number> {
+  if (!src) return Promise.resolve(PREVIEW_DEFAULT_RATIO);
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const ratio = img.naturalWidth > 0 && img.naturalHeight > 0 ? img.naturalWidth / img.naturalHeight : PREVIEW_DEFAULT_RATIO;
+      resolve(Math.min(2.6, Math.max(0.5, ratio)));
+    };
+    img.onerror = () => resolve(PREVIEW_DEFAULT_RATIO);
+    img.src = src;
+  });
+}
+
+function previewBox(ratio: number) {
+  const width = Math.round(Math.min(PREVIEW_MAX_WIDTH, PREVIEW_MAX_HEIGHT * ratio));
+  return { width, height: Math.round(width / ratio) };
+}
+
 interface DockPreviewTooltipProps {
   app: AppInfo;
-  previews: { hwnd: number; title: string; image: string }[];
+  previews: { hwnd: number; title: string; image: string; ratio: number }[];
   onClosePreview: (e: React.MouseEvent, hwnd: number) => void;
   renderMedia: (app: AppInfo) => React.ReactNode;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
+  zoom: number;
 }
 
 function DockPreviewTooltip({
@@ -281,8 +324,23 @@ function DockPreviewTooltip({
   renderMedia,
   onMouseEnter,
   onMouseLeave,
+  zoom,
 }: DockPreviewTooltipProps) {
   const t = useT();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [shift, setShift] = useState(0);
+  const isPresent = useIsPresent();
+
+  useLayoutEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const margin = 8;
+    let delta = 0;
+    if (rect.left < margin) delta = margin - rect.left;
+    else if (rect.right > window.innerWidth - margin) delta = window.innerWidth - margin - rect.right;
+    if (Math.abs(delta) > 0.5) setShift((s) => s + delta / (zoom || 1));
+  }, [previews, zoom]);
   const [liveHwnds, setLiveHwnds] = useState<Set<number>>(() => new Set());
   const surfaceRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
@@ -339,8 +397,16 @@ function DockPreviewTooltip({
     };
   }, [previews]);
 
+  useEffect(() => {
+    if (isPresent) return;
+    setLiveHwnds(new Set());
+    invoke('clear_live_thumbnails').catch(() => {});
+  }, [isPresent]);
+
   return (
     <motion.div
+      ref={rootRef}
+      style={{ ['--pv-shift' as string]: `${shift}px` }}
       className={`preview-tooltip ${previews.length > 1 ? 'multi' : ''}`}
       initial={{ opacity: 0, y: 10, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -352,14 +418,17 @@ function DockPreviewTooltip({
       <div className="preview-items">
         {previews.map((prev, idx) => {
           const isLive = liveHwnds.has(prev.hwnd);
+          const box = previewBox(prev.ratio);
           return (
             <div
               key={prev.hwnd}
               className="preview-item"
+              style={{ width: Math.max(150, box.width + 16) }}
               onClick={() => invoke('focus_window', { hwnd: prev.hwnd })}
             >
               <div
                 className={`preview-surface ${isLive ? "has-live" : ""}`}
+                style={{ width: box.width, height: box.height, aspectRatio: "auto", alignSelf: "center" }}
                 ref={(el) => {
                   if (el) surfaceRefs.current.set(prev.hwnd, el);
                   else surfaceRefs.current.delete(prev.hwnd);
@@ -459,13 +528,15 @@ const Dock = memo(function Dock() {
   const [dockRecycle, setDockRecycle] = useState(() => localStorage.getItem("nectar-dock-recycle-enabled") === "true");
   const [dockDrives, setDockDrives] = useState<string[]>(() => parseDrives(localStorage.getItem("nectar-dock-drives")));
   const [hiddenApps, setHiddenApps] = useState<HiddenApp[]>(() => parseHiddenApps(localStorage.getItem("nectar-dock-hidden-apps")));
+  const [menuItems, setMenuItems] = useState<string[]>(() => parseMenuItems(localStorage.getItem("nectar-dock-menu-items")));
   const [dockIconOnly, setDockIconOnly] = useState(() => localStorage.getItem("nectar-dock-icon-only") === "true");
+  const [windowIndicator, setWindowIndicator] = useState(() => localStorage.getItem("nectar-dock-indicator") ?? "bar");
   const [dockAdaptive, setDockAdaptive] = useState(() => localStorage.getItem("nectar-dock-adaptive") === "true");
   const [startIcon, setStartIcon] = useState(() => localStorage.getItem("nectar-start-icon") || "default");
   const [isMaximized, setIsMaximized] = useState(false);
   const [dockMixedReorder, setDockMixedReorder] = useState(() => localStorage.getItem("nectar-dock-mixed-reorder") === "true");
   const [mixedOrder, setMixedOrder] = useState<string[]>([]);
-  const [previewData, setPreviewData] = useState<{ id: string, previews: { hwnd: number, title: string, image: string }[] } | null>(null);
+  const [previewData, setPreviewData] = useState<{ id: string, previews: { hwnd: number, title: string, image: string, ratio: number }[] } | null>(null);
   const [isDockHovered, setIsDockHovered] = useState(false);
   const [isEdgeHovered, setIsEdgeHovered] = useState(false);
   const [isOverlapped, setIsOverlapped] = useState(false);
@@ -531,7 +602,7 @@ const Dock = memo(function Dock() {
     }
   }, [isAnyInteraction, hideDelay]);
 
-  const isHidden = ((dockMode === 'smart' || dockMode === 'peek') && (isFullscreen || isShellSurfaceFocused)) ||
+  const isHidden = ((dockMode === 'smart' || dockMode === 'peek') && isFullscreen) || isShellSurfaceFocused ||
     (!startupAnimating && (
       (dockMode === 'smart' && isOverlapped && interactionState === 'none') ||
       (dockMode === 'peek' && interactionState === 'none')
@@ -649,9 +720,11 @@ const Dock = memo(function Dock() {
       setDockRecycle(getVal("nectar-dock-recycle-enabled", "false") === "true");
       setDockDrives(parseDrives(getVal("nectar-dock-drives", "[]")));
       setHiddenApps(parseHiddenApps(getVal("nectar-dock-hidden-apps", "[]")));
+      setMenuItems(parseMenuItems(getVal("nectar-dock-menu-items")));
 
       const iconOnly = getVal("nectar-dock-icon-only", "false");
       setDockIconOnly(iconOnly === "true");
+      setWindowIndicator(getVal("nectar-dock-indicator", "bar") ?? "bar");
 
       const adaptive = getVal("nectar-dock-adaptive", "false");
       setDockAdaptive(adaptive === "true");
@@ -740,7 +813,9 @@ const Dock = memo(function Dock() {
       "nectar-dock-recycle-enabled": setDockRecycle,
       "nectar-dock-drives": (v) => setDockDrives(parseDrives(v)),
       "nectar-dock-hidden-apps": (v) => setHiddenApps(parseHiddenApps(v)),
+      "nectar-dock-menu-items": (v) => setMenuItems(parseMenuItems(v)),
       "nectar-dock-icon-only": setDockIconOnly,
+      "nectar-dock-indicator": (v) => setWindowIndicator(String(v)),
       "nectar-dock-adaptive": setDockAdaptive,
       "nectar-start-icon": setStartIcon,
       "nectar-dock-mixed-reorder": setDockMixedReorder,
@@ -1102,6 +1177,31 @@ const Dock = memo(function Dock() {
     return [...pinned, ...unpinned];
   }, [pinnedApps, activeApps, activeOrder, hiddenApps]);
 
+  const nectarOptionsMenu = () => {
+    const on = (id: string) => menuItems.includes(id);
+    const hasTop = ["calendar", "settings", "taskmgr", "restart", "clearicons"].some(on);
+    if (!hasTop && !on("quit")) return null;
+    return (
+      <div
+        className="menu-item has-submenu"
+        onMouseEnter={() => setActiveSubmenu('nectar')}
+        onMouseLeave={() => setActiveSubmenu(null)}
+      >
+        {t("dockmenu.options")}
+        <span className="submenu-arrow">▶</span>
+        <div className="submenu">
+          {on("calendar") && <div className="menu-item" onClick={() => { invoke('open_calendar_window'); closeMenu(); }}>{t("dockmenu.openCalendar")}</div>}
+          {on("settings") && <div className="menu-item" onClick={() => { invoke('open_settings_window'); closeMenu(); }}>{t("dockmenu.openSettings")}</div>}
+          {on("taskmgr") && <div className="menu-item" onClick={() => { invoke('open_app', { appName: 'taskmgr' }); closeMenu(); }}>{t("dockmenu.taskManager")}</div>}
+          {on("restart") && <div className="menu-item" onClick={() => invoke('restart_nectar')}>{t("general.restart")}</div>}
+          {on("clearicons") && <div className="menu-item" onClick={() => { handleClearIconCache(); closeMenu(); }}>{t("dockmenu.clearIconCache")}</div>}
+          {hasTop && on("quit") && <div className="menu-divider" />}
+          {on("quit") && <div className="menu-item quit" onClick={() => invoke('quit_nectar')}>{t("general.quit")}</div>}
+        </div>
+      </div>
+    );
+  };
+
   const hideFromDock = (app: AppInfo) => {
     const id = appIdentity(app.path, app.executable, app.name);
     if (hiddenApps.some(h => h.id === id)) return;
@@ -1229,6 +1329,12 @@ const Dock = memo(function Dock() {
     return () => window.removeEventListener('blur', handleBlur);
   }, []);
 
+  const hoveredPreviewSig = useMemo(() => {
+    const item = hoveredApp ? dockItems.find(a => itemKey(a) === hoveredApp) : undefined;
+    if (!item) return "";
+    return `${item.is_running ? 1 : 0}:${item.all_hwnds?.map(([h]) => h).join(",") ?? item.hwnd ?? ""}`;
+  }, [hoveredApp, dockItems]);
+
   useEffect(() => {
     if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
     isPreviewHoveredRef.current = false;
@@ -1240,7 +1346,7 @@ const Dock = memo(function Dock() {
     }
 
     if (hoveredApp && !isDragging && !contextMenu) {
-      const app = dockItems.find(a => itemKey(a) === hoveredApp);
+      const app = dockItemsRef.current.find(a => itemKey(a) === hoveredApp);
       if (app && app.is_running) {
         const hwndsToCapture = app.all_hwnds || (app.hwnd ? [[app.hwnd, app.name]] : []);
 
@@ -1263,10 +1369,11 @@ const Dock = memo(function Dock() {
               .filter((r): r is { hwnd: number, title: string, image: string, lastFocused: number } => r !== null)
               .sort((a, b) => b.lastFocused - a.lastFocused)
               .map(({ hwnd, title, image }) => ({ hwnd, title, image }));
+            const sized = await Promise.all(captured.map(async (c) => ({ ...c, ratio: await imageRatio(c.image) })));
 
             const currentHovered = hoveredAppRef.current;
-            if (captured.length > 0 && currentHovered === itemKey(app)) {
-              setPreviewData({ id: itemKey(app), previews: captured });
+            if (sized.length > 0 && currentHovered === itemKey(app)) {
+              setPreviewData({ id: itemKey(app), previews: sized });
               tourDockAction();
             } else if (currentHovered === itemKey(app)) {
               setPreviewData(null);
@@ -1284,7 +1391,7 @@ const Dock = memo(function Dock() {
     return () => {
       if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
     };
-  }, [hoveredApp, isDragging, dockItems, contextMenu, previewDelay]);
+  }, [hoveredApp, isDragging, hoveredPreviewSig, contextMenu, previewDelay]);
 
   const dockItemsRef = useRef(dockItems);
   dockItemsRef.current = dockItems;
@@ -1607,6 +1714,7 @@ const Dock = memo(function Dock() {
                       previews={previewData.previews}
                       onClosePreview={handleClosePreview}
                       renderMedia={renderPreviewMedia}
+                      zoom={scale}
                       onMouseEnter={() => { isPreviewHoveredRef.current = true; }}
                       onMouseLeave={() => { isPreviewHoveredRef.current = false; setHoveredApp(null); setPressedApp(null); }}
                     />
@@ -1643,7 +1751,7 @@ const Dock = memo(function Dock() {
                   })()}
                   {attentionBadge(app)}
                 </motion.div>
-                  {app.is_running && <WindowDots count={app.all_hwnds?.length ?? 1} />}
+                  {app.is_running && <WindowDots count={app.all_hwnds?.length ?? 1} mode={windowIndicator} />}
                     </motion.div>
                   </Reorder.Item>
                 ))}
@@ -1693,6 +1801,7 @@ const Dock = memo(function Dock() {
                             previews={previewData.previews}
                             onClosePreview={handleClosePreview}
                             renderMedia={renderPreviewMedia}
+                            zoom={scale}
                             onMouseEnter={() => { isPreviewHoveredRef.current = true; }}
                             onMouseLeave={() => { isPreviewHoveredRef.current = false; setHoveredApp(null); setPressedApp(null); }}
                           />
@@ -1725,7 +1834,7 @@ const Dock = memo(function Dock() {
                         })()}
                         {attentionBadge(app)}
                       </motion.div>
-                      {app.is_running && <WindowDots count={app.all_hwnds?.length ?? 1} />}
+                      {app.is_running && <WindowDots count={app.all_hwnds?.length ?? 1} mode={windowIndicator} />}
                     </motion.div>
                   </Reorder.Item>
                 ))}
@@ -1772,6 +1881,7 @@ const Dock = memo(function Dock() {
                             previews={previewData.previews}
                             onClosePreview={handleClosePreview}
                             renderMedia={renderPreviewMedia}
+                            zoom={scale}
                             onMouseEnter={() => { isPreviewHoveredRef.current = true; }}
                             onMouseLeave={() => { isPreviewHoveredRef.current = false; setHoveredApp(null); setPressedApp(null); }}
                           />
@@ -1805,7 +1915,7 @@ const Dock = memo(function Dock() {
                         })()}
                         {attentionBadge(app)}
                       </motion.div>
-                      {app.is_running && <WindowDots count={app.all_hwnds?.length ?? 1} />}
+                      {app.is_running && <WindowDots count={app.all_hwnds?.length ?? 1} mode={windowIndicator} />}
                     </motion.div>
                   </Reorder.Item>
                 ))}
@@ -1896,23 +2006,7 @@ const Dock = memo(function Dock() {
               <div className="menu-item" onClick={() => { setShowAddPopup(true); closeMenu(); }}>
                 {t("dockmenu.addApp")}
               </div>
-              <div 
-                className="menu-item has-submenu"
-                onMouseEnter={() => setActiveSubmenu('nectar')}
-                onMouseLeave={() => setActiveSubmenu(null)}
-              >
-                {t("dockmenu.options")}
-                <span className="submenu-arrow">▶</span>
-                <div className="submenu">
-                  <div className="menu-item" onClick={() => { invoke('open_calendar_window'); closeMenu(); }}>{t("dockmenu.openCalendar")}</div>
-                  <div className="menu-item" onClick={() => { invoke('open_settings_window'); closeMenu(); }}>{t("dockmenu.openSettings")}</div>
-                  <div className="menu-item" onClick={() => { invoke('open_app', { appName: 'taskmgr' }); closeMenu(); }}>{t("dockmenu.taskManager")}</div>
-                  <div className="menu-item" onClick={() => invoke('restart_nectar')}>{t("general.restart")}</div>
-                  <div className="menu-item" onClick={() => { handleClearIconCache(); closeMenu(); }}>{t("dockmenu.clearIconCache")}</div>
-                  <div className="menu-divider" />
-                  <div className="menu-item quit" onClick={() => invoke('quit_nectar')}>{t("general.quit")}</div>
-                </div>
-              </div>
+              {nectarOptionsMenu()}
               {contextMenu.app.is_running && (
                 <>
                   <div className="menu-divider" />
@@ -1935,23 +2029,7 @@ const Dock = memo(function Dock() {
               <div className="menu-item" onClick={() => { setShowAddPopup(true); closeMenu(); }}>
                 {t("dockmenu.addApp")}
               </div>
-              <div 
-                className="menu-item has-submenu"
-                onMouseEnter={() => setActiveSubmenu('nectar')}
-                onMouseLeave={() => setActiveSubmenu(null)}
-              >
-                {t("dockmenu.options")}
-                <span className="submenu-arrow">▶</span>
-                <div className="submenu">
-                  <div className="menu-item" onClick={() => { invoke('open_calendar_window'); closeMenu(); }}>{t("dockmenu.openCalendar")}</div>
-                  <div className="menu-item" onClick={() => { invoke('open_settings_window'); closeMenu(); }}>{t("dockmenu.openSettings")}</div>
-                  <div className="menu-item" onClick={() => { invoke('open_app', { appName: 'taskmgr' }); closeMenu(); }}>{t("dockmenu.taskManager")}</div>
-                  <div className="menu-item" onClick={() => invoke('restart_nectar')}>{t("general.restart")}</div>
-                  <div className="menu-item" onClick={() => { handleClearIconCache(); closeMenu(); }}>{t("dockmenu.clearIconCache")}</div>
-                  <div className="menu-divider" />
-                  <div className="menu-item quit" onClick={() => invoke('quit_nectar')}>{t("general.quit")}</div>
-                </div>
-              </div>
+              {nectarOptionsMenu()}
             </>
           )}
         </div>

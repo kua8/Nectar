@@ -445,26 +445,13 @@ button {
 }
 
 .cw-cell.today::before {
-  background: var(--cw-text);
-}
-
-.cw-cell.today .cw-daynum.today {
-  background: transparent;
-  color: var(--cw-inverse);
-}
-
-.cw-cell.today .cw-chip {
-  background: color-mix(in srgb, var(--cw-inverse) 16%, transparent);
-  color: var(--cw-inverse);
-}
-
-.cw-cell.today .cw-more {
-  color: color-mix(in srgb, var(--cw-inverse) 70%, transparent);
+  background: color-mix(in srgb, var(--nectar-highlight, #0a84ff) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nectar-highlight, #0a84ff) 45%, transparent);
 }
 
 .cw-cell.selected.today::before {
-  background: var(--cw-text);
-  box-shadow: inset 0 0 0 2px var(--cw-inverse);
+  background: color-mix(in srgb, var(--nectar-highlight, #0a84ff) 22%, transparent);
+  box-shadow: inset 0 0 0 1.5px var(--nectar-highlight, #0a84ff);
 }
 
 .cw-cell.selected::before {

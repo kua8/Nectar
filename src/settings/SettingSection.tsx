@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 
 type Props = {
@@ -19,6 +19,12 @@ export function SettingSection({ id, title, defaultOpen = false, children }: Pro
       return defaultOpen;
     }
   });
+
+  useEffect(() => {
+    const reveal = () => setOpen(true);
+    window.addEventListener("nectar-settings-reveal", reveal);
+    return () => window.removeEventListener("nectar-settings-reveal", reveal);
+  }, []);
 
   const toggle = () => {
     setOpen((prev) => {

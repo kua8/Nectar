@@ -37,6 +37,8 @@ Edit `settings.json` with any text editor while Nectar is running. Changes are a
 | `nectar-dock-recycle-enabled` | `"true"` / `"false"` | `"false"` | Show the Recycle Bin in the dock. Hidden in Legacy Mode. |
 | `nectar-dock-console-windows` | `"true"` / `"false"` | `"false"` | Show Command Prompt, batch script and PowerShell console windows (hosted by conhost) as running apps in the dock. Windows Terminal windows always show. |
 | `nectar-debug-battery` | `"level,charging"`, e.g. `"15,false"` | unset | Development builds only. Fakes a battery at that level, for testing the low battery label on a desktop PC. Ignored in releases. |
+| `nectar-dock-indicator` | `"bar"` / `"fixed"` / `"dots"` | `"bar"` | The mark under a running app. `"bar"` gets longer when the app has several windows, `"fixed"` is always the same bar, `"dots"` shows one dot per window (up to 4). |
+| `nectar-dock-menu-items` | JSON array of `"calendar"`, `"settings"`, `"taskmgr"`, `"restart"`, `"clearicons"`, `"quit"` | all six | Which entries show under Nectar Options when you right-click the dock. The submenu is left out when none are on. |
 | `nectar-dock-drives` | JSON array, e.g. `["C","D"]` | `[]` | Drive letters to show as dock buttons that open the drive in Explorer. Hidden in Legacy Mode. |
 | `nectar-dock-hidden-apps` | JSON array of `{"id","name"}` | `[]` | Running apps hidden from the dock with Hide from Dock in the right-click menu. Restore them in Settings > Dock. |
 | `nectar-dock-icon-only` | `"true"` / `"false"` | `"false"` | Minimal icon-only style (no background/padding around icons). |

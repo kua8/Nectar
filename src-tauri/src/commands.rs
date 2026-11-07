@@ -3622,13 +3622,17 @@ pub fn get_system_accent_color() -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn sync_windows_accent(app: AppHandle, hex: String) -> Result<(), String> {
-    crate::windows_accent::sync(&app, &hex)
+pub async fn sync_windows_accent(app: AppHandle, hex: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || crate::windows_accent::sync(&app, &hex))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
-pub fn restore_windows_accent(app: AppHandle) -> Result<(), String> {
-    crate::windows_accent::restore(&app)
+pub async fn restore_windows_accent(app: AppHandle) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || crate::windows_accent::restore(&app))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

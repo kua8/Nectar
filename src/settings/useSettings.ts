@@ -18,6 +18,17 @@ function readBool(val: string | null): boolean {
   return val === "true";
 }
 
+export const DOCK_MENU_IDS = ["calendar", "settings", "taskmgr", "restart", "clearicons", "quit"];
+
+function parseMenuItems(val: unknown): string[] {
+  try {
+    const parsed = typeof val === "string" ? JSON.parse(val) : val;
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => DOCK_MENU_IDS.includes(id)) : DOCK_MENU_IDS;
+  } catch {
+    return DOCK_MENU_IDS;
+  }
+}
+
 export interface HiddenDockApp { id: string; name: string }
 
 function parseHiddenApps(val: unknown): HiddenDockApp[] {
@@ -154,6 +165,8 @@ export function useSettings() {
   const [dockRecycle, setDockRecycle] = useState(
     () => localStorage.getItem("nectar-dock-recycle-enabled") === "true"
   );
+  const [dockMenuItems, setDockMenuItems] = useState<string[]>(() => parseMenuItems(localStorage.getItem("nectar-dock-menu-items")));
+  const [dockIndicator, setDockIndicator] = useState(() => localStorage.getItem("nectar-dock-indicator") ?? "bar");
   const [weekStart, setWeekStart] = useState(() => localStorage.getItem("nectar-week-start") ?? "auto");
   const [dockDrives, setDockDrives] = useState<string[]>(() => parseDrives(localStorage.getItem("nectar-dock-drives")));
   const [hiddenDockApps, setHiddenDockApps] = useState<HiddenDockApp[]>(() => parseHiddenApps(localStorage.getItem("nectar-dock-hidden-apps")));
@@ -298,6 +311,8 @@ export function useSettings() {
       apply(getVal("nectar-cc-layout"), setCcLayout, (v) => parseCcLayout(v));
       apply(getVal("nectar-dock-recycle-enabled"), setDockRecycle, readBool);
       apply(getVal("nectar-week-start"), setWeekStart, (v) => v ?? "auto");
+      apply(getVal("nectar-dock-indicator"), setDockIndicator, (v) => v);
+      apply(getVal("nectar-dock-menu-items"), setDockMenuItems, parseMenuItems);
       apply(getVal("nectar-dock-drives"), setDockDrives, parseDrives);
       apply(getVal("nectar-dock-hidden-apps"), setHiddenDockApps, parseHiddenApps);
       apply(getVal("nectar-dock-icon-only"), setDockIconOnly, readBool);
@@ -407,6 +422,8 @@ export function useSettings() {
     "nectar-cc-layout": (v) => setCcLayout(parseCcLayout(v === null ? null : String(v))),
     "nectar-dock-recycle-enabled": setDockRecycle,
     "nectar-week-start": (v) => setWeekStart(String(v)),
+    "nectar-dock-indicator": (v) => setDockIndicator(String(v)),
+    "nectar-dock-menu-items": (v) => setDockMenuItems(parseMenuItems(v)),
     "nectar-dock-drives": (v) => setDockDrives(parseDrives(v)),
     "nectar-dock-hidden-apps": (v) => setHiddenDockApps(parseHiddenApps(v)),
     "nectar-dock-icon-only": setDockIconOnly,
@@ -857,6 +874,17 @@ export function useSettings() {
     const next = dockDrives.includes(letter) ? dockDrives.filter((d) => d !== letter) : [...dockDrives, letter].sort();
     setDockDrives(next);
     saveSetting("nectar-dock-drives", JSON.stringify(next));
+  };
+
+  const toggleDockMenuItem = (id: string) => {
+    const next = dockMenuItems.includes(id) ? dockMenuItems.filter((x) => x !== id) : DOCK_MENU_IDS.filter((x) => x === id || dockMenuItems.includes(x));
+    setDockMenuItems(next);
+    saveSetting("nectar-dock-menu-items", JSON.stringify(next));
+  };
+
+  const changeDockIndicator = (value: string) => {
+    setDockIndicator(value);
+    saveSetting("nectar-dock-indicator", value);
   };
 
   const changeWeekStart = (value: string) => {
@@ -1330,6 +1358,10 @@ export function useSettings() {
     toggleDockDrive,
     weekStart,
     changeWeekStart,
+    dockIndicator,
+    changeDockIndicator,
+    dockMenuItems,
+    toggleDockMenuItem,
     hiddenDockApps,
     restoreHiddenDockApp,
     dockIconOnly,

@@ -19,6 +19,8 @@ import {
 import type { SettingsTab } from "./settings/index";
 import { initTheme } from "./theme";
 import { useT } from "./i18n";
+import { SettingsSearchBox, SearchResults, useSearchHits } from "./settings/SettingsSearch";
+import type { SearchEntry } from "./settings/searchIndex";
 import "./Settings.css";
 
 const appWindow = getCurrentWebviewWindow();
@@ -35,7 +37,40 @@ const TABS: { id: SettingsTab; labelKey: string; icon: typeof Settings }[] = [
 function SettingsApp() {
   const t = useT();
   const [activeTab, setActiveTab] = useState<SettingsTab>("general");
+  const [query, setQuery] = useState("");
+  const [pending, setPending] = useState<string | null>(null);
   const settings = useSettings();
+  const hits = useSearchHits(query);
+
+  const pick = (entry: SearchEntry) => {
+    setQuery("");
+    setActiveTab(entry.tab);
+    setPending(entry.key.startsWith("tabs.") ? null : entry.key);
+  };
+
+  useEffect(() => {
+    if (!pending) return;
+    const label = t(pending);
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries++;
+      window.dispatchEvent(new Event("nectar-settings-reveal"));
+      const row = Array.from(document.querySelectorAll<HTMLElement>(".setting-item, .setting-section-header")).find(
+        (el) => (el.querySelector(".setting-label") ?? el.querySelector("span"))?.textContent?.trim() === label
+      );
+      if (row) {
+        clearInterval(timer);
+        row.scrollIntoView({ block: "center", behavior: "smooth" });
+        row.classList.add("setting-flash");
+        setTimeout(() => row.classList.remove("setting-flash"), 1800);
+        setPending(null);
+      } else if (tries > 20) {
+        clearInterval(timer);
+        setPending(null);
+      }
+    }, 80);
+    return () => clearInterval(timer);
+  }, [pending, activeTab]);
 
   useEffect(() => {
     return initTheme();
@@ -82,6 +117,7 @@ function SettingsApp() {
 
       <div className="settings-body">
         <div className="settings-sidebar">
+          <SettingsSearchBox query={query} setQuery={setQuery} onEnter={() => hits[0] && pick(hits[0])} />
           {TABS.map(({ id, labelKey, icon: Icon }) => (
             <button
               key={id}
@@ -97,7 +133,8 @@ function SettingsApp() {
         </div>
 
         <div className="settings-content">
-          {activeTab === "general" && (
+          {query.trim() && <SearchResults hits={hits} query={query} onPick={pick} />}
+          {!query.trim() && activeTab === "general" && (
             <GeneralTab
               autostart={settings.autostart}
               weekStart={settings.weekStart}
@@ -120,7 +157,7 @@ function SettingsApp() {
               quitNectar={settings.quitNectar}
             />
           )}
-          {activeTab === "appearance" && (
+          {!query.trim() && activeTab === "appearance" && (
             <AppearanceTab
               themeMode={settings.themeMode}
               handleThemeModeChange={settings.handleThemeModeChange}
@@ -146,8 +183,8 @@ function SettingsApp() {
               handleScaleChange={settings.handleScaleChange}
             />
           )}
-          {activeTab === "calendar-sync" && <CalendarSyncPage onBack={() => setActiveTab("notch")} />}
-          {activeTab === "notch" && (
+          {!query.trim() && activeTab === "calendar-sync" && <CalendarSyncPage onBack={() => setActiveTab("notch")} />}
+          {!query.trim() && activeTab === "notch" && (
             <NotchTab
               onOpenCalendarSync={() => setActiveTab("calendar-sync")}
               notchMode={settings.notchMode}
@@ -223,7 +260,7 @@ function SettingsApp() {
               hasBattery={settings.hasBattery}
             />
           )}
-          {activeTab === "dock" && (
+          {!query.trim() && activeTab === "dock" && (
             <DockTab
               dockEnabled={settings.dockEnabled}
               toggleDock={settings.toggleDock}
@@ -256,6 +293,10 @@ function SettingsApp() {
               toggleDockDrive={settings.toggleDockDrive}
               hiddenDockApps={settings.hiddenDockApps}
               restoreHiddenDockApp={settings.restoreHiddenDockApp}
+              dockIndicator={settings.dockIndicator}
+              changeDockIndicator={settings.changeDockIndicator}
+              dockMenuItems={settings.dockMenuItems}
+              toggleDockMenuItem={settings.toggleDockMenuItem}
               dockIconOnly={settings.dockIconOnly}
               toggleDockIconOnly={settings.toggleDockIconOnly}
               dockAdaptive={settings.dockAdaptive}
@@ -276,7 +317,7 @@ function SettingsApp() {
               replaceDockModes={settings.replaceDockModesByMonitor}
             />
           )}
-          {activeTab === "overlays" && (
+          {!query.trim() && activeTab === "overlays" && (
             <OverlaysTab
               volumeOverlayEnabled={settings.volumeOverlayEnabled}
               toggleVolumeOverlay={settings.toggleVolumeOverlay}
@@ -288,7 +329,7 @@ function SettingsApp() {
               toggleBrightnessEdge={settings.toggleBrightnessEdge}
             />
           )}
-          {activeTab === "about" && (
+          {!query.trim() && activeTab === "about" && (
             <AboutTab
               appVersion={settings.appVersion}
               autoUpdate={settings.autoUpdate}

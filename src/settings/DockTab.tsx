@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent, CSSProperties } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Monitor, Eye, EyeOff, BellDot, Square, Search, Shuffle, MonitorCheck, CalendarDays, Maximize2, Keyboard, Sparkles, RotateCcw, LayoutGrid, Trash2, HardDrive, ChevronUp, TextSearch, SquareTerminal } from "lucide-react";
+import { Monitor, Eye, EyeOff, BellDot, Square, Search, Shuffle, MonitorCheck, CalendarDays, Maximize2, Keyboard, Sparkles, RotateCcw, LayoutGrid, Trash2, HardDrive, ChevronUp, TextSearch, SquareTerminal, PanelBottom, Settings as SettingsIcon, Activity, Eraser, Power } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { SettingSection } from "./SettingSection";
 import { Dropdown } from "./Dropdown";
@@ -72,6 +72,10 @@ interface DockTabProps {
   toggleDockDrive: (letter: string) => void;
   hiddenDockApps: { id: string; name: string }[];
   restoreHiddenDockApp: (id: string) => void;
+  dockIndicator: string;
+  changeDockIndicator: (value: string) => void;
+  dockMenuItems: string[];
+  toggleDockMenuItem: (id: string) => void;
   dockIconOnly: boolean;
   toggleDockIconOnly: () => void;
   dockAdaptive: boolean;
@@ -124,6 +128,10 @@ export function DockTab({
   toggleDockDrive,
   hiddenDockApps,
   restoreHiddenDockApp,
+  dockIndicator,
+  changeDockIndicator,
+  dockMenuItems,
+  toggleDockMenuItem,
   dockIconOnly,
   toggleDockIconOnly,
   dockAdaptive,
@@ -377,12 +385,42 @@ export function DockTab({
             </SettingSection>
           )}
 
+          <SettingSection id="dock-menu" title={t("dock.menu.title")}>
+            {([
+              ["calendar", CalendarDays, "dockmenu.openCalendar"],
+              ["settings", SettingsIcon, "dockmenu.openSettings"],
+              ["taskmgr", Activity, "dockmenu.taskManager"],
+              ["restart", RotateCcw, "general.restart"],
+              ["clearicons", Eraser, "dockmenu.clearIconCache"],
+              ["quit", Power, "general.quit"],
+            ] as const).map(([id, Icon, labelKey]) => (
+              <SettingRow key={id} icon={Icon} label={t(labelKey)}>
+                <label className="toggle-switch">
+                  <input type="checkbox" checked={dockMenuItems.includes(id)} onChange={() => toggleDockMenuItem(id)} />
+                  <span className="slider"></span>
+                </label>
+              </SettingRow>
+            ))}
+          </SettingSection>
+
           <SettingSection id="dock-style" title={t("dock.section.style")}>
             <SettingRow icon={Square} label={t("dock.iconOnly")} desc={t("dock.iconOnly.desc")}>
               <label className="toggle-switch">
                 <input type="checkbox" checked={dockIconOnly} onChange={toggleDockIconOnly} />
                 <span className="slider"></span>
               </label>
+            </SettingRow>
+
+            <SettingRow icon={PanelBottom} label={t("dock.indicator")} desc={t("dock.indicator.desc")}>
+              <Dropdown
+                value={dockIndicator}
+                options={[
+                  { value: "bar", label: t("dock.indicator.bar") },
+                  { value: "fixed", label: t("dock.indicator.fixed") },
+                  { value: "dots", label: t("dock.indicator.dots") },
+                ]}
+                onChange={changeDockIndicator}
+              />
             </SettingRow>
 
             <SettingRow icon={Keyboard} label={t("dock.winNumber")} desc={t("dock.winNumber.desc")}>

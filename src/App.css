@@ -1509,7 +1509,7 @@ img {
     opacity: 0.72;
 }
 
-/* Gradient overlay to smoothly fade the image to the notch's background color without using buggy WebView2 mask-image */
+/* Gradient overlay that dims the glow toward the edges without using buggy WebView2 mask-image; it never goes fully opaque, so no dark band is left along the rounded corners */
 .notch-ambient-glow::after {
     content: "";
     position: absolute;
@@ -1517,7 +1517,7 @@ img {
     left: 0;
     right: 0;
     bottom: 0;
-    background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.3) 20%, rgba(0, 0, 0, 0.5) 50%, var(--notch-bg) 85%);
+    background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.28) 20%, rgba(0, 0, 0, 0.46) 60%, rgba(0, 0, 0, 0.58) 100%);
     pointer-events: none;
     z-index: 1;
 }

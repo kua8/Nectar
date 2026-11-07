@@ -94,7 +94,7 @@ body {
   position: absolute;
   bottom: calc(100% + 20px);
   left: 50%;
-  transform: translateX(-50%) !important;
+  transform: translateX(calc(-50% + var(--pv-shift, 0px))) !important;
   background: rgba(22, 22, 26, 0.82);
   backdrop-filter: blur(28px) saturate(1.4);
   -webkit-backdrop-filter: blur(28px) saturate(1.4);
@@ -555,6 +555,18 @@ body {
 
 .window-dots.multi .active-indicator {
   width: 20px;
+}
+
+.window-dots.dots {
+  gap: 3px;
+}
+
+.window-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--nectar-highlight, white);
+  box-shadow: 0 0 4px var(--nectar-highlight, rgba(255, 255, 255, 0.6));
 }
 
 /* An app flashed for attention (a dot) or shows an unread count in its title (the number) */
