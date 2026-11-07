@@ -21,8 +21,8 @@ export const SEARCH_ENTRIES: SearchEntry[] = [
   ...group("notch", [
     "notch.behavior", "notch.calendar", "notch.calendarSync", "notch.timer", "notch.timerSound", "notch.timerProgress",
     "notch.stopwatch", "notch.dualClock", "notch.musicMode", "notch.compactMode", "notch.mediaLayout", "notch.artworkTheme",
-    "notch.ambientGlow", "notch.compactGlow", "notch.panelControlCenter", "notch.panelShelf", "notch.rememberMode",
-    "notch.panelOrder", "notch.agentApi", "notch.agentSounds", "notch.scrollVolume", "notch.shelfPersist", "notch.weather",
+    "notch.ambientGlow", "notch.compactGlow", "notch.panelControlCenter", "notch.panelShelf", "notch.panelStatus", "notch.rememberMode",
+    "notch.panelOrder", "notch.scrollDirection", "notch.agentApi", "notch.agentSounds", "notch.scrollVolume", "notch.shelfPersist", "notch.weather",
     "notch.hotkey", "notch.netWidget", "notch.edgeDelay", "notch.widgets.group", "notch.ccTiles", "notch.ccButtons", "notch.ccSliders",
   ]),
   ...group("dock", [
@@ -75,6 +75,7 @@ export const KEYWORDS: Record<string, string> = {
   "notch.musicMode": "spotify media player song cover",
   "notch.weather": "temperature forecast city location",
   "notch.timer": "countdown pomodoro alarm",
+  "notch.scrollDirection": "mouse wheel reverse invert natural scroll switch panels up down",
   "overlays.volume": "sound audio slider hud",
   "overlays.brightness": "screen light slider hud",
   "about.reset": "factory default restore erase",

@@ -227,6 +227,8 @@ function SettingsApp() {
               toggleArtworkTheme={settings.toggleArtworkTheme}
               agentApi={settings.agentApi}
               toggleAgentApi={settings.toggleAgentApi}
+              panelScrollDirection={settings.panelScrollDirection}
+              changePanelScrollDirection={settings.changePanelScrollDirection}
               notchScrollVolume={settings.notchScrollVolume}
               toggleNotchScrollVolume={settings.toggleNotchScrollVolume}
               shelfPersist={settings.shelfPersist}
@@ -237,6 +239,8 @@ function SettingsApp() {
               togglePanelControlCenter={settings.togglePanelControlCenter}
               panelShelf={settings.panelShelf}
               togglePanelShelf={settings.togglePanelShelf}
+              panelStatus={settings.panelStatus}
+              togglePanelStatus={settings.togglePanelStatus}
               panelOrder={settings.panelOrder}
               reorderPanels={settings.reorderPanels}
               resetPanelOrder={settings.resetPanelOrder}

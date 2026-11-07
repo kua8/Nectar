@@ -1335,6 +1335,8 @@ const Dock = memo(function Dock() {
     return `${item.is_running ? 1 : 0}:${item.all_hwnds?.map(([h]) => h).join(",") ?? item.hwnd ?? ""}`;
   }, [hoveredApp, dockItems]);
 
+  const previewOrderRef = useRef(new Map<number, number>());
+
   useEffect(() => {
     if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
     isPreviewHoveredRef.current = false;
@@ -1367,8 +1369,12 @@ const Dock = memo(function Dock() {
 
             const captured = results
               .filter((r): r is { hwnd: number, title: string, image: string, lastFocused: number } => r !== null)
-              .sort((a, b) => b.lastFocused - a.lastFocused)
               .map(({ hwnd, title, image }) => ({ hwnd, title, image }));
+            const order = previewOrderRef.current;
+            for (const c of [...captured].sort((a, b) => a.hwnd - b.hwnd)) {
+              if (!order.has(c.hwnd)) order.set(c.hwnd, order.size);
+            }
+            captured.sort((a, b) => (order.get(a.hwnd) ?? 0) - (order.get(b.hwnd) ?? 0));
             const sized = await Promise.all(captured.map(async (c) => ({ ...c, ratio: await imageRatio(c.image) })));
 
             const currentHovered = hoveredAppRef.current;

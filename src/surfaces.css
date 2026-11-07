@@ -40,6 +40,10 @@
     stroke-linejoin: round;
 }
 
+:root.style-solid {
+    --surface-outline: transparent;
+}
+
 :root.light-mode {
     --surface-outline: rgba(0, 0, 0, 0.14);
 }
@@ -49,6 +53,11 @@
 }
 
 :root:is(.style-frosted, .style-liquid, .style-material, .light-mode) .edge-outline {
+    display: block;
+}
+
+/* The notch measures its shape through this element, so it has to be laid out in every style */
+.nectar > .edge-outline {
     display: block;
 }
 
@@ -79,6 +88,23 @@
 .brightness-notch::before,
 .brightness-notch::after {
     background: var(--nectar-bg, rgba(0, 0, 0, 0.8)) !important;
+}
+
+/* Solid and Material notch: the plain fill is also drawn by the shape, so the flares and the album glow are part of it */
+:root:not(.style-frosted, .style-liquid) .nectar {
+    isolation: isolate;
+    background: transparent !important;
+}
+
+:root:not(.style-frosted, .style-liquid) .nectar::before,
+:root:not(.style-frosted, .style-liquid) .nectar::after {
+    display: none !important;
+}
+
+:root:not(.style-frosted, .style-liquid) .nectar > .surface-fill {
+    display: block;
+    background-color: var(--notch-bg, var(--nectar-bg, rgba(0, 0, 0, 0.8)));
+    transition: background-color 0.3s ease;
 }
 
 /* ── Glass: the fill layer carries everything, the surface itself is clear ── */

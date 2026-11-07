@@ -14,6 +14,7 @@ import {
   Inbox,
   History,
   ListOrdered,
+  ArrowDownUp,
   SlidersHorizontal,
   Minimize2,
   LayoutList,
@@ -96,6 +97,8 @@ interface NotchTabProps {
   toggleArtworkTheme: () => void;
   agentApi: boolean;
   toggleAgentApi: () => void;
+  panelScrollDirection: string;
+  changePanelScrollDirection: (value: string) => void;
   notchScrollVolume: boolean;
   toggleNotchScrollVolume: () => void;
   shelfPersist: boolean;
@@ -106,6 +109,8 @@ interface NotchTabProps {
   togglePanelControlCenter: () => void;
   panelShelf: boolean;
   togglePanelShelf: () => void;
+  panelStatus: boolean;
+  togglePanelStatus: () => void;
   panelOrder: PanelId[] | null;
   reorderPanels: (order: PanelId[]) => void;
   resetPanelOrder: () => void;
@@ -171,6 +176,8 @@ export function NotchTab({
   toggleArtworkTheme,
   agentApi,
   toggleAgentApi,
+  panelScrollDirection,
+  changePanelScrollDirection,
   notchScrollVolume,
   toggleNotchScrollVolume,
   shelfPersist,
@@ -181,6 +188,8 @@ export function NotchTab({
   togglePanelControlCenter,
   panelShelf,
   togglePanelShelf,
+  panelStatus,
+  togglePanelStatus,
   panelOrder,
   reorderPanels,
   resetPanelOrder,
@@ -416,6 +425,13 @@ export function NotchTab({
               </label>
             </SettingRow>
 
+        <SettingRow icon={Activity} label={t("notch.panelStatus")} desc={t("notch.panelStatus.desc")}>
+              <label className="toggle-switch">
+                <input type="checkbox" checked={panelStatus} onChange={togglePanelStatus} />
+                <span className="slider"></span>
+              </label>
+            </SettingRow>
+
         <SettingRow icon={Inbox} label={t("notch.panelShelf")} desc={t("notch.panelShelf.desc")}>
               <label className="toggle-switch">
                 <input type="checkbox" checked={panelShelf} onChange={togglePanelShelf} />
@@ -429,6 +445,17 @@ export function NotchTab({
                 <span className="slider"></span>
               </label>
             </SettingRow>
+
+        <SettingRow icon={ArrowDownUp} label={t("notch.scrollDirection")} desc={t("notch.scrollDirection.desc")}>
+          <Dropdown
+            value={panelScrollDirection}
+            options={[
+              { value: "down", label: t("notch.scrollDirection.down") },
+              { value: "up", label: t("notch.scrollDirection.up") },
+            ]}
+            onChange={changePanelScrollDirection}
+          />
+        </SettingRow>
 
         <SettingRow icon={ListOrdered} label={t("notch.panelOrder")} desc={t("notch.panelOrder.desc")} divider={false} stacked>
           <OrderList

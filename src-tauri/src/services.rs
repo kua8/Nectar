@@ -1836,9 +1836,17 @@ pub fn now_ms() -> i64 {
 /// the way even if the capture window isn't recognised as fullscreen.
 unsafe extern "system" fn capture_ui_enum_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
     use windows::Win32::UI::WindowsAndMessaging::IsIconic;
+    use windows::Win32::UI::WindowsAndMessaging::GetWindowRect;
     let found = &mut *(lparam.0 as *mut bool);
     if *found { return BOOL(0); }
     if !IsWindowVisible(hwnd).as_bool() || IsIconic(hwnd).as_bool() { return BOOL(1); }
+
+    let mut rect = windows::Win32::Foundation::RECT::default();
+    let covers_monitor = GetWindowRect(hwnd, &mut rect).is_ok()
+        && monitor_rect_for_hwnd(hwnd).is_some_and(|(_, _, mw, mh)| {
+            (rect.right - rect.left) * 10 >= mw * 9 && (rect.bottom - rect.top) * 10 >= mh * 9
+        });
+    if !covers_monitor { return BOOL(1); }
 
     let mut pid = 0u32;
     GetWindowThreadProcessId(hwnd, Some(&mut pid));

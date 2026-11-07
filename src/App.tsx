@@ -728,10 +728,12 @@ function App() {
   const [settingsMusicModeEnabled, setSettingsMusicModeEnabled] = useState(() => localStorage.getItem("nectar-music-mode-enabled") !== "false");
   const [settingsMusicCompactNotch, setSettingsMusicCompactNotch] = useState(() => localStorage.getItem("nectar-music-compact-notch") !== "false");
   const [settingsScrollVolume, setSettingsScrollVolume] = useState(() => localStorage.getItem("nectar-notch-scroll-volume") === "true");
+  const [reversePanelScroll, setReversePanelScroll] = useState(() => localStorage.getItem("nectar-notch-scroll-direction") === "up");
   const [settingsShelfPersist, setSettingsShelfPersist] = useState(() => localStorage.getItem("nectar-shelf-persist") === "true");
   const [settingsRememberMode, setSettingsRememberMode] = useState(() => localStorage.getItem("nectar-notch-remember-mode") === "true");
   const [panelControlCenter, setPanelControlCenter] = useState(() => localStorage.getItem("nectar-panel-control-center-enabled") !== "false");
   const [panelShelf, setPanelShelf] = useState(() => localStorage.getItem("nectar-panel-shelf-enabled") !== "false");
+  const [panelStatus, setPanelStatus] = useState(() => localStorage.getItem("nectar-panel-status-enabled") !== "false");
   const [panelOrder, setPanelOrder] = useState(() => parsePanelOrder(localStorage.getItem("nectar-panel-order")));
   const [ccLayout, setCcLayout] = useState(() => parseCcLayout(localStorage.getItem("nectar-cc-layout")));
   const ccResolved = resolveCcLayout(ccLayout);
@@ -818,6 +820,7 @@ function App() {
       setSettingsCornersEnabled(getVal("nectar-corners-enabled", "false") === "true");
       setTimeFormat24h(getVal("nectar-time-format-24h") === "true");
       setSettingsLegacyMode(getVal("nectar-legacy-mode") === "true");
+      setReversePanelScroll(getVal("nectar-notch-scroll-direction") === "up");
       const scrollVolume = getVal("nectar-notch-scroll-volume") === "true";
       localStorage.setItem("nectar-notch-scroll-volume", String(scrollVolume));
       setSettingsScrollVolume(scrollVolume);
@@ -963,10 +966,12 @@ function App() {
       "nectar-music-mode-enabled": setSettingsMusicModeEnabled,
       "nectar-music-compact-notch": setSettingsMusicCompactNotch,
       "nectar-notch-scroll-volume": setSettingsScrollVolume,
+      "nectar-notch-scroll-direction": (v) => setReversePanelScroll(v === "up"),
       "nectar-shelf-persist": setSettingsShelfPersist,
       "nectar-notch-remember-mode": setSettingsRememberMode,
       "nectar-panel-control-center-enabled": (v) => setPanelControlCenter(v !== false && v !== "false"),
       "nectar-panel-shelf-enabled": (v) => setPanelShelf(v !== false && v !== "false"),
+      "nectar-panel-status-enabled": (v) => setPanelStatus(v !== false && v !== "false"),
       "nectar-panel-order": (v) => setPanelOrder(parsePanelOrder(v === null ? null : String(v))),
       "nectar-cc-layout": (v) => setCcLayout(parseCcLayout(v === null ? null : String(v))),
       "nectar-media-visualizer-enabled": setSettingsVisualizerEnabled,
@@ -1175,7 +1180,9 @@ function App() {
       : musicBeforeStatus
         ? ['command-center', 'music', 'status', 'calendar', 'shelf']
         : ['command-center', 'status', 'music', 'calendar', 'shelf'];
+    const noStatusWidgets = !panelStatus || statusWidgets.left.length + statusWidgets.right.length === 0;
     return modes.filter(m => {
+      if (m === 'status' && noStatusWidgets && nectarMode !== 'status') return false;
       if (m === 'music' && (!settingsMusicModeEnabled || !mediaInfo.has_media)) return false;
       if (m === 'calendar' && !productivityEnabled) return false;
       if (m === 'shelf' && (!isNotchWindow || settingsLegacyMode || !panelShelf)) return false;
@@ -1200,7 +1207,7 @@ function App() {
     wheelIdleTimeoutRef.current = setTimeout(() => { wheelAccumRef.current = 0; }, WHEEL_IDLE_RESET_MS);
 
     if (Math.abs(wheelAccumRef.current) < WHEEL_STEP_THRESHOLD) return;
-    const direction = wheelAccumRef.current > 0 ? 1 : -1;
+    const direction = (wheelAccumRef.current > 0 ? 1 : -1) * (reversePanelScroll ? -1 : 1);
     wheelAccumRef.current = 0;
 
     const availableModes = availableNotchModes();
@@ -2146,32 +2153,6 @@ function App() {
       >
         {widgetTip && isHovered && <div className="widget-tip">{widgetTip}</div>}
 
-
-
-        <AnimatePresence>
-          {isMusicMode && settingsAmbienceEnabled && !settingsArtworkTheme && albumArtUrl && isHovered && !isCalendarMode && (
-            <motion.div
-              className="notch-ambient-glow"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-            >
-              <AnimatePresence mode="wait">
-                <motion.img
-                  key={albumArtUrl}
-                  src={albumArtUrl}
-                  alt=""
-                  draggable={false}
-                  initial={{ opacity: 0, scale: 1.1 }}
-                  animate={{ opacity: 1, scale: 1.8 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.3 }}
-                />
-              </AnimatePresence>
-            </motion.div>
-          )}
-        </AnimatePresence>
         <AnimatePresence mode="wait">
           {isExpanded && (
             <motion.div
@@ -2921,7 +2902,32 @@ function App() {
           )}
         </AnimatePresence>
 
-        <SurfaceShape edge="top" flare={isImpacted ? 13 : 0} radius={isCalendarMode ? 28 : 18} edgeRadius={18} />
+        <SurfaceShape edge="top" flare={isImpacted ? 13 : 0} radius={isCalendarMode ? 28 : 18} edgeRadius={18}>
+            <AnimatePresence>
+              {isMusicMode && settingsAmbienceEnabled && !settingsArtworkTheme && albumArtUrl && isHovered && !isCalendarMode && (
+                <motion.div
+                  className="notch-ambient-glow"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  <AnimatePresence mode="wait">
+                    <motion.img
+                      key={albumArtUrl}
+                      src={albumArtUrl}
+                      alt=""
+                      draggable={false}
+                      initial={{ opacity: 0, scale: 1.1 }}
+                      animate={{ opacity: 1, scale: 1.8 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.3 }}
+                    />
+                  </AnimatePresence>
+                </motion.div>
+              )}
+            </AnimatePresence>
+        </SurfaceShape>
 
         {showTimerProgressBar && (
           <NotchProgressBorder

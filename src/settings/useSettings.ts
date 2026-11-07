@@ -156,6 +156,9 @@ export function useSettings() {
   const [ccLayout, setCcLayout] = useState<CcLayout>(
     () => parseCcLayout(localStorage.getItem("nectar-cc-layout"))
   );
+  const [panelStatus, setPanelStatus] = useState(
+    () => localStorage.getItem("nectar-panel-status-enabled") !== "false"
+  );
   const [panelShelf, setPanelShelf] = useState(
     () => localStorage.getItem("nectar-panel-shelf-enabled") !== "false"
   );
@@ -167,6 +170,7 @@ export function useSettings() {
   );
   const [dockMenuItems, setDockMenuItems] = useState<string[]>(() => parseMenuItems(localStorage.getItem("nectar-dock-menu-items")));
   const [dockIndicator, setDockIndicator] = useState(() => localStorage.getItem("nectar-dock-indicator") ?? "bar");
+  const [panelScrollDirection, setPanelScrollDirection] = useState(() => localStorage.getItem("nectar-notch-scroll-direction") ?? "down");
   const [weekStart, setWeekStart] = useState(() => localStorage.getItem("nectar-week-start") ?? "auto");
   const [dockDrives, setDockDrives] = useState<string[]>(() => parseDrives(localStorage.getItem("nectar-dock-drives")));
   const [hiddenDockApps, setHiddenDockApps] = useState<HiddenDockApp[]>(() => parseHiddenApps(localStorage.getItem("nectar-dock-hidden-apps")));
@@ -307,10 +311,12 @@ export function useSettings() {
       apply(getVal("nectar-dock-show-desktop-corner"), setDockShowDesktop, readBool);
       apply(getVal("nectar-panel-control-center-enabled"), setPanelControlCenter, (v) => v !== "false");
       apply(getVal("nectar-panel-shelf-enabled"), setPanelShelf, (v) => v !== "false");
+      apply(getVal("nectar-panel-status-enabled"), setPanelStatus, (v) => v !== "false");
       apply(getVal("nectar-panel-order"), setPanelOrder, (v) => parsePanelOrder(v));
       apply(getVal("nectar-cc-layout"), setCcLayout, (v) => parseCcLayout(v));
       apply(getVal("nectar-dock-recycle-enabled"), setDockRecycle, readBool);
       apply(getVal("nectar-week-start"), setWeekStart, (v) => v ?? "auto");
+      apply(getVal("nectar-notch-scroll-direction"), setPanelScrollDirection, (v) => v);
       apply(getVal("nectar-dock-indicator"), setDockIndicator, (v) => v);
       apply(getVal("nectar-dock-menu-items"), setDockMenuItems, parseMenuItems);
       apply(getVal("nectar-dock-drives"), setDockDrives, parseDrives);
@@ -418,10 +424,12 @@ export function useSettings() {
     "nectar-dock-show-desktop-corner": setDockShowDesktop,
     "nectar-panel-control-center-enabled": (v) => setPanelControlCenter(v !== false && v !== "false"),
     "nectar-panel-shelf-enabled": (v) => setPanelShelf(v !== false && v !== "false"),
+    "nectar-panel-status-enabled": (v) => setPanelStatus(v !== false && v !== "false"),
     "nectar-panel-order": (v) => setPanelOrder(parsePanelOrder(v === null ? null : String(v))),
     "nectar-cc-layout": (v) => setCcLayout(parseCcLayout(v === null ? null : String(v))),
     "nectar-dock-recycle-enabled": setDockRecycle,
     "nectar-week-start": (v) => setWeekStart(String(v)),
+    "nectar-notch-scroll-direction": (v) => setPanelScrollDirection(String(v)),
     "nectar-dock-indicator": (v) => setDockIndicator(String(v)),
     "nectar-dock-menu-items": (v) => setDockMenuItems(parseMenuItems(v)),
     "nectar-dock-drives": (v) => setDockDrives(parseDrives(v)),
@@ -852,6 +860,12 @@ export function useSettings() {
     invoke("save_setting", { key: "nectar-panel-order", value: null }).catch(() => {});
   };
 
+  const togglePanelStatus = () => {
+    const next = !panelStatus;
+    setPanelStatus(next);
+    saveSetting("nectar-panel-status-enabled", String(next));
+  };
+
   const togglePanelShelf = () => {
     const next = !panelShelf;
     setPanelShelf(next);
@@ -885,6 +899,11 @@ export function useSettings() {
   const changeDockIndicator = (value: string) => {
     setDockIndicator(value);
     saveSetting("nectar-dock-indicator", value);
+  };
+
+  const changePanelScrollDirection = (value: string) => {
+    setPanelScrollDirection(value);
+    saveSetting("nectar-notch-scroll-direction", value);
   };
 
   const changeWeekStart = (value: string) => {
@@ -1346,6 +1365,8 @@ export function useSettings() {
     togglePanelControlCenter,
     panelShelf,
     togglePanelShelf,
+    panelStatus,
+    togglePanelStatus,
     panelOrder,
     reorderPanels,
     resetPanelOrder,
@@ -1358,6 +1379,8 @@ export function useSettings() {
     toggleDockDrive,
     weekStart,
     changeWeekStart,
+    panelScrollDirection,
+    changePanelScrollDirection,
     dockIndicator,
     changeDockIndicator,
     dockMenuItems,
