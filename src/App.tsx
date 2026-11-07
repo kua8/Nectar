@@ -2457,7 +2457,7 @@ function App() {
                               <div
                                 className="time-flip-container"
                                 onClick={cycleNotchMode}
-                                style={batteryLow ? { minWidth: Math.max(96, dualClockSize?.main ?? 0) } : dualClockSize ? { minWidth: dualClockSize.main } : undefined}
+                                style={batteryLow ? { minWidth: Math.max(96, Math.ceil(t("battery.low").length * 10), dualClockSize?.main ?? 0) } : dualClockSize ? { minWidth: dualClockSize.main } : undefined}
                               >
                                 <AnimatePresence initial={false}>
                                   {isCompactTimerVisible || isTimerFinished ? (
