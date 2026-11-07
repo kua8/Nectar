@@ -59,6 +59,22 @@ fn task_exists() -> bool {
     schtasks(&["/query", "/tn", TASK_NAME])
 }
 
+fn is_build_output() -> bool {
+    cfg!(debug_assertions) || std::env::current_exe().is_ok_and(|p| p.components().any(|c| c.as_os_str() == "target"))
+}
+
+fn task_command() -> Option<String> {
+    let out = Command::new("schtasks")
+        .args(["/query", "/tn", TASK_NAME, "/xml"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .ok()?;
+    let text = String::from_utf8_lossy(&out.stdout).into_owned();
+    let start = text.find("<Command>")? + "<Command>".len();
+    let end = text[start..].find("</Command>")? + start;
+    Some(text[start..end].replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">"))
+}
+
 fn create_task() -> bool {
     let Ok(exe) = std::env::current_exe() else { return false };
     let user = format!(
@@ -108,6 +124,9 @@ pub fn is_enabled(app: &AppHandle) -> bool {
 }
 
 pub fn set_enabled(app: &AppHandle, on: bool) -> Result<(), String> {
+    if is_build_output() {
+        return Ok(());
+    }
     let launcher = app.autolaunch();
     if on {
         if create_task() {
@@ -123,6 +142,15 @@ pub fn set_enabled(app: &AppHandle, on: bool) -> Result<(), String> {
 }
 
 pub fn migrate(app: &AppHandle) {
+    if is_build_output() {
+        return;
+    }
+    if let (Some(command), Ok(exe)) = (task_command(), std::env::current_exe()) {
+        if !command.eq_ignore_ascii_case(&exe.to_string_lossy()) && create_task() {
+            crate::diagnostics::log("startup: pointed the logon task at this Nectar");
+        }
+        return;
+    }
     let launcher = app.autolaunch();
     if launcher.is_enabled().unwrap_or(false) && !task_exists() && create_task() {
         let _ = launcher.disable();
