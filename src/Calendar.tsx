@@ -9,6 +9,7 @@ import { WindowControls } from "./components/WindowControls";
 import { initTheme } from "./theme";
 import { useCaldav, type CalEvent } from "./hooks/useCaldav";
 import { dateLocale, timeAgo, useT, weekdayNames } from "./i18n";
+import { daysSinceWeekStart, useWeekStart } from "./weekStart";
 import "./Calendar.css";
 
 type View = "day" | "week" | "month" | "agenda";
@@ -70,6 +71,7 @@ function colorStyle(e: CalEvent): React.CSSProperties {
 
 function CalendarWindow() {
   const t = useT();
+  const weekStart = useWeekStart();
   const state = useCaldav();
   const today = startOfDay(new Date());
   const [view, setViewState] = useState<View>(readView);
@@ -145,7 +147,7 @@ function CalendarWindow() {
 
   let title: string;
   if (view === "week") {
-    const first = addDays(anchor, -anchor.getDay());
+    const first = addDays(anchor, -daysSinceWeekStart(anchor, weekStart));
     const last = addDays(first, 6);
     const fmt = (d: Date) => d.toLocaleDateString(dateLocale(), { month: "short", day: "numeric" });
     title = `${fmt(first)} – ${first.getMonth() === last.getMonth() ? last.getDate() : fmt(last)}`;
@@ -309,8 +311,9 @@ const CARD_WIDTH = 236;
 
 function MonthView({ anchor, today, events, time, onSelect, onOpen }: MonthProps) {
   const t = useT();
+  const weekStart = useWeekStart();
   const first = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
-  const gridStart = addDays(first, -first.getDay());
+  const gridStart = addDays(first, -daysSinceWeekStart(first, weekStart));
   const days = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
 
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -351,7 +354,7 @@ function MonthView({ anchor, today, events, time, onSelect, onOpen }: MonthProps
   return (
     <div ref={wrapRef} className="cw-month">
       <div className="cw-dow">
-        {weekdayNames("short").map((d) => (
+        {weekdayNames("short", weekStart).map((d) => (
           <div key={d}>{d}</div>
         ))}
       </div>
@@ -430,7 +433,8 @@ function MonthView({ anchor, today, events, time, onSelect, onOpen }: MonthProps
 
 function WeekView({ anchor, today, events, time, onOpen }: { anchor: Date; today: Date; events: CalEvent[]; time: (ms: number) => string; onOpen: (d: Date) => void }) {
   const t = useT();
-  const first = addDays(anchor, -anchor.getDay());
+  const weekStart = useWeekStart();
+  const first = addDays(anchor, -daysSinceWeekStart(anchor, weekStart));
   return (
     <div className="cw-week">
       {Array.from({ length: 7 }, (_, i) => {

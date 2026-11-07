@@ -1048,10 +1048,14 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                                                 art_attempts = (track_key, 0);
                                             }
                                             if let Some((ref last_title, ref last_artist, _, _, ref last_art, _, _)) = last_emitted_info {
-                                                // A track whose artwork failed to load is retried a few times, the player may not have it ready yet
-                                                if last_title == &title && last_artist == &artist && (last_art.is_some() || art_attempts.1 >= 8) {
+                                                // A track whose artwork failed to load is retried every poll at first, then every 15th poll, the player may not have it ready yet
+                                                let retry_due = art_attempts.1 < 8 || (art_attempts.1 - 8) % 15 == 0;
+                                                if last_title == &title && last_artist == &artist && (last_art.is_some() || !retry_due) {
                                                     artwork = last_art.as_ref().map(|art| vec![art.clone()]);
                                                     got_art_from_cache = true;
+                                                    if last_art.is_none() {
+                                                        art_attempts.1 += 1;
+                                                    }
                                                 }
                                             }
 
@@ -3287,11 +3291,13 @@ pub unsafe extern "system" fn enum_windows_proc(hwnd: HWND, lparam: LPARAM) -> B
                     }
 
                     if (lowercase_path.contains("nectar.exe") && title != "Settings") ||
-                       lowercase_path.contains("conhost.exe") ||
+                       (lowercase_path.contains("conhost.exe")
+                           && !(window_class == "ConsoleWindowClass" && crate::utils::setting_flag("nectar-dock-console-windows"))) ||
                        (lowercase_path.contains("explorer.exe") && !is_explorer_window) ||
                        lowercase_path.contains("shellexperiencehost.exe") ||
                        lowercase_path.contains("searchhost.exe") ||
                        lowercase_path.contains("textinputhost.exe") ||
+                       lowercase_path.ends_with("gamingservicesui.exe") ||
                        (lowercase_path.contains("applicationframehost.exe") && window_class != "ApplicationFrameWindow") {
                         let _ = CloseHandle(process_handle);
                         return true.into();
@@ -3329,7 +3335,9 @@ pub unsafe extern "system" fn enum_windows_proc(hwnd: HWND, lparam: LPARAM) -> B
                     let is_browser_pwa = is_browser_host
                         && window_aumid.as_deref().map_or(false, crate::commands::is_browser_pwa_aumid);
 
-                    let final_name = if ((is_browser_host && (is_browser_pwa || window_aumid.is_none()))
+                    let final_name = if name.eq_ignore_ascii_case("conhost") && !title.is_empty() {
+                        title.clone()
+                    } else if ((is_browser_host && (is_browser_pwa || window_aumid.is_none()))
                         || name == "ApplicationFrameHost"
                         || name == "SystemSettings")
                         && !title.is_empty()

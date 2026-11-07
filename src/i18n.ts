@@ -90,9 +90,9 @@ export function dateLocale(): string {
   return resolve(readPreference());
 }
 
-/** Weekday names starting on Sunday. */
-export function weekdayNames(width: "short" | "narrow"): string[] {
-  return Array.from({ length: 7 }, (_, i) => new Date(2023, 0, 1 + i).toLocaleDateString(dateLocale(), { weekday: width }));
+/** Weekday names starting on the given day (0 is Sunday). */
+export function weekdayNames(width: "short" | "narrow", weekStart = 0): string[] {
+  return Array.from({ length: 7 }, (_, i) => new Date(2023, 0, 1 + ((i + weekStart) % 7)).toLocaleDateString(dateLocale(), { weekday: width }));
 }
 
 export function timeAgo(ms: number | null, translate: (key: string, params?: Record<string, string | number>) => string): string {

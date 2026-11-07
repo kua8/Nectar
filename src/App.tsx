@@ -407,6 +407,7 @@ function App() {
   const prevChargingRef = useRef<boolean | null>(null);
   const powerPulseTimeoutRef = useRef<any>(null);
   const lowBatteryPulseShownRef = useRef<boolean>(false);
+  const batteryLow = hasBattery && !isCharging && batteryLevel <= lowBatteryThreshold;
 
   const [eventPeek, setEventPeek] = useState(false);
   const eventPeekTimeoutRef = useRef<any>(null);
@@ -1407,6 +1408,18 @@ function App() {
 
     const initBattery = async () => {
       try {
+        if (import.meta.env.DEV) {
+          const saved = (await invoke("load_settings").catch(() => ({}))) as Record<string, unknown>;
+          const fake = String(saved["nectar-debug-battery"] ?? "");
+          if (fake) {
+            const [level, charging] = fake.split(",");
+            (window as any).__nectarFakeBattery = true;
+            setBatteryLevel(Number(level) || 0);
+            setIsCharging(charging === "true");
+            setHasBattery(true);
+            return;
+          }
+        }
         battery = await (navigator as any).getBattery();
 
         const updateBattery = () => {
@@ -1488,6 +1501,7 @@ function App() {
     invoke<boolean>("get_bluetooth_state").then(setBluetoothEnabled).catch(() => { });
     invoke<boolean>("get_battery_saver_state").then(setBatterySaverEnabled).catch(() => { });
     invoke<boolean>("has_battery").then((present) => {
+      if ((window as any).__nectarFakeBattery) return;
       setHasBattery(present);
       localStorage.setItem("nectar-has-battery", String(present));
     }).catch(() => { });
@@ -2443,7 +2457,7 @@ function App() {
                               <div
                                 className="time-flip-container"
                                 onClick={cycleNotchMode}
-                                style={dualClockSize ? { minWidth: dualClockSize.main } : undefined}
+                                style={batteryLow ? { minWidth: Math.max(96, dualClockSize?.main ?? 0) } : dualClockSize ? { minWidth: dualClockSize.main } : undefined}
                               >
                                 <AnimatePresence initial={false}>
                                   {isCompactTimerVisible || isTimerFinished ? (
@@ -2458,6 +2472,17 @@ function App() {
                                       {isTimerRunning || isTimerFinished
                                         ? formatTimerTime(timerSeconds)
                                         : <StopwatchReadout base={stopwatch.base} startedAt={stopwatch.startedAt} precise={false} />}
+                                    </motion.span>
+                                  ) : batteryLow ? (
+                                    <motion.span
+                                      key="low-battery"
+                                      className="time low-battery-text"
+                                      initial={{ rotateX: -90, opacity: 0 }}
+                                      animate={{ rotateX: 0, opacity: 1 }}
+                                      exit={{ rotateX: 90, opacity: 0 }}
+                                      transition={{ type: "spring", stiffness: 600, damping: 30 }}
+                                    >
+                                      {t("battery.low")}
                                     </motion.span>
                                   ) : (
                                     <motion.span

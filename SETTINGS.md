@@ -35,6 +35,8 @@ Edit `settings.json` with any text editor while Nectar is running. Changes are a
 | `nectar-dock-taskview-enabled` | `"true"` / `"false"` | `"false"` | Show a Task View button next to the calendar icon (Win+Tab). Hidden in Legacy Mode. |
 | `nectar-dock-show-desktop-corner` | `"true"` / `"false"` | `"false"` | Show a thin bar at the right end of the dock that shows the desktop (Win+D) when clicked, and do the same for a click in the very bottom-right corner of the screen (a 6 px square on the dock's monitor, not while a fullscreen app is in front). |
 | `nectar-dock-recycle-enabled` | `"true"` / `"false"` | `"false"` | Show the Recycle Bin in the dock. Hidden in Legacy Mode. |
+| `nectar-dock-console-windows` | `"true"` / `"false"` | `"false"` | Show Command Prompt, batch script and PowerShell console windows (hosted by conhost) as running apps in the dock. Windows Terminal windows always show. |
+| `nectar-debug-battery` | `"level,charging"`, e.g. `"15,false"` | unset | Development builds only. Fakes a battery at that level, for testing the low battery label on a desktop PC. Ignored in releases. |
 | `nectar-dock-drives` | JSON array, e.g. `["C","D"]` | `[]` | Drive letters to show as dock buttons that open the drive in Explorer. Hidden in Legacy Mode. |
 | `nectar-dock-hidden-apps` | JSON array of `{"id","name"}` | `[]` | Running apps hidden from the dock with Hide from Dock in the right-click menu. Restore them in Settings > Dock. |
 | `nectar-dock-icon-only` | `"true"` / `"false"` | `"false"` | Minimal icon-only style (no background/padding around icons). |
@@ -200,6 +202,7 @@ Example:
 | `nectar-update-channel` | `"stable"` / `"prerelease"` | `"stable"` | Which releases the updater offers. `"prerelease"` also offers releases published with the pre-release flag, the newest release wins. Never offers a version lower than the running one. Settings > About > Get pre-releases. |
 | `nectar-show-update-indicator` | `"true"` / `"false"` | `"true"` | Show a green dot on the notch when an update is available. |
 | `nectar-time-format-24h` | `"true"` / `"false"` | `"false"` | Use 24-hour clock format in the notch. When `"false"`, displays 12-hour format with AM/PM. |
+| `nectar-week-start` | `"auto"` / `"sunday"` / `"monday"` | `"auto"` | First day of the week in the notch and Calendar window. `"auto"` follows the language's region. |
 | `nectar-language` | `"system"` / language code, e.g. `"en"` | `"system"` | UI language: `en`, `tr`, `de`, `es`, `fr` and `ar` (Arabic mirrors the Settings and Calendar windows right to left). `"system"` follows the Windows display language and falls back to English when that language has no translation. Missing keys in a translation fall back to English. Translations live in `src/locales/<code>.json` and are registered in `src/i18n.ts` and `src-tauri/src/i18n.rs` (tray menu). Calendar dates and times follow this language too. |
 | `nectar-tour-seen` | `"1"` | unset | Set once the first-run tour has been finished or skipped. Delete it to see the tour again, or use Settings > About > Replay Tour. |
 | `nectar-legacy-mode` | `"true"` / `"false"` | `"false"` | Keep the classic notch and dock. Turns off features added after 1.4 (dock Task View, Recycle Bin and drive buttons, and later additions). Settings > General > Legacy Mode. |

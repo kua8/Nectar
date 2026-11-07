@@ -121,6 +121,7 @@ export function useSettings() {
   const [dockEnabled, setDockEnabled] = useState(true);
   const [dockPreviewEnabled, setDockPreviewEnabled] = useState(true);
   const [dockAttentionEnabled, setDockAttentionEnabled] = useState(true);
+  const [dockConsoleWindows, setDockConsoleWindows] = useState(() => localStorage.getItem("nectar-dock-console-windows") === "true");
   const [dockSearchEnabled, setDockSearchEnabled] = useState(true);
   const [dockSearchProvider, setDockSearchProvider] = useState(
     () => localStorage.getItem("nectar-dock-search-provider") || "windows"
@@ -153,6 +154,7 @@ export function useSettings() {
   const [dockRecycle, setDockRecycle] = useState(
     () => localStorage.getItem("nectar-dock-recycle-enabled") === "true"
   );
+  const [weekStart, setWeekStart] = useState(() => localStorage.getItem("nectar-week-start") ?? "auto");
   const [dockDrives, setDockDrives] = useState<string[]>(() => parseDrives(localStorage.getItem("nectar-dock-drives")));
   const [hiddenDockApps, setHiddenDockApps] = useState<HiddenDockApp[]>(() => parseHiddenApps(localStorage.getItem("nectar-dock-hidden-apps")));
   const [dockIconOnly, setDockIconOnly] = useState(
@@ -282,6 +284,7 @@ export function useSettings() {
       apply(getVal("nectar-dock-enabled"), setDockEnabled, readBool);
       apply(getVal("nectar-dock-preview-enabled"), setDockPreviewEnabled, readBool);
       apply(getVal("nectar-dock-attention-enabled"), setDockAttentionEnabled, (v) => v !== "false");
+      apply(getVal("nectar-dock-console-windows"), setDockConsoleWindows, readBool);
       apply(getVal("nectar-dock-search-enabled"), setDockSearchEnabled, readBool);
       apply(getVal("nectar-dock-search-provider"), setDockSearchProvider, (v) => v);
       apply(getVal("nectar-dock-search-shortcut"), setDockSearchShortcut, (v) => v);
@@ -294,6 +297,7 @@ export function useSettings() {
       apply(getVal("nectar-panel-order"), setPanelOrder, (v) => parsePanelOrder(v));
       apply(getVal("nectar-cc-layout"), setCcLayout, (v) => parseCcLayout(v));
       apply(getVal("nectar-dock-recycle-enabled"), setDockRecycle, readBool);
+      apply(getVal("nectar-week-start"), setWeekStart, (v) => v ?? "auto");
       apply(getVal("nectar-dock-drives"), setDockDrives, parseDrives);
       apply(getVal("nectar-dock-hidden-apps"), setHiddenDockApps, parseHiddenApps);
       apply(getVal("nectar-dock-icon-only"), setDockIconOnly, readBool);
@@ -402,6 +406,7 @@ export function useSettings() {
     "nectar-panel-order": (v) => setPanelOrder(parsePanelOrder(v === null ? null : String(v))),
     "nectar-cc-layout": (v) => setCcLayout(parseCcLayout(v === null ? null : String(v))),
     "nectar-dock-recycle-enabled": setDockRecycle,
+    "nectar-week-start": (v) => setWeekStart(String(v)),
     "nectar-dock-drives": (v) => setDockDrives(parseDrives(v)),
     "nectar-dock-hidden-apps": (v) => setHiddenDockApps(parseHiddenApps(v)),
     "nectar-dock-icon-only": setDockIconOnly,
@@ -410,6 +415,7 @@ export function useSettings() {
     "nectar-dock-win-number-enabled": setDockWinNumberEnabled,
     "nectar-dock-preview-enabled": setDockPreviewEnabled,
     "nectar-dock-attention-enabled": (v) => setDockAttentionEnabled(v !== false && v !== "false"),
+    "nectar-dock-console-windows": setDockConsoleWindows,
     "nectar-dock-search-enabled": setDockSearchEnabled,
     "nectar-dock-search-provider": (v) => setDockSearchProvider(String(v)),
     "nectar-dock-search-shortcut": (v) => setDockSearchShortcut(String(v)),
@@ -761,6 +767,12 @@ export function useSettings() {
     saveSetting("nectar-dock-preview-enabled", String(next));
   };
 
+  const toggleDockConsoleWindows = () => {
+    const next = !dockConsoleWindows;
+    setDockConsoleWindows(next);
+    saveSetting("nectar-dock-console-windows", String(next));
+  };
+
   const toggleDockAttention = () => {
     const next = !dockAttentionEnabled;
     setDockAttentionEnabled(next);
@@ -845,6 +857,11 @@ export function useSettings() {
     const next = dockDrives.includes(letter) ? dockDrives.filter((d) => d !== letter) : [...dockDrives, letter].sort();
     setDockDrives(next);
     saveSetting("nectar-dock-drives", JSON.stringify(next));
+  };
+
+  const changeWeekStart = (value: string) => {
+    setWeekStart(value);
+    saveSetting("nectar-week-start", value);
   };
 
   const restoreHiddenDockApp = (id: string) => {
@@ -1281,6 +1298,8 @@ export function useSettings() {
     toggleDockPreview,
     dockAttentionEnabled,
     toggleDockAttention,
+    dockConsoleWindows,
+    toggleDockConsoleWindows,
     dockSearchEnabled,
     toggleDockSearch,
     dockSearchProvider,
@@ -1309,6 +1328,8 @@ export function useSettings() {
     toggleDockRecycle,
     dockDrives,
     toggleDockDrive,
+    weekStart,
+    changeWeekStart,
     hiddenDockApps,
     restoreHiddenDockApp,
     dockIconOnly,

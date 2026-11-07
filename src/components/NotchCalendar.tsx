@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import type { CaldavState, CalEvent } from "../hooks/useCaldav";
 import { dateLocale, useT, weekdayNames } from "../i18n";
+import { daysSinceWeekStart, useWeekStart } from "../weekStart";
 
 type View = "day" | "week" | "month" | "agenda";
 
@@ -57,6 +58,7 @@ interface Props {
 
 export function NotchCalendar({ caldav, hour12 }: Props) {
   const t = useT();
+  const weekStart = useWeekStart();
   const connected = caldav.connected;
   const today = startOfDay(new Date());
   const [view, setViewState] = useState<View>(readView);
@@ -91,7 +93,7 @@ export function NotchCalendar({ caldav, hour12 }: Props) {
 
   let title: string;
   if (activeView === "week") {
-    const first = addDays(anchor, -anchor.getDay());
+    const first = addDays(anchor, -daysSinceWeekStart(anchor, weekStart));
     const last = addDays(first, 6);
     const fmt = (d: Date) => d.toLocaleDateString(dateLocale(), { month: "short", day: "numeric" });
     title = `${fmt(first)} – ${first.getMonth() === last.getMonth() ? last.getDate() : fmt(last)}`;
@@ -181,10 +183,11 @@ interface MonthProps {
 }
 
 function MonthGrid({ anchor, today, events, connected, onPick }: MonthProps) {
+  const weekStart = useWeekStart();
   const year = anchor.getFullYear();
   const month = anchor.getMonth();
   const totalDays = new Date(year, month + 1, 0).getDate();
-  const startDay = new Date(year, month, 1).getDay();
+  const startDay = daysSinceWeekStart(new Date(year, month, 1), weekStart);
 
   const byDay = useMemo(() => {
     if (!connected) return [];
@@ -219,7 +222,7 @@ function MonthGrid({ anchor, today, events, connected, onPick }: MonthProps) {
 
   return (
     <div className="calendar-grid">
-      {weekdayNames("narrow").map((d, i) => (
+      {weekdayNames("narrow", weekStart).map((d, i) => (
         <div key={`${d}-${i}`} className="day-name">
           {d}
         </div>
@@ -274,7 +277,8 @@ function Chip({ event, time }: TimeProps & { event: CalEvent }) {
 
 function WeekList({ anchor, today, events, time, onOpen }: TimeProps & { anchor: Date; today: Date; events: CalEvent[]; onOpen: (d: Date) => void }) {
   const t = useT();
-  const first = addDays(anchor, -anchor.getDay());
+  const weekStart = useWeekStart();
+  const first = addDays(anchor, -daysSinceWeekStart(anchor, weekStart));
   return (
     <div className="cal-scroll">
       {Array.from({ length: 7 }, (_, i) => {

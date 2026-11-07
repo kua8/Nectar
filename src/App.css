@@ -303,6 +303,14 @@ img {
     transform: scale(0.95);
 }
 
+.time.low-battery-text {
+    color: #FF453A;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
 .time {
     font-size: 13px;
     font-weight: 500;

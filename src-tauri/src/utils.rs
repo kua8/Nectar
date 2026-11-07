@@ -502,6 +502,16 @@ pub fn get_nectar_scale(_app: &tauri::AppHandle) -> f64 {
 }
 
 /// Read any string value from the settings cache. Returns None if the key is absent.
+pub fn setting_flag(key: &str) -> bool {
+    let Some(cache) = crate::state::SETTINGS_CACHE.get() else { return false };
+    let Ok(guard) = cache.lock() else { return false };
+    match guard.get(key) {
+        Some(serde_json::Value::Bool(b)) => *b,
+        Some(serde_json::Value::String(s)) => s == "true",
+        _ => false,
+    }
+}
+
 pub fn get_setting_str(_app: &tauri::AppHandle, key: &str) -> Option<String> {
     let cache = crate::state::SETTINGS_CACHE.get()?;
     let guard = cache.lock().ok()?;
