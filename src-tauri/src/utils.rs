@@ -555,7 +555,7 @@ fn encode_thumbnail(mut pixels: Vec<u8>, width: u32, height: u32, max_width: u32
     let mut img = image::RgbaImage::from_raw(width, height, pixels)?;
     if img.width() > max_width || img.height() > max_height {
         let dyn_img = image::DynamicImage::ImageRgba8(img);
-        img = dyn_img.resize(max_width, max_height, image::imageops::FilterType::Triangle).into_rgba8();
+        img = dyn_img.resize(max_width, max_height, image::imageops::FilterType::Lanczos3).into_rgba8();
     }
     let mut buf = std::io::Cursor::new(Vec::new());
     image::write_buffer_with_format(&mut buf, &img, img.width(), img.height(), image::ColorType::Rgba8, image::ImageFormat::Png).ok()?;
@@ -647,7 +647,7 @@ pub fn capture_hwnd_to_base64(hwnd: HWND, max_width: u32, max_height: u32) -> Op
                 if let Some(mut img) = image::RgbaImage::from_raw(width as u32, height as u32, pixels) {
                     if img.width() > max_width || img.height() > max_height {
                         let dyn_img = image::DynamicImage::ImageRgba8(img);
-                        img = dyn_img.resize(max_width, max_height, image::imageops::FilterType::Triangle).into_rgba8();
+                        img = dyn_img.resize(max_width, max_height, image::imageops::FilterType::Lanczos3).into_rgba8();
                     }
                     let mut buf = std::io::Cursor::new(Vec::new());
                     if image::write_buffer_with_format(&mut buf, &img, img.width(), img.height(), image::ColorType::Rgba8, image::ImageFormat::Png).is_ok() {

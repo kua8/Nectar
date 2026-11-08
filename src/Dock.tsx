@@ -416,12 +416,16 @@ function DockPreviewTooltip({
       onMouseLeave={onMouseLeave}
     >
       <div className="preview-items">
+        <AnimatePresence initial={false}>
         {previews.map((prev, idx) => {
           const isLive = liveHwnds.has(prev.hwnd);
           const box = previewBox(prev.ratio);
           return (
-            <div
+            <motion.div
               key={prev.hwnd}
+              layout
+              exit={{ opacity: 0, scale: 0.92 }}
+              transition={{ duration: 0.15 }}
               className="preview-item"
               style={{ width: Math.max(150, box.width + 16) }}
               onClick={() => invoke('focus_window', { hwnd: prev.hwnd })}
@@ -473,7 +477,7 @@ function DockPreviewTooltip({
               <button
                 className="preview-close-btn"
                 onClick={(e) => onClosePreview(e, prev.hwnd)}
-                data-tooltip={t("dockmenu.closeWindow")}
+                aria-label={t("dockmenu.closeWindow")}
               >
                 <svg
                   width="10"
@@ -488,9 +492,10 @@ function DockPreviewTooltip({
                   <line x1="6" y1="6" x2="18" y2="18"></line>
                 </svg>
               </button>
-            </div>
+            </motion.div>
           );
         })}
+        </AnimatePresence>
       </div>
       {renderMedia(app)}
     </motion.div>
@@ -965,17 +970,18 @@ const Dock = memo(function Dock() {
 
   const handleClosePreview = async (e: React.MouseEvent, hwnd: number) => {
     e.stopPropagation();
+    setPreviewData(prev => {
+      if (!prev) return null;
+      const remaining = prev.previews.filter(p => p.hwnd !== hwnd);
+      if (remaining.length === 0) {
+        setHoveredApp(null);
+        return null;
+      }
+      return { ...prev, previews: remaining };
+    });
     try {
+      await invoke('clear_live_thumbnails');
       await invoke('close_window', { hwnd });
-      setPreviewData(prev => {
-        if (!prev) return null;
-        const remaining = prev.previews.filter(p => p.hwnd !== hwnd);
-        if (remaining.length === 0) {
-          setHoveredApp(null);
-          return null;
-        }
-        return { ...prev, previews: remaining };
-      });
     } catch (err) {
       console.error("Failed to close window:", err);
     }
@@ -1351,13 +1357,14 @@ const Dock = memo(function Dock() {
       const app = dockItemsRef.current.find(a => itemKey(a) === hoveredApp);
       if (app && app.is_running) {
         const hwndsToCapture = app.all_hwnds || (app.hwnd ? [[app.hwnd, app.name]] : []);
+        const pixelScale = (window.devicePixelRatio || 1) * (scale || 1);
 
         previewTimerRef.current = setTimeout(async () => {
           try {
             const results = await Promise.all(
               hwndsToCapture.map(async ([hwnd, title]) => {
                 try {
-                  const res = await invoke<[string, number] | null>("capture_window_thumbnail", { hwnd, maxWidth: 480, maxHeight: 300 });
+                  const res = await invoke<[string, number] | null>("capture_window_thumbnail", { hwnd, maxWidth: Math.ceil(PREVIEW_MAX_WIDTH * pixelScale), maxHeight: Math.ceil(PREVIEW_MAX_HEIGHT * pixelScale) });
                   if (res) {
                     const [image, lastFocused] = res;
                     return { hwnd, title, image, lastFocused };
