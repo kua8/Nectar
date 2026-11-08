@@ -1147,7 +1147,13 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
         let first = wmi_con.query::<WmiMonitorBrightness>();
         let supported = first.as_ref().map(|r| !r.is_empty()).unwrap_or(false);
         let poll = if supported { 1500 } else { 30_000 };
-        let mut last_brightness = match first.ok().and_then(|res| res.first().map(|b| b.current_brightness as u32)) { Some(v) => v, None => 50 };
+        let saved_brightness = if supported { None } else {
+            handle_brightness.path().app_config_dir().ok()
+                .and_then(|d| std::fs::read_to_string(d.join("last_brightness.txt")).ok())
+                .and_then(|t| t.trim().parse::<u32>().ok())
+                .map(|v| v.min(100))
+        };
+        let mut last_brightness = match first.ok().and_then(|res| res.first().map(|b| b.current_brightness as u32)) { Some(v) => v, None => saved_brightness.unwrap_or(50) };
         CURRENT_BRIGHTNESS.store(last_brightness, Ordering::Relaxed);
         loop {
             if get_now_ms() - LAST_BRIGHTNESS_CHANGE.load(Ordering::Relaxed) < 2000 { std::thread::sleep(std::time::Duration::from_millis(500)); continue; }
@@ -3379,6 +3385,16 @@ pub unsafe extern "system" fn enum_windows_proc(hwnd: HWND, lparam: LPARAM) -> B
                             }
                         } else {
                             path
+                        };
+                        let is_control_panel = window_class == "CabinetWClass"
+                            && lowercase_path.ends_with("\\explorer.exe")
+                            && crate::utils::get_window_app_user_model_id(hwnd)
+                                .map_or(false, |id| id.eq_ignore_ascii_case("Microsoft.Windows.ControlPanel"));
+                        let (final_name, path, exe_name) = if is_control_panel {
+                            let control = format!(r"{}\System32\control.exe", std::env::var("WINDIR").unwrap_or_else(|_| r"C:\Windows".into()));
+                            ("Control Panel".to_string(), control, Some("control.exe".to_string()))
+                        } else {
+                            (final_name, path, exe_name)
                         };
                         apps.push(AppInfo {
                             name: final_name,

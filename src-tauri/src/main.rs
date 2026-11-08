@@ -218,6 +218,7 @@ fn main() {
             capture_window_thumbnail,
             set_live_thumbnails,
             clear_live_thumbnails,
+            set_live_thumbnails_opacity,
             is_dwm_composition_enabled,
             get_wifi_status,
             set_wifi_state,

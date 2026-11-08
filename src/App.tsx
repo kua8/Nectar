@@ -1985,12 +1985,12 @@ function App() {
     if (nectarMode === 'shelf') return Math.max(300, Math.min(120 + shelf.items.length * 70, 460));
     if (isCalendarMode) return Math.max(settingsCalendarEnabled && showClockColumn ? 480 : settingsCalendarEnabled ? 310 : 270, 140 + dualClockExtra);
     if (nectarMode === 'command-center' && isHovered) {
-      const totalWidgets = statusWidgets.left.length + statusWidgets.right.length;
-      return Math.max(390, Math.min(200 + totalWidgets * 65, 480)) + dualClockExtra;
+      const totalWidgets = Math.max(statusWidgets.left.length, statusWidgets.right.length) * 2;
+      return Math.max(390, Math.min(200 + totalWidgets * 65, 530)) + dualClockExtra;
     }
     if (nectarMode === 'status' && isHovered) {
-      const totalWidgets = statusWidgets.left.length + statusWidgets.right.length;
-      return Math.min(200 + totalWidgets * 65, 460) + dualClockExtra;
+      const totalWidgets = Math.max(statusWidgets.left.length, statusWidgets.right.length) * 2;
+      return Math.min(200 + totalWidgets * 65, 530) + dualClockExtra;
     }
     if (isMusicMode && isHovered) return mediaLayout === 'compact' ? 300 : 340;
     if ((showPowerPulse || showLowBatteryPulse || showUpdatePulse) && !isHovered) return 200;
