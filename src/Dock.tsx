@@ -398,9 +398,26 @@ function DockPreviewTooltip({
   }, [previews]);
 
   useEffect(() => {
-    if (isPresent) return;
-    setLiveHwnds(new Set());
-    invoke('clear_live_thumbnails').catch(() => {});
+    let raf = 0;
+    const ramp = (from: number, to: number, done?: () => void) => {
+      const start = performance.now();
+      const step = (now: number) => {
+        const p = Math.min(1, (now - start) / 150);
+        invoke('set_live_thumbnails_opacity', { opacity: Math.round(from + (to - from) * p) }).catch(() => {});
+        if (p < 1) raf = requestAnimationFrame(step);
+        else done?.();
+      };
+      raf = requestAnimationFrame(step);
+    };
+    if (isPresent) {
+      ramp(0, 255);
+      return () => cancelAnimationFrame(raf);
+    }
+    ramp(255, 0, () => {
+      setLiveHwnds(new Set());
+      invoke('clear_live_thumbnails').then(() => invoke('set_live_thumbnails_opacity', { opacity: 255 })).catch(() => {});
+    });
+    return () => cancelAnimationFrame(raf);
   }, [isPresent]);
 
   return (
@@ -408,20 +425,23 @@ function DockPreviewTooltip({
       ref={rootRef}
       style={{ ['--pv-shift' as string]: `${shift}px` }}
       className={`preview-tooltip ${previews.length > 1 ? 'multi' : ''}`}
-      initial={{ opacity: 0, y: 10, scale: 0.95 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.95 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
       <div className="preview-items">
+        <AnimatePresence initial={false}>
         {previews.map((prev, idx) => {
           const isLive = liveHwnds.has(prev.hwnd);
           const box = previewBox(prev.ratio);
           return (
-            <div
+            <motion.div
               key={prev.hwnd}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
               className="preview-item"
               style={{ width: Math.max(150, box.width + 16) }}
               onClick={() => invoke('focus_window', { hwnd: prev.hwnd })}
@@ -473,7 +493,7 @@ function DockPreviewTooltip({
               <button
                 className="preview-close-btn"
                 onClick={(e) => onClosePreview(e, prev.hwnd)}
-                data-tooltip={t("dockmenu.closeWindow")}
+                aria-label={t("dockmenu.closeWindow")}
               >
                 <svg
                   width="10"
@@ -488,9 +508,10 @@ function DockPreviewTooltip({
                   <line x1="6" y1="6" x2="18" y2="18"></line>
                 </svg>
               </button>
-            </div>
+            </motion.div>
           );
         })}
+        </AnimatePresence>
       </div>
       {renderMedia(app)}
     </motion.div>
@@ -965,17 +986,18 @@ const Dock = memo(function Dock() {
 
   const handleClosePreview = async (e: React.MouseEvent, hwnd: number) => {
     e.stopPropagation();
+    setPreviewData(prev => {
+      if (!prev) return null;
+      const remaining = prev.previews.filter(p => p.hwnd !== hwnd);
+      if (remaining.length === 0) {
+        setHoveredApp(null);
+        return null;
+      }
+      return { ...prev, previews: remaining };
+    });
     try {
+      await invoke('clear_live_thumbnails');
       await invoke('close_window', { hwnd });
-      setPreviewData(prev => {
-        if (!prev) return null;
-        const remaining = prev.previews.filter(p => p.hwnd !== hwnd);
-        if (remaining.length === 0) {
-          setHoveredApp(null);
-          return null;
-        }
-        return { ...prev, previews: remaining };
-      });
     } catch (err) {
       console.error("Failed to close window:", err);
     }
@@ -1351,18 +1373,25 @@ const Dock = memo(function Dock() {
       const app = dockItemsRef.current.find(a => itemKey(a) === hoveredApp);
       if (app && app.is_running) {
         const hwndsToCapture = app.all_hwnds || (app.hwnd ? [[app.hwnd, app.name]] : []);
+        const pixelScale = (window.devicePixelRatio || 1) * (scale || 1);
 
         previewTimerRef.current = setTimeout(async () => {
           try {
             const results = await Promise.all(
               hwndsToCapture.map(async ([hwnd, title]) => {
-                try {
-                  const res = await invoke<[string, number] | null>("capture_window_thumbnail", { hwnd, maxWidth: 480, maxHeight: 300 });
-                  if (res) {
-                    const [image, lastFocused] = res;
-                    return { hwnd, title, image, lastFocused };
+                for (let attempt = 0; attempt < 3; attempt++) {
+                  if (attempt > 0) {
+                    await new Promise((r) => setTimeout(r, 120));
+                    if (hoveredAppRef.current !== itemKey(app)) break;
                   }
-                } catch {}
+                  try {
+                    const res = await invoke<[string, number] | null>("capture_window_thumbnail", { hwnd, maxWidth: Math.ceil(PREVIEW_MAX_WIDTH * pixelScale), maxHeight: Math.ceil(PREVIEW_MAX_HEIGHT * pixelScale) });
+                    if (res && res[0]) {
+                      const [image, lastFocused] = res;
+                      return { hwnd, title, image, lastFocused };
+                    }
+                  } catch {}
+                }
                 return { hwnd, title, image: "", lastFocused: 0 };
               })
             );

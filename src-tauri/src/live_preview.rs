@@ -68,11 +68,6 @@ pub fn set_live_thumbnails(
         }
     }
 
-    let targets: Vec<LiveThumbnailTarget> = targets
-        .into_iter()
-        .filter(|t| unsafe { !IsIconic(HWND(t.hwnd as *mut _)).as_bool() })
-        .collect();
-
     let mut map = get_map().lock().map_err(|e| e.to_string())?;
     let target_hwnds: std::collections::HashSet<isize> = targets.iter().map(|t| t.hwnd).collect();
 
@@ -122,7 +117,7 @@ pub fn set_live_thumbnails(
                     dwFlags: DWM_TNP_RECTDESTINATION | DWM_TNP_VISIBLE | DWM_TNP_OPACITY | DWM_TNP_SOURCECLIENTAREAONLY,
                     rcDestination: fitted,
                     rcSource: RECT::default(),
-                    opacity: 255,
+                    opacity: OPACITY.load(std::sync::atomic::Ordering::Relaxed),
                     fVisible: BOOL(1),
                     fSourceClientAreaOnly: if client_area_only { BOOL(1) } else { BOOL(0) },
                 };
@@ -135,12 +130,19 @@ pub fn set_live_thumbnails(
             unsafe {
                 match DwmRegisterThumbnail(dest_hwnd, src_hwnd) {
                     Ok(handle) => {
+                        if IsIconic(raw_hwnd).as_bool() {
+                            let size = DwmQueryThumbnailSourceSize(handle).unwrap_or_default();
+                            if size.cx < 64 || size.cy < 64 {
+                                let _ = DwmUnregisterThumbnail(handle);
+                                continue;
+                            }
+                        }
                         let fitted = fit_rect(handle, rc_dest);
                         let props = DWM_THUMBNAIL_PROPERTIES {
                             dwFlags: DWM_TNP_RECTDESTINATION | DWM_TNP_VISIBLE | DWM_TNP_OPACITY | DWM_TNP_SOURCECLIENTAREAONLY,
                             rcDestination: fitted,
                             rcSource: RECT::default(),
-                            opacity: 255,
+                            opacity: OPACITY.load(std::sync::atomic::Ordering::Relaxed),
                             fVisible: BOOL(1),
                             fSourceClientAreaOnly: if client_area_only { BOOL(1) } else { BOOL(0) },
                         };
@@ -162,6 +164,24 @@ pub fn set_live_thumbnails(
     }
 
     Ok(successfully_active)
+}
+
+static OPACITY: std::sync::atomic::AtomicU8 = std::sync::atomic::AtomicU8::new(255);
+
+pub fn set_opacity(opacity: u8) -> Result<(), String> {
+    OPACITY.store(opacity, std::sync::atomic::Ordering::Relaxed);
+    let map = get_map().lock().map_err(|e| e.to_string())?;
+    for record in map.values() {
+        let props = DWM_THUMBNAIL_PROPERTIES {
+            dwFlags: DWM_TNP_OPACITY,
+            opacity,
+            ..Default::default()
+        };
+        unsafe {
+            let _ = DwmUpdateThumbnailProperties(record.handle, &props);
+        }
+    }
+    Ok(())
 }
 
 pub fn clear_all_thumbnails() -> Result<(), String> {

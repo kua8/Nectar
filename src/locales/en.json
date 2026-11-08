@@ -101,7 +101,7 @@
   "notch.hotkey": "Hide or show the notch",
   "notch.hotkey.desc": "A global shortcut that hides the notch until you press it again, for example while you click tabs under it. Click the box, then press the keys you want. Clear it to turn the shortcut off.",
   "notch.netWidget": "Network widget",
-  "notch.netWidget.desc": "What the Net widget in the collapsed notch shows: live upload and download speed, or an icon for Wi-Fi, Ethernet or offline.",
+  "notch.netWidget.desc": "Show internet speed or a connection icon.",
   "notch.netWidget.speed": "Speed",
   "notch.netWidget.status": "Connection icon",
   "notch.edgeDelay": "Edge delay",

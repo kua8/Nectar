@@ -57,6 +57,8 @@ if ($NotesFile) {
 } else {
     $notes = (git log -1 --pretty=format:"%b" --no-merges | Out-String).Trim()
     if (-not $notes) { $notes = (git log -1 --pretty=format:"%s" --no-merges | Out-String).Trim() }
+    $notes = ($notes -split '\r?\n' | Where-Object { $_ -notmatch '^Co-authored-by:' }) -join "`n"
+    $notes = $notes.Trim()
     $notes = $notes -replace "(?m)^(What's New|Improvements|Changed|Bug Fixes|Other):?\s*$", '### $1'
     git fetch --tags --quiet
     $prev = git tag --sort=-version:refname | Where-Object { $_ -like "v*" -and $_ -ne $tag } | Select-Object -First 1

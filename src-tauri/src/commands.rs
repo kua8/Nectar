@@ -1529,6 +1529,27 @@ pub async fn get_app_icon(app: AppHandle, path: String, name: Option<String>, hw
         }
     }
 
+    // Java programs share one javaw.exe, so the exe icon is the same for all of them. Use the window's own icon.
+    if let Some(h) = hwnd {
+        let path_lc = path.to_lowercase();
+        if path_lc.ends_with("\\javaw.exe") || path_lc.ends_with("\\java.exe") {
+            let icon = tauri::async_runtime::spawn_blocking(move || unsafe {
+                use windows::Win32::UI::WindowsAndMessaging::{GetClassLongPtrW, GCLP_HICON, WM_GETICON, ICON_BIG, SendMessageTimeoutW, SMTO_ABORTIFHUNG};
+                let h_hwnd = HWND(h as *mut _);
+                let mut res = 0usize;
+                let _ = SendMessageTimeoutW(h_hwnd, WM_GETICON, windows::Win32::Foundation::WPARAM(ICON_BIG as usize), windows::Win32::Foundation::LPARAM(0), SMTO_ABORTIFHUNG, 250, Some(&mut res));
+                let mut h_icon = windows::Win32::UI::WindowsAndMessaging::HICON(res as *mut _);
+                if h_icon.is_invalid() {
+                    h_icon = windows::Win32::UI::WindowsAndMessaging::HICON(GetClassLongPtrW(h_hwnd, GCLP_HICON) as *mut _);
+                }
+                if h_icon.is_invalid() { None } else { icon_to_base64(h_icon) }
+            }).await.unwrap_or(None);
+            if let Some(icon) = icon {
+                return Ok(Some(icon));
+            }
+        }
+    }
+
     let cache = ICON_CACHE.get_or_init(|| {
         let version_marker = cache_dir.join("icons_cache_v2");
         if !version_marker.exists() {
@@ -3228,6 +3249,9 @@ pub fn set_brightness(app: AppHandle, brightness: u32) {
     let val = brightness.min(100);
     crate::state::CURRENT_BRIGHTNESS.store(val, Ordering::Relaxed);
     crate::state::LAST_BRIGHTNESS_CHANGE.store(crate::utils::get_now_ms(), Ordering::Relaxed);
+    if let Ok(dir) = app.path().app_config_dir() {
+        let _ = std::fs::write(dir.join("last_brightness.txt"), val.to_string());
+    }
     let _ = app.emit("brightness-change", BrightnessChangeEvent { brightness: val });
     if let Some(tx) = crate::state::BRIGHTNESS_SENDER.get() {
         let _ = tx.send(val);
@@ -4251,6 +4275,11 @@ pub fn set_live_thumbnails(
 ) -> Result<Vec<isize>, String> {
     let dest_hwnd = window.hwnd().map_err(|e| e.to_string())?.0 as isize;
     crate::live_preview::set_live_thumbnails(dest_hwnd, targets, client_area_only.unwrap_or(false))
+}
+
+#[tauri::command]
+pub fn set_live_thumbnails_opacity(opacity: u8) -> Result<(), String> {
+    crate::live_preview::set_opacity(opacity)
 }
 
 #[tauri::command]
