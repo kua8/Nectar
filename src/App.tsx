@@ -1986,11 +1986,11 @@ function App() {
     if (isCalendarMode) return Math.max(settingsCalendarEnabled && showClockColumn ? 480 : settingsCalendarEnabled ? 310 : 270, 140 + dualClockExtra);
     if (nectarMode === 'command-center' && isHovered) {
       const totalWidgets = Math.max(statusWidgets.left.length, statusWidgets.right.length) * 2;
-      return Math.max(390, Math.min(200 + totalWidgets * 65, 530)) + dualClockExtra;
+      return Math.max(390, Math.min(200 + totalWidgets * 80, 780)) + dualClockExtra;
     }
     if (nectarMode === 'status' && isHovered) {
       const totalWidgets = Math.max(statusWidgets.left.length, statusWidgets.right.length) * 2;
-      return Math.min(200 + totalWidgets * 65, 530) + dualClockExtra;
+      return Math.min(200 + totalWidgets * 80, 780) + dualClockExtra;
     }
     if (isMusicMode && isHovered) return mediaLayout === 'compact' ? 300 : 340;
     if ((showPowerPulse || showLowBatteryPulse || showUpdatePulse) && !isHovered) return 200;

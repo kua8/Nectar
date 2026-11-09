@@ -158,6 +158,7 @@ fn main() {
             focus_agent_window,
             agent_answer,
             pick_agent_sound,
+            pick_program,
             reset_agent_sound,
             agent_sound_data,
             agent_sound_custom,

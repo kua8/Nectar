@@ -4207,6 +4207,22 @@ fn agent_sound_files(state: &str) -> Vec<std::path::PathBuf> {
 }
 
 #[tauri::command]
+pub async fn pick_program(app: AppHandle) -> Result<Option<(String, String)>, String> {
+    let Some(path) = app
+        .dialog()
+        .file()
+        .set_title("Choose a program")
+        .add_filter("Programs", &["exe", "lnk", "bat", "cmd", "url"])
+        .blocking_pick_file()
+    else {
+        return Ok(None);
+    };
+    let path = path.into_path().map_err(|e| e.to_string())?;
+    let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("App").to_string();
+    Ok(Some((name, path.to_string_lossy().into_owned())))
+}
+
+#[tauri::command]
 pub async fn pick_agent_sound(app: AppHandle, state: String) -> Result<bool, String> {
     const MAX_SOUND_BYTES: u64 = 3 * 1024 * 1024;
     if !AGENT_SOUND_STATES.contains(&state.as_str()) {

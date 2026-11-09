@@ -3358,6 +3358,8 @@ pub unsafe extern "system" fn enum_windows_proc(hwnd: HWND, lparam: LPARAM) -> B
                     {
                         // Extract a cleaner name from the window title for host processes (PWAs, UWP apps)
                         title.split(" - ").next().map(|s| s.trim()).unwrap_or(&title).to_string()
+                    } else if (name.eq_ignore_ascii_case("javaw") || name.eq_ignore_ascii_case("java")) && !title.is_empty() {
+                        title.clone()
                     } else if name.eq_ignore_ascii_case("explorer") {
                         "File Explorer".to_string()
                     } else {

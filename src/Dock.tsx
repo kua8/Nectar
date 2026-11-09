@@ -2138,6 +2138,19 @@ function AddAppPopup({
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const mountedRef = useRef(false);
+  const browsingRef = useRef(false);
+
+  const browseForProgram = async () => {
+    browsingRef.current = true;
+    try {
+      const res = await invoke<[string, string] | null>("pick_program");
+      if (res) onAdd({ name: res[0], path: res[1], icon: null, is_running: false });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      browsingRef.current = false;
+    }
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 150);
@@ -2261,7 +2274,9 @@ function AddAppPopup({
         onClose();
       }
     };
-    const handleBlur = () => onClose();
+    const handleBlur = () => {
+      if (!browsingRef.current) onClose();
+    };
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("blur", handleBlur);
     document.addEventListener("mousedown", handleMouseDown, true);
@@ -2394,6 +2409,9 @@ function AddAppPopup({
                 : t("dockmenu.emptyHint")}
             </div>
           )}
+        </div>
+        <div className="popup-browse-row" onClick={browseForProgram}>
+          {t("dockmenu.browseProgram")}
         </div>
       </motion.div>
     </div>

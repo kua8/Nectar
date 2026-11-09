@@ -510,6 +510,7 @@
   "dockmenu.running": "Running",
   "dockmenu.allApps": "All apps",
   "dockmenu.searchApps": "Search apps...",
+  "dockmenu.browseProgram": "Browse for a program...",
   "dockmenu.noResults": "No results",
   "dockmenu.emptyHint": "Running apps show up here — search to pin anything else",
   "battery.full": "Fully charged",

@@ -958,6 +958,21 @@ body {
   color: var(--nectar-text, rgba(255, 255, 255, 0.9));
 }
 
+.popup-browse-row {
+  padding: 10px 14px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--nectar-text-muted, rgba(255, 255, 255, 0.55));
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.popup-browse-row:hover {
+  color: var(--nectar-text, #fff);
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .popup-empty {
   padding: 40px;
   text-align: center;
