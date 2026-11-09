@@ -440,6 +440,7 @@
   "tabs.dock": "Dock",
   "tabs.overlays": "Overlays",
   "tabs.about": "About",
+  "tabs.diagnostics": "Diagnostics",
   "settings.title": "Settings",
   "settings.search": "Search settings",
   "settings.search.empty": "Nothing found for “{query}”",

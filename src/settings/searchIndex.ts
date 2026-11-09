@@ -35,8 +35,10 @@ export const SEARCH_ENTRIES: SearchEntry[] = [
     "overlays.volume", "overlays.brightness", "overlays.edgeHover", "overlays.edgeDelay", "overlays.volumeSide", "overlays.brightnessSide",
   ]),
   ...group("about", [
-    "about.autoUpdate", "about.prerelease", "about.update.check", "about.tour", "about.export", "about.import", "about.icons",
-    "about.diagnostics.copy", "about.logs", "about.hitbox", "about.reset", "about.uninstall",
+    "about.autoUpdate", "about.prerelease", "about.update.check", "about.tour", "about.export", "about.import", "about.reset", "about.uninstall",
+  ]),
+  ...group("diagnostics", [
+    "about.diagnostics.copy", "about.logs", "about.hitbox", "about.icons",
   ]),
 ];
 
@@ -47,6 +49,7 @@ export const TAB_KEYS: Record<string, string> = {
   dock: "tabs.dock",
   overlays: "tabs.overlays",
   about: "tabs.about",
+  diagnostics: "tabs.diagnostics",
 };
 
 export const TAB_ENTRIES: SearchEntry[] = Object.keys(TAB_KEYS).map((tab) => ({ key: TAB_KEYS[tab], tab: tab as SettingsTab }));
