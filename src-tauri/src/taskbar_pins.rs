@@ -96,25 +96,93 @@ fn is_explorer_pin(lnk: &Path) -> bool {
     std::fs::read(lnk).ok().is_some_and(|b| find_bytes(&b, &needle).is_some())
 }
 
+fn is_package_aumid(token: &str) -> bool {
+    let Some((family, app)) = token.split_once('!') else { return false };
+    let Some((_, hash)) = family.rsplit_once('_') else { return false };
+    hash.len() == 13
+        && hash.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit())
+        && !app.is_empty()
+        && !app.contains('!')
+}
+
+// Store apps pinned to the taskbar have no shortcut file, only an entry in the Taskband blob
+fn store_pins(blob: &[u8]) -> Vec<(usize, String)> {
+    let mut found: Vec<(usize, String)> = Vec::new();
+    for parity in 0..2 {
+        let mut token = String::new();
+        let mut start = 0usize;
+        let flush = |token: &mut String, start: usize, found: &mut Vec<(usize, String)>| {
+            if is_package_aumid(token) && !found.iter().any(|(_, t)| t.eq_ignore_ascii_case(token)) {
+                found.push((start, token.clone()));
+            }
+            token.clear();
+        };
+        let mut i = parity;
+        while i + 1 < blob.len() {
+            let unit = u16::from_le_bytes([blob[i], blob[i + 1]]);
+            match char::from_u32(unit as u32) {
+                Some(c) if c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | '!') => {
+                    if token.is_empty() { start = i; }
+                    token.push(c);
+                }
+                _ => flush(&mut token, start, &mut found),
+            }
+            i += 2;
+        }
+        flush(&mut token, start, &mut found);
+    }
+    found
+}
+
+unsafe fn store_display_name(aumid: &str) -> Option<String> {
+    use windows::Win32::UI::Shell::{IShellItem, SHCreateItemFromParsingName, SIGDN_NORMALDISPLAY};
+    let wide: Vec<u16> = format!("shell:AppsFolder\\{aumid}").encode_utf16().chain(std::iter::once(0)).collect();
+    let item: IShellItem = SHCreateItemFromParsingName(PCWSTR(wide.as_ptr()), None).ok()?;
+    let name = item.GetDisplayName(SIGDN_NORMALDISPLAY).ok()?;
+    let text = String::from_utf16_lossy(PCWSTR(name.0).as_wide());
+    CoTaskMemFree(Some(name.0 as *const _));
+    (!text.trim().is_empty()).then_some(text)
+}
+
+enum Pin {
+    Shortcut(PathBuf),
+    Store(String),
+}
+
 pub fn read_pins() -> Option<Vec<AppInfo>> {
     let mut files = lnk_files();
-    if files.is_empty() { return None; }
-
     let blob = taskband_favorites().unwrap_or_default();
-    let mut keyed: Vec<(usize, std::time::SystemTime, PathBuf)> = files
+    let stores = store_pins(&blob);
+    if files.is_empty() && stores.is_empty() { return None; }
+
+    let mut keyed: Vec<(usize, std::time::SystemTime, Pin)> = files
         .drain(..)
         .map(|p| {
             let file_name = p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
             let utf16: Vec<u8> = file_name.encode_utf16().flat_map(|u| u.to_le_bytes()).collect();
             let pos = find_bytes(&blob, &utf16).unwrap_or(usize::MAX);
             let created = std::fs::metadata(&p).and_then(|m| m.created()).unwrap_or(std::time::UNIX_EPOCH);
-            (pos, created, p)
+            (pos, created, Pin::Shortcut(p))
         })
         .collect();
+    for (pos, aumid) in stores {
+        keyed.push((pos, std::time::UNIX_EPOCH, Pin::Store(aumid)));
+    }
     keyed.sort_by_key(|(pos, created, _)| (*pos, *created));
 
-    let mut apps = Vec::new();
-    for (_, _, lnk) in keyed {
+    let mut apps: Vec<AppInfo> = Vec::new();
+    for (_, _, pin) in keyed {
+        let lnk = match pin {
+            Pin::Shortcut(lnk) => lnk,
+            Pin::Store(aumid) => {
+                let path = format!("shell:AppsFolder\\{aumid}");
+                if apps.iter().any(|a| a.path.eq_ignore_ascii_case(&path)) { continue; }
+                let name = unsafe { store_display_name(&aumid) }
+                    .unwrap_or_else(|| aumid.split_once('!').map(|(_, a)| a.to_string()).unwrap_or_else(|| aumid.clone()));
+                apps.push(AppInfo { name, path, icon: None, is_running: false, hwnd: None, executable: None, all_hwnds: None, args: None });
+                continue;
+            }
+        };
         let name = lnk.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_default();
         let lnk_str = lnk.to_string_lossy().to_string();
 
@@ -133,6 +201,7 @@ pub fn read_pins() -> Option<Vec<AppInfo>> {
             continue;
         };
 
+        if path.to_lowercase().starts_with("shell:appsfolder") && apps.iter().any(|a| a.path.eq_ignore_ascii_case(&path)) { continue; }
         apps.push(AppInfo { name, path, icon: None, is_running: false, hwnd: None, executable, all_hwnds: None, args });
     }
     Some(apps)
@@ -196,4 +265,25 @@ pub fn icon_for_target(target: &str) -> Option<String> {
     let lower = target.to_lowercase();
     let (_, lnk) = pin_shortcuts().iter().find(|(t, _)| *t == lower)?;
     unsafe { shortcut_custom_icon(lnk) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn utf16(s: &str) -> Vec<u8> {
+        s.encode_utf16().flat_map(|u| u.to_le_bytes()).collect()
+    }
+
+    #[test]
+    fn finds_store_pins_at_either_alignment() {
+        let mut blob = vec![1u8, 2, 3];
+        blob.extend(utf16("Claude_pzs8sxrjxfjjc!Claude"));
+        blob.extend([0, 0, 9]);
+        blob.extend(utf16("com.squirrel.Discord.Discord"));
+        blob.extend([0, 0]);
+        blob.extend(utf16("Claude_3.6556.1.0_x64__pzs8sxrjxfjjc"));
+        let found: Vec<String> = store_pins(&blob).into_iter().map(|(_, t)| t).collect();
+        assert_eq!(found, vec!["Claude_pzs8sxrjxfjjc!Claude".to_string()]);
+    }
 }

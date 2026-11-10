@@ -1,5 +1,7 @@
 import { AgentSounds } from "./AgentSounds";
+import { AgentIntro } from "./AgentIntro";
 import { NotchEdgeDelay } from "./NotchEdgeDelay";
+import { EdgeArea } from "./EdgeArea";
 import { NetWidgetMode } from "./NetWidgetMode";
 import { NotchHotkey } from "./NotchHotkey";
 import {
@@ -237,6 +239,7 @@ export function NotchTab({
         )}
 
         {notchMode !== "fixed" && <NotchEdgeDelay />}
+        {notchMode !== "fixed" && <EdgeArea settingKey="nectar-notch-edge-area" />}
 
         <SettingRow icon={MonitorCheck} label={t("common.showOn")} desc={t("notch.showOn.desc")}>
           <Dropdown
@@ -418,27 +421,6 @@ export function NotchTab({
       </SettingSection>
 
       <SettingSection id="notch-panels" title={t("notch.section.panels")}>
-        <SettingRow icon={SlidersHorizontal} label={t("notch.panelControlCenter")} desc={t("notch.panelControlCenter.desc")}>
-              <label className="toggle-switch">
-                <input type="checkbox" checked={panelControlCenter} onChange={togglePanelControlCenter} />
-                <span className="slider"></span>
-              </label>
-            </SettingRow>
-
-        <SettingRow icon={Activity} label={t("notch.panelStatus")} desc={t("notch.panelStatus.desc")}>
-              <label className="toggle-switch">
-                <input type="checkbox" checked={panelStatus} onChange={togglePanelStatus} />
-                <span className="slider"></span>
-              </label>
-            </SettingRow>
-
-        <SettingRow icon={Inbox} label={t("notch.panelShelf")} desc={t("notch.panelShelf.desc")}>
-              <label className="toggle-switch">
-                <input type="checkbox" checked={panelShelf} onChange={togglePanelShelf} />
-                <span className="slider"></span>
-              </label>
-            </SettingRow>
-
         <SettingRow icon={History} label={t("notch.rememberMode")} desc={t("notch.rememberMode.desc")}>
               <label className="toggle-switch">
                 <input type="checkbox" checked={rememberMode} onChange={toggleRememberMode} />
@@ -466,6 +448,8 @@ export function NotchTab({
               return <Icon size={14} strokeWidth={2} />;
             }}
             onReorder={(order) => reorderPanels(order as PanelId[])}
+            enabled={(id) => ({ "command-center": panelControlCenter, status: panelStatus, shelf: panelShelf, music: musicModeEnabled, calendar: calendarEnabled } as Record<string, boolean>)[id] ?? true}
+            onToggle={(id) => ({ "command-center": togglePanelControlCenter, status: togglePanelStatus, shelf: togglePanelShelf, music: toggleMusicMode, calendar: toggleCalendar } as Record<string, () => void>)[id]?.()}
             onReset={panelOrder ? resetPanelOrder : undefined}
             resetLabel={t("notch.panelOrder.reset")}
           />
@@ -488,6 +472,7 @@ export function NotchTab({
             <span className="slider"></span>
           </label>
         </SettingRow>
+        <AgentIntro enabled={agentApi} />
         <AgentSounds />
       </SettingSection>
 

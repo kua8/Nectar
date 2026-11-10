@@ -476,7 +476,7 @@ body {
   justify-content: center;
   align-items: center;
   border-radius: 12px;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.05) 100%);
+  background: rgba(255, 255, 255, 0.1);
   color: var(--nectar-text, white);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   transition: opacity 0.2s ease;
@@ -1104,4 +1104,34 @@ body {
 
 .preview-fallback-glyph {
   opacity: 0.5;
+}
+
+.rename-popup {
+  width: 240px;
+  padding-bottom: 8px;
+}
+
+.rename-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 4px 10px 2px;
+}
+
+.rename-btn {
+  height: 26px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--nectar-group-bg, rgba(255, 255, 255, 0.12));
+  color: inherit;
+}
+
+.rename-btn.primary {
+  background: var(--nectar-text, #fff);
+  color: var(--nectar-bg-expanded, #000);
 }

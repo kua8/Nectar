@@ -9,14 +9,16 @@ use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
 const MAX_HEAD: usize = 8192;
-const MAX_BODY: usize = 4096;
+const MAX_BODY: usize = 8192;
 const MAX_CONNECTIONS: usize = 8;
 const ASK_WAIT: u64 = 120;
+const DETAIL_MAX: usize = 600;
 const SETTING: &str = "nectar-agent-api";
 
 static ACTIVE: AtomicUsize = AtomicUsize::new(0);
 static NEXT_ASK: AtomicU64 = AtomicU64::new(1);
-static PENDING: Mutex<Option<HashMap<u64, mpsc::Sender<bool>>>> = Mutex::new(None);
+type Decision = (bool, Vec<usize>);
+static PENDING: Mutex<Option<HashMap<u64, mpsc::Sender<Decision>>>> = Mutex::new(None);
 
 #[derive(Deserialize)]
 struct Incoming {
@@ -34,6 +36,13 @@ struct IncomingAsk {
     window: Option<u64>,
     tool: Option<String>,
     detail: Option<String>,
+    questions: Option<Vec<AskQuestion>>,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct AskQuestion {
+    question: String,
+    options: Vec<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -41,6 +50,7 @@ struct Ask {
     id: u64,
     tool: Option<String>,
     detail: Option<String>,
+    questions: Option<Vec<AskQuestion>>,
 }
 
 #[derive(Serialize, Clone)]
@@ -103,20 +113,20 @@ fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
     haystack.windows(needle.len()).position(|w| w == needle)
 }
 
-pub fn answer(id: u64, allow: bool) {
+pub fn answer(id: u64, allow: bool, choices: Vec<usize>) {
     let sender = PENDING.lock().ok().and_then(|mut map| map.as_mut().and_then(|m| m.remove(&id)));
     if let Some(sender) = sender {
-        let _ = sender.send(allow);
+        let _ = sender.send((allow, choices));
     }
 }
 
-fn wait_for_answer(stream: &mut TcpStream, id: u64, rx: &mpsc::Receiver<bool>) -> Option<bool> {
+fn wait_for_answer(stream: &mut TcpStream, id: u64, rx: &mpsc::Receiver<Decision>) -> Option<Decision> {
     let _ = stream.set_nonblocking(true);
     let mut waited = 0;
     while waited < ASK_WAIT {
-        if let Ok(allow) = rx.recv_timeout(Duration::from_secs(1)) {
+        if let Ok(decision) = rx.recv_timeout(Duration::from_secs(1)) {
             let _ = stream.set_nonblocking(false);
-            return Some(allow);
+            return Some(decision);
         }
         waited += 1;
         let mut probe = [0u8; 1];
@@ -201,13 +211,27 @@ fn handle(mut stream: TcpStream, app: &AppHandle, token: &str) {
                 project: project.clone(),
                 window,
                 detail: None,
-                ask: Some(Ask { id, tool: clean(incoming.tool, 40), detail: clean(incoming.detail, 200) }),
+                ask: Some(Ask {
+                    id,
+                    tool: clean(incoming.tool, 40),
+                    detail: clean(incoming.detail, DETAIL_MAX),
+                    questions: incoming.questions.map(|list| {
+                        list.into_iter()
+                            .take(4)
+                            .filter_map(|q| {
+                                let question = clean(Some(q.question), DETAIL_MAX)?;
+                                Some(AskQuestion { question, options: q.options.into_iter().filter_map(|o| clean(Some(o), 80)).take(4).collect() })
+                            })
+                            .collect()
+                    }),
+                }),
                 cancelled: None,
             },
         );
         return match wait_for_answer(&mut stream, id, &rx) {
-            Some(true) => reply_json(&mut stream, r#"{"decision":"allow"}"#),
-            Some(false) => reply_json(&mut stream, r#"{"decision":"deny"}"#),
+            Some((true, choices)) if !choices.is_empty() => reply_json(&mut stream, &serde_json::json!({ "decision": "allow", "choices": choices }).to_string()),
+            Some((true, _)) => reply_json(&mut stream, r#"{"decision":"allow"}"#),
+            Some((false, _)) => reply_json(&mut stream, r#"{"decision":"deny"}"#),
             None => {
                 let _ = app.emit("agent-activity", Activity { state: "working", name, project, window, detail: None, ask: None, cancelled: Some(id) });
                 reply(&mut stream, "204 No Content");
@@ -226,7 +250,7 @@ fn handle(mut stream: TcpStream, app: &AppHandle, token: &str) {
         name: clean(incoming.name, 40),
         project: clean(incoming.project, 40),
         window: incoming.window,
-        detail: clean(incoming.detail, 200),
+        detail: clean(incoming.detail, DETAIL_MAX),
         ask: None,
         cancelled: None,
     });
@@ -471,29 +495,64 @@ fn ask(args: &[String]) {
     let _ = std::io::stdin().read_to_string(&mut input);
     let event: serde_json::Value = serde_json::from_str(&input).unwrap_or_default();
     let tool_input = &event["tool_input"];
+    let detail: Option<String>;
+    let mut asked: Option<Vec<(String, Vec<String>)>> = None;
     if event["tool_name"].as_str() == Some("AskUserQuestion") {
-        let question = tool_input["questions"][0]["question"].as_str().map(str::to_string);
-        let mut forwarded = vec!["needs-input".to_string()];
-        forwarded.extend(args.iter().cloned());
-        let _ = send_with(&forwarded, question);
-        return;
+        let list = tool_input["questions"].as_array().cloned().unwrap_or_default();
+        let parsed: Vec<(String, Vec<String>)> = list
+            .iter()
+            .filter(|q| q["multiSelect"].as_bool() != Some(true))
+            .filter_map(|q| {
+                let labels: Vec<String> = q["options"].as_array()?.iter().filter_map(|o| o["label"].as_str().map(str::to_string)).collect();
+                (2..=4).contains(&labels.len()).then(|| Some((q["question"].as_str()?.to_string(), labels))).flatten()
+            })
+            .collect();
+        if list.is_empty() || list.len() > 4 || parsed.len() != list.len() {
+            let mut forwarded = vec!["needs-input".to_string()];
+            forwarded.extend(args.iter().cloned());
+            let _ = send_with(&forwarded, list.first().and_then(|q| q["question"].as_str()).map(str::to_string));
+            return;
+        }
+        detail = None;
+        asked = Some(parsed);
+    } else {
+        detail = ["command", "file_path", "url", "pattern", "description"]
+            .iter()
+            .find_map(|key| tool_input.get(*key).and_then(|v| v.as_str()))
+            .map(str::to_string)
+            .or_else(|| (!tool_input.is_null()).then(|| tool_input.to_string()));
     }
-    let detail = ["command", "file_path", "url", "pattern", "description"]
-        .iter()
-        .find_map(|key| tool_input.get(*key).and_then(|v| v.as_str()))
-        .map(str::to_string)
-        .or_else(|| (!tool_input.is_null()).then(|| tool_input.to_string()));
+    let detail = detail.map(|d| d.chars().take(DETAIL_MAX).collect::<String>());
+    let questions = asked.as_ref().map(|list| list.iter().map(|(q, o)| serde_json::json!({ "question": q, "options": o })).collect::<Vec<_>>());
     let body = serde_json::json!({
         "name": name,
         "project": project,
         "window": ancestor_window(),
         "tool": event["tool_name"].as_str(),
         "detail": detail,
+        "questions": questions,
     })
     .to_string();
 
     let Some(response) = post("/ask", body, ASK_WAIT + 5) else { return };
     let decision = response.split("\r\n\r\n").nth(1).and_then(|b| serde_json::from_str::<serde_json::Value>(b).ok());
+    if let Some(asked) = asked {
+        let Some(choices) = decision.as_ref().and_then(|d| d["choices"].as_array()) else { return };
+        if choices.len() != asked.len() {
+            return;
+        }
+        let mut answers = serde_json::Map::new();
+        for ((question, labels), choice) in asked.iter().zip(choices) {
+            let Some(label) = choice.as_u64().and_then(|i| labels.get(i as usize)) else { return };
+            answers.insert(question.clone(), serde_json::Value::String(label.clone()));
+        }
+        let updated = serde_json::json!({ "questions": tool_input["questions"], "answers": answers });
+        println!(
+            "{}",
+            serde_json::json!({ "hookSpecificOutput": { "hookEventName": "PermissionRequest", "decision": { "behavior": "allow", "updatedInput": updated } } })
+        );
+        return;
+    }
     let behavior = match decision.as_ref().and_then(|d| d["decision"].as_str()) {
         Some("allow") => serde_json::json!({ "behavior": "allow" }),
         Some("deny") => serde_json::json!({ "behavior": "deny", "message": "Denied from Nectar" }),

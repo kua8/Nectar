@@ -1025,20 +1025,27 @@ function OverlayApp() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
           >
+            <motion.div
+              className="splash-glow"
+              initial={{ scale: 0.6, opacity: 0 }}
+              animate={{ scale: [0.6, 1, 1.15, 1.5], opacity: [0, 0.6, 0.4, 0] }}
+              transition={{ duration: 2.6, times: [0, 0.3, 0.7, 1], ease: "easeInOut" }}
+            />
             <motion.img
               src="/nectar.png"
               className="splash-logo"
               draggable={false}
-              initial={{ scale: 0, opacity: 0, rotate: 0 }}
+              initial={{ scale: 0.82, opacity: 0, y: 10, filter: "blur(14px)" }}
               animate={{
-                scale: [0, 1.1, 1, 1.2, 1, 1, 0.2],
-                opacity: [0, 1, 1, 1, 1, 1, 0],
-                rotate: [0, 0, 0, 0, 0, 540, 1080],
+                scale: [0.82, 1.04, 1, 1, 1.12],
+                opacity: [0, 1, 1, 1, 0],
+                y: [10, 0, 0, 0, -6],
+                filter: ["blur(14px)", "blur(0px)", "blur(0px)", "blur(0px)", "blur(8px)"],
               }}
               transition={{
-                duration: 3.2,
-                times: [0, 0.17, 0.3, 0.43, 0.56, 0.78, 1],
-                ease: ["easeOut", "easeInOut", "easeInOut", "easeInOut", "linear", "linear"],
+                duration: 2.6,
+                times: [0, 0.3, 0.42, 0.75, 1],
+                ease: ["easeOut", "easeInOut", "linear", "easeIn"],
               }}
               onAnimationComplete={onSplashComplete}
             />

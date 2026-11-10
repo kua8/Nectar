@@ -20,9 +20,20 @@ async function sourceFor(state: SoundState) {
   return source;
 }
 
+export const soundKey = (state: SoundState) => `nectar-agent-sound-${state}`;
+
+export function stateSoundOn(state: SoundState) {
+  try {
+    const value = localStorage.getItem(soundKey(state));
+    return value === null ? state !== "done" : value === "true";
+  } catch {
+    return state !== "done";
+  }
+}
+
 export async function playAgentSound(state: SoundState, force = false) {
   try {
-    if (!force && localStorage.getItem("nectar-agent-sounds") === "false") return;
+    if (!force && (localStorage.getItem("nectar-agent-sounds") === "false" || !stateSoundOn(state))) return;
     const audio = new Audio(await sourceFor(state));
     audio.volume = 0.6;
     await audio.play();

@@ -1917,3 +1917,56 @@ input:checked + .slider:before {
   0%, 35% { background: color-mix(in srgb, var(--nectar-accent, #0a84ff) 28%, transparent); }
   100% { background: transparent; }
 }
+
+.agent-legend {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 4px 16px 14px;
+}
+
+.agent-legend-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--nectar-group-bg, rgba(255, 255, 255, 0.04));
+}
+
+.agent-legend-item > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.agent-legend-item b {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.agent-legend-item span:not(.agent-legend-dot) {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--text-muted);
+}
+
+.agent-legend-dot {
+  width: 9px;
+  height: 9px;
+  margin-top: 4px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.panel-order-item.off .panel-order-name,
+.panel-order-item.off .panel-order-icon {
+  opacity: 0.45;
+}
+
+.panel-order-toggle {
+  margin-left: auto;
+  margin-right: 10px;
+  flex: none;
+}

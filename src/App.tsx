@@ -7,7 +7,7 @@ import type { UpdateCheckResult } from "./updater";
 import "./App.css";
 import "./surfaces.css";
 import { initTheme } from "./theme";
-import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, VolumeLowIcon, VolumeHighIcon, MusicNoteIcon } from "./icons";
+import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, VolumeLowIcon, VolumeHighIcon, VolumeLevelIcon, MusicNoteIcon } from "./icons";
 import { CompactMediaPlayer } from "./CompactMediaPlayer";
 import { artTheme, FALLBACK_THEME, type ArtTheme } from "./music/palette";
 import { useWeather } from "./hooks/useWeather";
@@ -46,6 +46,15 @@ import {
   Wifi,
   WifiOff,
   EthernetPort,
+  LayoutGrid,
+  Bluetooth as BluetoothLucide,
+  Settings as SettingsLucide,
+  Moon,
+  PanelBottom,
+  PanelTop,
+  Bell,
+  RotateCw,
+  BatteryCharging,
 } from "lucide-react";
 import { setVisibleInterval } from "./hooks/visibleInterval";
 
@@ -107,14 +116,7 @@ const playTimerChime = () => {
 
 // Simple SVG icons
 function WifiIcon({ enabled, connected }: { enabled: boolean; connected: boolean }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" opacity={!enabled ? 0.4 : connected ? 1 : 0.7}>
-      <path d="M5 12.55a11 11 0 0 1 14.08 0" />
-      <path d="M1.42 9a16 16 0 0 1 21.16 0" />
-      <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
-      <line x1="12" y1="20" x2="12.01" y2="20" />
-    </svg>
-  );
+  return <Wifi size={16} strokeWidth={2} opacity={!enabled ? 0.4 : connected ? 1 : 0.7} />;
 }
 
 function formatDuration(seconds: number): string {
@@ -132,26 +134,11 @@ function batteryTooltip(charging: boolean, level: number, secondsLeft: number | 
 }
 
 function EthernetIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="4" y="4" width="16" height="11" rx="2" />
-      <path d="M8 15v3h8v-3" />
-      <line x1="9" y1="8" x2="9" y2="11" />
-      <line x1="12" y1="8" x2="12" y2="11" />
-      <line x1="15" y1="8" x2="15" y2="11" />
-    </svg>
-  );
+  return <EthernetPort size={16} strokeWidth={2} />;
 }
 
 function TrayIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="6" height="6" rx="1" />
-      <rect x="15" y="3" width="6" height="6" rx="1" />
-      <rect x="15" y="15" width="6" height="6" rx="1" />
-      <rect x="3" y="15" width="6" height="6" rx="1" />
-    </svg>
-  );
+  return <LayoutGrid size={16} strokeWidth={2} />;
 }
 
 function BatteryIcon({ charging, level, threshold = 20 }: { charging: boolean; level: number; threshold?: number }) {
@@ -552,6 +539,7 @@ function App() {
   const [dockEnabled, setDockEnabled] = useState(() => localStorage.getItem("nectar-dock-enabled") !== "false");
   const [isNotchHovered, setIsNotchHovered] = useState(false);
   const [agentActivity, setAgentActivity] = useState<AgentActivity | null>(null);
+  const [agentPicks, setAgentPicks] = useState<{ id: number; choices: number[] }>({ id: 0, choices: [] });
   const lastAgentKey = useRef("");
   const windowLabelRef = useRef("");
   windowLabelRef.current = windowLabel;
@@ -894,7 +882,7 @@ function App() {
         try {
           const parsed = JSON.parse(widgetsVal);
           if (parsed && Array.isArray(parsed.left) && Array.isArray(parsed.right)) {
-            setStatusWidgets(parsed);
+            setStatusWidgets({ ...parsed, left: parsed.left.slice(0, 2), right: parsed.right.slice(0, 2) });
           }
         } catch {}
       }
@@ -998,7 +986,7 @@ function App() {
         try {
           const parsed = JSON.parse(value);
           if (parsed && Array.isArray(parsed.left) && Array.isArray(parsed.right)) {
-            setStatusWidgets(parsed);
+            setStatusWidgets({ ...parsed, left: parsed.left.slice(0, 2), right: parsed.right.slice(0, 2) });
           }
         } catch {}
       },
@@ -1957,7 +1945,7 @@ function App() {
   }, [nectarMode, panelControlCenter, panelShelf]);
 
   useEffect(() => {
-    if (nectarMode === 'agent' && !agentActivity) setNectarMode('status');
+    if (nectarMode === 'agent' && (!agentActivity || agentActivity.state === 'working' || agentActivity.state === 'tool' || agentActivity.state === 'done')) setNectarMode('status');
   }, [nectarMode, agentActivity]);
 
   // Music mode shows any time we have media info (playing or paused) and music mode setting is enabled
@@ -1977,20 +1965,23 @@ function App() {
   );
 
   // Calculate width dynamically based on enabled features
-  const agentNeedsYou = !!agentActivity && isNotchWindow;
+  const agentNeedsYou = !!agentActivity && isNotchWindow && (agentActivity.state === 'needs_input' || agentActivity.state === 'error');
   const agentWings = !!agentActivity && isNotchWindow && !isHovered && (nectarMode === 'status' || isMusicMode);
 
   const getDynamicWidth = () => {
+    const widgetsRowWidth = isHovered && statusWidgets.left.length + statusWidgets.right.length > 0
+      ? Math.min(200 + Math.max(statusWidgets.left.length, statusWidgets.right.length) * 2 * 65, 530) + dualClockExtra
+      : 0;
     if (nectarMode === 'agent') return 340;
-    if (nectarMode === 'shelf') return Math.max(300, Math.min(120 + shelf.items.length * 70, 460));
-    if (isCalendarMode) return Math.max(settingsCalendarEnabled && showClockColumn ? 480 : settingsCalendarEnabled ? 310 : 270, 140 + dualClockExtra);
+    if (nectarMode === 'shelf') return Math.max(300, Math.min(120 + shelf.items.length * 70, 460), widgetsRowWidth);
+    if (isCalendarMode) return Math.max(settingsCalendarEnabled && showClockColumn ? 480 : settingsCalendarEnabled ? 310 : 270, 140 + dualClockExtra, widgetsRowWidth);
     if (nectarMode === 'command-center' && isHovered) {
       const totalWidgets = Math.max(statusWidgets.left.length, statusWidgets.right.length) * 2;
-      return Math.max(390, Math.min(200 + totalWidgets * 80, 780)) + dualClockExtra;
+      return Math.max(390, Math.min(200 + totalWidgets * 65, 530)) + dualClockExtra;
     }
     if (nectarMode === 'status' && isHovered) {
       const totalWidgets = Math.max(statusWidgets.left.length, statusWidgets.right.length) * 2;
-      return Math.min(200 + totalWidgets * 80, 780) + dualClockExtra;
+      return Math.min(200 + totalWidgets * 65, 530) + dualClockExtra;
     }
     if (isMusicMode && isHovered) return mediaLayout === 'compact' ? 300 : 340;
     if ((showPowerPulse || showLowBatteryPulse || showUpdatePulse) && !isHovered) return 200;
@@ -2012,7 +2003,16 @@ function App() {
     if (!isExpanded || isHidden) {
       return isImpacted ? 28.9 : 44.2;
     }
-    if (nectarMode === 'agent') return agentActivity?.ask ? 184 : agentActivity?.detail ? 160 : 130;
+    if (nectarMode === 'agent') {
+      const ask = agentActivity?.ask;
+      const qs = ask?.questions;
+      const text = qs ? qs.reduce((a, q) => (q.question.length > a.length ? q.question : a), '') : ask?.detail ?? agentActivity?.detail ?? '';
+      const lines = Math.min(8, Math.ceil(text.length / 44));
+      const chipRows = qs ? Math.max(...qs.map(q => Math.ceil(q.options.reduce((n, o) => n + o.length * 6.5 + 36, 0) / 300))) : 0;
+      if (qs) return Math.min(380, 100 + lines * 16 + chipRows * 30);
+      const base = ask ? 184 : text ? 160 : 130;
+      return Math.min(300, base + Math.max(0, lines - 2) * 16);
+    }
     if (nectarMode === 'shelf') return shelf.items.length === 0 ? 96 : 176;
     if (nectarMode === 'calendar') return settingsCalendarEnabled ? (caldav.connected ? 350 : 310) : 262;
     if (nectarMode === 'command-center') {
@@ -2426,7 +2426,7 @@ function App() {
                                   initial={{ opacity: 0 }}
                                   animate={{ opacity: 1 }}
                                   exit={{ opacity: 0 }}
-                                  transition={{ duration: 0.2 }}
+                                  transition={{ duration: 0.2, delay: 0.18 }}
                                 >
                                   {statusWidgets.left.map(renderStatusWidget)}
                                 </motion.div>
@@ -2569,7 +2569,7 @@ function App() {
                                   initial={{ opacity: 0 }}
                                   animate={{ opacity: 1 }}
                                   exit={{ opacity: 0 }}
-                                  transition={{ duration: 0.2 }}
+                                  transition={{ duration: 0.2, delay: 0.18 }}
                                 >
                                   {statusWidgets.right.map(renderStatusWidget)}
                                 </motion.div>
@@ -2592,7 +2592,7 @@ function App() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0, transition: { duration: 0.1 } }}
-                    transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 30, delay: 0.12 }}
                   >
                     {showConnections && (
                       <ConnectionsView
@@ -2610,6 +2610,7 @@ function App() {
                       <div
                         className={`cc-pill-tile ${showLan || wifiEnabled ? 'active' : ''}`}
                         style={ccStyle("tiles", "network")}
+                        {...tip(t(showLan ? "cc.tip.ethernet" : "cc.tip.wifi"))}
                         onClick={(e) => { e.stopPropagation(); if (showLan) invoke('open_ethernet_settings'); else toggleWifi(); }}
                         onContextMenu={handleWifiRightClick}
                       >
@@ -2629,6 +2630,7 @@ function App() {
                       <div
                         className={`cc-pill-tile ${dockMode === 'fixed' ? 'active' : ''}`}
                         style={ccStyle("tiles", "dock-mode")}
+                        {...tip(t("cc.tip.dockMode"))}
                         onClick={toggleDockModeSetting}
                       >
                         <div className="cc-pill-icon-wrapper">
@@ -2644,6 +2646,7 @@ function App() {
                       <div
                         className={`cc-pill-tile ${bluetoothEnabled ? 'active' : ''}`}
                         style={ccStyle("tiles", "bluetooth")}
+                        {...tip(t("cc.tip.bluetooth"))}
                         onClick={(e) => { e.stopPropagation(); toggleBluetooth(); }}
                         onContextMenu={handleBluetoothRightClick}
                       >
@@ -2663,6 +2666,7 @@ function App() {
                       <div
                         className={`cc-pill-tile ${notchMode === 'fixed' ? 'active' : ''}`}
                         style={ccStyle("tiles", "notch-mode")}
+                        {...tip(t("cc.tip.notchMode"))}
                         onClick={toggleNotchModeSetting}
                       >
                         <div className="cc-pill-icon-wrapper">
@@ -2736,7 +2740,7 @@ function App() {
                           {...(settingsLegacyMode ? {} : tip(t('cc.outputDevice')))}
                           onClick={settingsLegacyMode ? undefined : (e) => { e.stopPropagation(); setCcView('audio'); }}
                         >
-                          <VolumeLowIcon style={{ opacity: 0.5 }} />
+                          <VolumeLevelIcon level={displayVolume} style={{ opacity: 0.5 }} />
                           <span>{t("cc.volume")}</span>
                           {!settingsLegacyMode && <span className="cc-label-more">›</span>}
                         </div>
@@ -2759,8 +2763,8 @@ function App() {
 
                       {/* Brightness Slider */}
                       <div className="cc-classic-slider-row" style={ccStyle("sliders", "brightness")} onWheel={handleBrightnessWheel}>
-                        <div className="cc-classic-slider-label">
-                          <BrightnessLowIcon />
+                        <div className="cc-classic-slider-label" {...tip(t("cc.tip.brightness"))}>
+                          <BrightnessIcon level={currentBrightness} />
                           <span>{t("cc.brightness")}</span>
                         </div>
                         <div className="cc-classic-slider-track">
@@ -2851,10 +2855,12 @@ function App() {
                   >
                     <AgentPanel
                       activity={agentActivity}
+                      picks={agentPicks.id === agentActivity.ask?.id ? agentPicks.choices : []}
+                      onPick={(choices) => setAgentPicks({ id: agentActivity.ask?.id ?? 0, choices })}
                       onOpen={() => { if (agentActivity.window) invoke('focus_agent_window', { window: agentActivity.window }).catch(() => { }); }}
                       onDismiss={() => { setAgentActivity(null); setNectarMode('status'); }}
-                      onAnswer={(allow) => {
-                        if (agentActivity.ask) invoke('agent_answer', { id: agentActivity.ask.id, allow }).catch(() => { });
+                      onAnswer={(allow, choices) => {
+                        if (agentActivity.ask) invoke('agent_answer', { id: agentActivity.ask.id, allow, choices }).catch(() => { });
                         setAgentActivity({ ...agentActivity, state: 'working', ask: undefined });
                         setNectarMode('status');
                       }}
@@ -2949,84 +2955,47 @@ function App() {
 }
 
 function BluetoothIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M6.5 6.5l11 11L12 23V1l5.5 5.5-11 11" />
-    </svg>
-  );
+  return <BluetoothLucide size={16} strokeWidth={2} />;
 }
 
 function SettingsIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.9 }}>
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-    </svg>
-  );
+  return <SettingsLucide size={16} strokeWidth={2} />;
 }
 
-function BrightnessLowIcon() {
+function BrightnessIcon({ level }: { level: number }) {
+  const rays = [[12, 2.5, 12, 5], [12, 19, 12, 21.5], [2.5, 12, 5, 12], [19, 12, 21.5, 12], [5.3, 5.3, 7, 7], [17, 17, 18.7, 18.7], [5.3, 18.7, 7, 17], [17, 7, 18.7, 5.3]];
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
-      <circle cx="12" cy="12" r="5" fill="currentColor" />
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
+      <circle cx="12" cy="12" r="4.2" fill="currentColor" />
+      <g opacity={0.35 + (Math.min(100, Math.max(0, level)) / 100) * 0.65}>
+        {rays.map(([x1, y1, x2, y2], i) => <line key={i} x1={x1} y1={y1} x2={x2} y2={y2} />)}
+      </g>
     </svg>
   );
 }
 
 function MoonIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-    </svg>
-  );
+  return <Moon size={16} strokeWidth={2} />;
 }
 
 function DockIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="14" width="20" height="8" rx="2" />
-      <line x1="6" y1="18" x2="6.01" y2="18" strokeWidth="3.5" strokeLinecap="round" />
-      <line x1="10" y1="18" x2="10.01" y2="18" strokeWidth="3.5" strokeLinecap="round" />
-      <line x1="14" y1="18" x2="14.01" y2="18" strokeWidth="3.5" strokeLinecap="round" />
-      <line x1="18" y1="18" x2="18.01" y2="18" strokeWidth="3.5" strokeLinecap="round" />
-    </svg>
-  );
+  return <PanelBottom size={16} strokeWidth={2} />;
 }
 
 function NotchIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 3h16a2 2 0 0 1 2 2v2a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" />
-      <path d="M9 9v4a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2V9" />
-    </svg>
-  );
+  return <PanelTop size={16} strokeWidth={2} />;
 }
 
 function BellIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9z" />
-      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-    </svg>
-  );
+  return <Bell size={16} strokeWidth={2} />;
 }
 
 function ReloadIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
-    </svg>
-  );
+  return <RotateCw size={16} strokeWidth={2} />;
 }
 
 function BatterySaverIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="7" width="16" height="10" rx="2" />
-      <path d="M22 11v2" />
-      <path d="M6 12h4l2-3v6l-2-3H6" />
-    </svg>
-  );
+  return <BatteryCharging size={16} strokeWidth={2} />;
 }
 
 export default App;

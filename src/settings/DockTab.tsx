@@ -10,6 +10,7 @@ import { usePerMonitor } from "./usePerMonitor";
 import { useT } from "../i18n";
 import { HideDelay } from "./HideDelay";
 import { PreviewDelay } from "./PreviewDelay";
+import { EdgeArea } from "./EdgeArea";
 import { ShortcutField } from "./ShortcutField";
 
 const SEARCH_PROVIDERS = ["windows", "cmdpal", "ptrun", "raycast", "shortcut"];
@@ -203,6 +204,7 @@ export function DockTab({
             )}
 
             {dockMode !== "fixed" && <HideDelay />}
+            {dockMode !== "fixed" && <EdgeArea settingKey="nectar-dock-edge-area" />}
 
             <SettingRow icon={MonitorCheck} label={t("common.showOn")} desc={t("dock.showOn.desc")}>
               <Dropdown

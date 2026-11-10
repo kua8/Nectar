@@ -4,6 +4,7 @@ export { SkipBackIcon } from './SkipBackIcon';
 export { SkipForwardIcon } from './SkipForwardIcon';
 export { VolumeLowIcon } from './VolumeLowIcon';
 export { VolumeHighIcon } from './VolumeHighIcon';
+export { VolumeLevelIcon } from './VolumeLevelIcon';
 export { MusicNoteIcon } from './MusicNoteIcon';
 export { SpeakerIcon } from './SpeakerIcon';
 export { HeadphonesIcon } from './HeadphonesIcon';

@@ -12,6 +12,8 @@ interface Props {
   edgeRadius?: number;
   // Drawn inside the fill layer, so it is clipped to the same silhouette, flares included
   children?: ReactNode;
+  // Hides the outline while the surface is still growing, so it cannot trail the fill
+  settling?: boolean;
 }
 
 const INSET = 0.5;
@@ -60,7 +62,7 @@ function silhouette(edge: SurfaceEdge, w: number, h: number, f: number, r: numbe
   return { closed: false, d: `M ${P(w, -f)} ${arc(f, 1, w - f, i)} H ${X(rr)} ${arc(a, 0, i, rr)} V ${Y(h - rr)} ${arc(a, 0, rr, h - i)} H ${X(w - f)} ${arc(f, 1, w, h + f)}` };
 }
 
-export function SurfaceShape({ edge, flare, radius, edgeRadius = 0, children }: Props) {
+export function SurfaceShape({ edge, flare, radius, edgeRadius = 0, children, settling = false }: Props) {
   const ref = useRef<SVGSVGElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
 
@@ -94,7 +96,7 @@ export function SurfaceShape({ edge, flare, radius, edgeRadius = 0, children }: 
   return (
     <>
       <div className="surface-fill" style={fillStyle} aria-hidden="true">{children}</div>
-      <svg ref={ref} className="edge-outline" aria-hidden>
+      <svg ref={ref} className={`edge-outline${settling ? " settling" : ""}`} aria-hidden>
         {line && <path d={line.d} />}
       </svg>
     </>

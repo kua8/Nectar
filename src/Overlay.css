@@ -47,9 +47,19 @@ body,
 }
 
 .splash-logo {
+    position: relative;
     width: 120px;
     height: 120px;
     object-fit: contain;
+}
+
+.splash-glow {
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 68%);
+    pointer-events: none;
 }
 
 /* ─── Auto-Update Splash ─────────────────────────────────────────────────── */

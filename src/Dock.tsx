@@ -564,6 +564,30 @@ const Dock = memo(function Dock() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isShellSurfaceFocused, setIsShellSurfaceFocused] = useState(false);
   const [showAddPopup, setShowAddPopup] = useState(false);
+  const [renameApp, setRenameApp] = useState<AppInfo | null>(null);
+  const [dockNames, setDockNames] = useState<Record<string, string>>(() => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem("nectar-dock-names") ?? "{}");
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    } catch {
+      return {};
+    }
+  });
+  const popupOpen = showAddPopup || !!renameApp;
+  const displayName = (app: AppInfo) => dockNames[itemKey(app)] || app.name;
+  const saveName = (app: AppInfo, name: string) => {
+    const key = itemKey(app);
+    const next = { ...dockNames };
+    const trimmed = name.trim();
+    if (trimmed && trimmed !== app.name) next[key] = trimmed;
+    else delete next[key];
+    setDockNames(next);
+    const value = JSON.stringify(next);
+    localStorage.setItem("nectar-dock-names", value);
+    invoke("save_setting", { key: "nectar-dock-names", value }).catch(console.error);
+    setRenameApp(null);
+    invoke('set_menu_open', { open: false, rect: null }).catch(() => {});
+  };
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, app: AppInfo | null } | null>(null);
   const [contextMenuHeight, setContextMenuHeight] = useState(0);
   const [contextMenuWidth, setContextMenuWidth] = useState(0);
@@ -598,15 +622,15 @@ const Dock = memo(function Dock() {
   // Measure the dock pill when the popup opens. The card tucks ~14px behind it,
   // so the seam stays fused even if the measurement is slightly off.
   useEffect(() => {
-    if (showAddPopup) {
+    if (popupOpen) {
       const h = dockRef.current?.getBoundingClientRect().height ?? 0;
       if (h > 0) setPopupBottom(h / (scale || 1) - 14);
     }
-  }, [showAddPopup, scale]);
+  }, [popupOpen, scale]);
 
   const isCurrentlyHovered = isDockHovered || isEdgeHovered;
   const [interactionState, setInteractionState] = useState<'active' | 'grace' | 'none'>('none');
-  const isAnyInteraction = isCurrentlyHovered || !!contextMenu || showAddPopup;
+  const isAnyInteraction = isCurrentlyHovered || !!contextMenu || popupOpen;
   
   const previewTimerRef = useRef<any>(null);
   const isPreviewHoveredRef = useRef(false);
@@ -1084,6 +1108,7 @@ const Dock = memo(function Dock() {
 
   const closePopup = () => {
     setShowAddPopup(false);
+    setRenameApp(null);
     invoke('set_menu_open', { open: false, rect: null }).catch(() => {});
   };
 
@@ -1116,7 +1141,7 @@ const Dock = memo(function Dock() {
         height: Math.round(r.height) 
       };
       open = true;
-    } else if (showAddPopup && popupRef.current) {
+    } else if (popupOpen && popupRef.current) {
       const r = popupRef.current.getBoundingClientRect();
       rect = { 
         x: Math.round(r.x), 
@@ -1129,7 +1154,7 @@ const Dock = memo(function Dock() {
 
     invoke('set_menu_open', { open, rect }).catch(() => {});
 
-  }, [contextMenu, showAddPopup, pinnedApps, activeApps, activeSubmenu, scale]);
+  }, [contextMenu, popupOpen, pinnedApps, activeApps, activeSubmenu, scale]);
 
   const dockItems = useMemo(() => {
     const runningMap = new Map();
@@ -1189,7 +1214,7 @@ const Dock = memo(function Dock() {
       ...pinnedApps.map(p => {
         const running = findRunningApp(p);
         return { ...p, is_running: !!running, hwnd: running?.hwnd, all_hwnds: running?.all_hwnds };
-      })
+      }).filter(p => !hiddenApps.some(h => h.id === appIdentity(p.path, p.executable, p.name)))
     ];
 
     const unpinned = activeOrder
@@ -1577,6 +1602,7 @@ const Dock = memo(function Dock() {
         <SurfaceShape
           edge="bottom"
           flare={isExpanded && !isHidden ? 13 : 0}
+          settling={startupAnimating}
           radius={(isImpacted || isExpanded) && !isHidden ? 18 : 17}
           edgeRadius={(isImpacted || isExpanded) && !isHidden ? 0 : 17}
         />
@@ -1587,7 +1613,7 @@ const Dock = memo(function Dock() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
+              transition={{ duration: 0.15, delay: startupAnimating ? 0.3 : 0 }}
               className="dock-reorder-container"
             >
               {startItem && (
@@ -1758,7 +1784,7 @@ const Dock = memo(function Dock() {
                 
                 {/* Fallback to text tooltip if previews are disabled, app isn't running, or preview failed to load */}
                 {(!dockPreviewEnabled || (dockPreviewEnabled && hoveredApp === itemKey(app) && !previewData)) && (
-                  <div className="tooltip">{app.name}</div>
+                  <div className="tooltip">{displayName(app)}</div>
                 )}
                 <motion.div 
                   className="dock-icon"
@@ -1843,7 +1869,7 @@ const Dock = memo(function Dock() {
                         )}
                       </AnimatePresence>
                       {(!dockPreviewEnabled || (dockPreviewEnabled && hoveredApp === itemKey(app) && !previewData)) && (
-                        <div className="tooltip">{app.name}</div>
+                        <div className="tooltip">{displayName(app)}</div>
                       )}
                       <motion.div
                         className="dock-icon"
@@ -1924,7 +1950,7 @@ const Dock = memo(function Dock() {
                       </AnimatePresence>
 
                       {(!dockPreviewEnabled || (dockPreviewEnabled && hoveredApp === itemKey(app) && !previewData)) && (
-                        <div className="tooltip">{app.name}</div>
+                        <div className="tooltip">{displayName(app)}</div>
                       )}
                       <motion.div
                         className="dock-icon"
@@ -2004,7 +2030,7 @@ const Dock = memo(function Dock() {
               <div className="menu-item" onClick={() => togglePin(contextMenu.app!)}>
                 {contextMenu.app.is_pinned ? t("dockmenu.unpin") : t("dockmenu.pin")}
               </div>
-              {!contextMenu.app.is_pinned && contextMenu.app.is_running && contextMenu.app.path !== 'start' && (
+              {(contextMenu.app.is_pinned || contextMenu.app.is_running) && contextMenu.app.path !== 'start' && (
                 <div className="menu-item" onClick={() => hideFromDock(contextMenu.app!)}>
                   {t("dockmenu.hide")}
                 </div>
@@ -2036,6 +2062,11 @@ const Dock = memo(function Dock() {
                     ) : null;
                   })()}
                 </>
+              )}
+              {contextMenu.app.is_pinned && contextMenu.app.path !== 'start' && (
+                <div className="menu-item" onClick={() => { setRenameApp(contextMenu.app!); closeMenu(); }}>
+                  {t("dockmenu.rename")}
+                </div>
               )}
               <div className="menu-divider" />
               <div className="menu-item" onClick={() => { setShowAddPopup(true); closeMenu(); }}>
@@ -2080,6 +2111,17 @@ const Dock = memo(function Dock() {
       />
 
       <AnimatePresence>
+        {renameApp && (
+          <RenamePopup
+            containerRef={popupRef}
+            app={renameApp}
+            current={dockNames[itemKey(renameApp)] ?? ""}
+            scale={scale}
+            bottom={popupBottom}
+            onSave={(name) => saveName(renameApp, name)}
+            onClose={() => { setRenameApp(null); invoke('set_menu_open', { open: false, rect: null }).catch(() => {}); }}
+          />
+        )}
         {showAddPopup && (
           <AddAppPopup 
             containerRef={popupRef}
@@ -2110,6 +2152,63 @@ const Dock = memo(function Dock() {
     </div>
   );
 });
+
+function RenamePopup({ app, current, containerRef, scale, bottom, onSave, onClose }: {
+  app: AppInfo;
+  current: string;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  scale: number;
+  bottom: number;
+  onSave: (name: string) => void;
+  onClose: () => void;
+}) {
+  const t = useT();
+  const [value, setValue] = useState(current || app.name);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    invoke('set_window_keyboard_focus', { enabled: true })
+      .catch(() => {})
+      .finally(() => { inputRef.current?.focus(); inputRef.current?.select(); });
+    return () => {
+      invoke('set_window_keyboard_focus', { enabled: false }).catch(() => {});
+    };
+  }, []);
+
+  return (
+    <div className="add-popup-anchor" style={{ zoom: scale, bottom }}>
+      <motion.div
+        ref={containerRef}
+        className="add-app-popup rename-popup"
+        style={{ transformOrigin: "bottom center" }}
+        initial={{ opacity: 0, scaleY: 0 }}
+        animate={{ opacity: 1, scaleY: 1 }}
+        exit={{ opacity: 0, scaleY: 0, transition: { duration: 0.16, ease: "easeIn" } }}
+        transition={{ opacity: { duration: 0.15 }, scaleY: { type: "spring", stiffness: 300, damping: 28, mass: 0.9 } }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="popup-search-row">
+          <input
+            ref={inputRef}
+            type="text"
+            className="popup-search-input"
+            value={value}
+            maxLength={40}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onSave(value);
+              if (e.key === "Escape") onClose();
+            }}
+          />
+        </div>
+        <div className="rename-actions">
+          {current && <button type="button" className="rename-btn" onClick={() => onSave("")}>{t("dockmenu.renameReset")}</button>}
+          <button type="button" className="rename-btn primary" onClick={() => onSave(value)}>{t("dockmenu.renameSave")}</button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
 
 function AddAppPopup({
   onClose,

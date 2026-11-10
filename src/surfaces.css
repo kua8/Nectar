@@ -32,6 +32,15 @@
     z-index: 3;
 }
 
+.edge-outline {
+    transition: opacity 0.25s ease;
+}
+
+.edge-outline.settling {
+    opacity: 0;
+    transition: none;
+}
+
 .edge-outline path {
     fill: none;
     stroke: var(--surface-outline, rgba(255, 255, 255, 0.22));

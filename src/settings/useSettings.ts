@@ -368,7 +368,7 @@ export function useSettings() {
         try {
           const parsed = JSON.parse(widgetsVal);
           if (parsed && Array.isArray(parsed.left) && Array.isArray(parsed.right)) {
-            setStatusWidgets(parsed);
+            setStatusWidgets({ ...parsed, left: parsed.left.slice(0, 2), right: parsed.right.slice(0, 2) });
           }
         } catch {}
       }

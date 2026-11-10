@@ -238,8 +238,10 @@ export function StatusWidgetConfig({ value, onChange, hasBattery = true }: Statu
 
   const swapSide = (id: string) => {
     if (config.left.includes(id)) {
+      if (config.right.length >= MAX_PER_ZONE) return;
       emit({ left: config.left.filter((x) => x !== id), right: [...config.right, id] });
     } else {
+      if (config.left.length >= MAX_PER_ZONE) return;
       emit({ right: config.right.filter((x) => x !== id), left: [...config.left, id] });
     }
   };

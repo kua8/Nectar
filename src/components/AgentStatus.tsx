@@ -9,7 +9,7 @@ export interface AgentActivity {
   project?: string;
   window?: number;
   detail?: string;
-  ask?: { id: number; tool?: string; detail?: string };
+  ask?: { id: number; tool?: string; detail?: string; questions?: { question: string; options: string[] }[] };
   cancelled?: number;
 }
 
@@ -57,9 +57,18 @@ export function AgentLeft({ activity, dot }: { activity: AgentActivity; dot: boo
   );
 }
 
-export function AgentPanel({ activity, onOpen, onDismiss, onAnswer }: { activity: AgentActivity; onOpen: () => void; onDismiss: () => void; onAnswer: (allow: boolean) => void }) {
+export function AgentPanel({ activity, picks, onPick, onOpen, onDismiss, onAnswer }: { activity: AgentActivity; picks: number[]; onPick: (choices: number[]) => void; onOpen: () => void; onDismiss: () => void; onAnswer: (allow: boolean, choices?: number[]) => void }) {
   const t = useT();
   const { ask } = activity;
+  const questions = ask?.questions;
+  const step = picks.length;
+  const current = questions?.[step];
+  const options = current?.options;
+  const choose = (i: number) => {
+    const next = [...picks, i];
+    if (questions && next.length >= questions.length) onAnswer(true, next);
+    else onPick(next);
+  };
   return (
     <>
       <div className="agent-panel-head">
@@ -70,7 +79,20 @@ export function AgentPanel({ activity, onOpen, onDismiss, onAnswer }: { activity
         </div>
         <span className={`agent-dot ${activity.state}`} />
       </div>
-      {ask && (
+      {ask && current && options && (
+        <div className="agent-ask">
+          <span className="agent-ask-text">
+            {questions!.length > 1 && <em className="agent-step">{step + 1}/{questions!.length}</em>}
+            {current.question}
+          </span>
+          <div className="agent-options">
+            {options.map((label, i) => (
+              <button key={i} className="agent-btn agent-option" onClick={() => choose(i)}>{label}</button>
+            ))}
+          </div>
+        </div>
+      )}
+      {ask && !questions && (
         <div className="agent-ask">
           {ask.tool && <b>{ask.tool}</b>}
           {ask.detail && <code>{ask.detail}</code>}
@@ -81,7 +103,7 @@ export function AgentPanel({ activity, onOpen, onDismiss, onAnswer }: { activity
           <span className="agent-ask-text">{activity.detail}</span>
         </div>
       )}
-      <div className="agent-panel-actions">
+      {!questions && <div className="agent-panel-actions">
         {ask ? (
           <>
             <button className="agent-btn primary" onClick={() => onAnswer(true)}>{t("agent.allow")}</button>
@@ -90,7 +112,7 @@ export function AgentPanel({ activity, onOpen, onDismiss, onAnswer }: { activity
         ) : null}
         <button className={`agent-btn${ask ? "" : " primary"}`} onClick={onOpen} disabled={!activity.window}>{t("agent.open")}</button>
         {!ask && <button className="agent-btn" onClick={onDismiss}>{t("agent.dismiss")}</button>}
-      </div>
+      </div>}
     </>
   );
 }

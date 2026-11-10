@@ -1614,17 +1614,18 @@ img {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    flex: none;
+    border-radius: 8px;
     background: var(--nectar-group-bg, rgba(255, 255, 255, 0.08));
     color: var(--nectar-text, rgba(255, 255, 255, 0.9));
     transition: all 0.15s ease;
 }
 
 .cc-pill-icon-wrapper svg {
-    width: 14px;
-    height: 14px;
+    width: 16px;
+    height: 16px;
 }
 
 .cc-pill-info {
@@ -1660,23 +1661,29 @@ img {
 }
 
 .cc-pill-tile.active .cc-pill-icon-wrapper {
-    background: var(--nectar-group-bg, rgba(0, 0, 0, 0.08));
+    background: color-mix(in srgb, var(--nectar-on-highlight, var(--nectar-bg-expanded, #000)) 14%, transparent);
     color: var(--nectar-on-highlight, var(--nectar-bg-expanded, #000));
 }
 
 /* Circular Actions Row */
 .cc-circular-actions-row {
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 8px;
     width: 100%;
-    padding: 0 4px;
+    padding: 0;
+}
+
+.cc-circular-btn svg {
+    width: 16px;
+    height: 16px;
 }
 
 .cc-circular-btn {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
+    flex: 1;
+    min-width: 0;
+    height: 34px;
+    border-radius: 12px;
     background: var(--nectar-group-bg, rgba(255, 255, 255, 0.04));
     border: 1px solid var(--nectar-border, rgba(255, 255, 255, 0.02));
     color: var(--nectar-text-muted, rgba(255, 255, 255, 0.7));
@@ -2653,8 +2660,7 @@ img {
     box-shadow: 0 0 8px #60a5fa;
 }
 
-.agent-dot.working { animation: agent-pulse 1.2s ease-in-out infinite; }
-.agent-dot.tool { background: #a78bfa; box-shadow: 0 0 8px #a78bfa; animation: agent-pulse 0.8s ease-in-out infinite; }
+.agent-dot.working, .agent-dot.tool { animation: agent-pulse 1.2s ease-in-out infinite; }
 .agent-dot.needs_input { background: #ff9f43; box-shadow: 0 0 10px #ff9f43; animation: agent-pulse 0.55s ease-in-out infinite; }
 .agent-dot.done { background: #4ade80; box-shadow: 0 0 8px #4ade80; }
 .agent-dot.error { background: #ff5f5f; box-shadow: 0 0 8px #ff5f5f; }
@@ -2762,9 +2768,10 @@ img {
     background: var(--nectar-group-bg, rgba(255, 255, 255, 0.08));
     border-radius: 6px;
     padding: 4px 7px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 7.5em;
+    overflow-y: auto;
 }
 
 .agent-ask-text {
@@ -2772,7 +2779,42 @@ img {
     line-height: 1.35;
     white-space: normal;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 8;
     -webkit-box-orient: vertical;
     overflow: hidden;
+}
+
+.agent-options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.agent-option {
+    flex: none;
+    max-width: 100%;
+    height: 24px;
+    padding: 0 12px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 500;
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--nectar-border, rgba(255, 255, 255, 0.22));
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.agent-option:not(:disabled):hover {
+    background: var(--nectar-text, #fff);
+    color: var(--nectar-bg-expanded, #000);
+    filter: none;
+}
+
+.agent-step {
+    font-style: normal;
+    font-weight: 600;
+    margin-right: 6px;
+    color: var(--nectar-text-muted, rgba(255, 255, 255, 0.6));
 }

@@ -147,6 +147,7 @@ pub static LAST_BRIGHTNESS_CHANGE: AtomicI64 = AtomicI64::new(0);
 pub static ANY_MEDIA_PLAYING: AtomicBool = AtomicBool::new(false);
 pub static LAST_START_TOGGLE_MS: AtomicI64 = AtomicI64::new(0);
 pub static OVERLAY_IN_SPLASH: AtomicBool = AtomicBool::new(false);
+pub static SPLASH_FINISHED: AtomicBool = AtomicBool::new(false);
 pub static CURRENT_FOREGROUND_FULLSCREEN: AtomicBool = AtomicBool::new(false);
 pub static CURRENT_FOREGROUND_FULLSCREEN_ON_DOCK: AtomicBool = AtomicBool::new(false);
 pub static CURRENT_FOREGROUND_SHELL_ON_DOCK: AtomicBool = AtomicBool::new(false);

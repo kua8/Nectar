@@ -102,6 +102,13 @@ pub fn set_ignore_cursor_events(window: Window, ignore: bool) {
     let _ = window.set_ignore_cursor_events(ignore);
 }
 
+pub async fn wait_for_splash() {
+    let waited = std::time::Instant::now();
+    while !crate::state::SPLASH_FINISHED.load(Ordering::Relaxed) && waited.elapsed() < std::time::Duration::from_secs(8) {
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+}
+
 #[tauri::command]
 pub async fn init_dock(app: AppHandle, mode: String) {
     // Backend guard: bail if dock is disabled in settings.
@@ -115,6 +122,8 @@ pub async fn init_dock(app: AppHandle, mode: String) {
         crate::startup::settle("dock disabled");
         return;
     }
+
+    wait_for_splash().await;
 
     if let Some(dock_win) = app.get_webview_window("dock") {
         init_dock_window(&app, dock_win, &mode).await;
@@ -260,6 +269,7 @@ pub async fn change_dock_mode(app: AppHandle, mode: String) {
     if enabled != "true" {
         return;
     }
+    wait_for_splash().await;
     let labels: Vec<String> = app.webview_windows().keys()
         .filter(|l| crate::state::is_dock_label(l))
         .cloned()
@@ -350,6 +360,7 @@ async fn change_dock_mode_for_window(app: &AppHandle, dock_win: tauri::WebviewWi
 
 #[tauri::command]
 pub async fn change_notch_mode(app: AppHandle, mode: String) {
+    wait_for_splash().await;
     let labels: Vec<String> = app.webview_windows().keys()
         .filter(|l| crate::state::is_notch_label(l))
         .cloned()
@@ -2112,6 +2123,7 @@ pub fn set_splash_fullscreen(app: AppHandle, fullscreen: bool) {
             let _ = win.show();
         } else {
             let _ = win.hide();
+            crate::state::SPLASH_FINISHED.store(true, Ordering::Relaxed);
             crate::services::sync_overlays(&app);
         }
     }
@@ -2717,6 +2729,20 @@ pub async fn restart_nectar(handle: AppHandle) {
     #[cfg(debug_assertions)]
     {
         // Dev just reloads the pages. Leave SHUTTING_DOWN alone here or the hooks stay off.
+        crate::state::SPLASH_FINISHED.store(false, Ordering::Relaxed);
+        for (label, w) in handle.webview_windows() {
+            let extra = label != "main" && label != "dock";
+            if crate::state::is_dock_label(&label) || crate::state::is_notch_label(&label) {
+                if extra { crate::monitors::destroy_monitor_window(&handle, &label); } else { let _ = w.hide(); }
+            }
+        }
+        {
+            let h = handle.clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                crate::monitors::sync_monitor_windows(&h);
+            });
+        }
         for (_, w) in handle.webview_windows() {
             let _ = w.eval("window.location.reload()");
         }
@@ -4191,8 +4217,8 @@ pub async fn focus_agent_window(window: u64) {
 }
 
 #[tauri::command]
-pub fn agent_answer(id: u64, allow: bool) {
-    crate::agent_api::answer(id, allow);
+pub fn agent_answer(id: u64, allow: bool, choices: Option<Vec<usize>>) {
+    crate::agent_api::answer(id, allow, choices.unwrap_or_default());
 }
 
 const AGENT_SOUND_STATES: [&str; 3] = ["needs_input", "done", "error"];
@@ -4208,17 +4234,20 @@ fn agent_sound_files(state: &str) -> Vec<std::path::PathBuf> {
 
 #[tauri::command]
 pub async fn pick_program(app: AppHandle) -> Result<Option<(String, String)>, String> {
-    let Some(path) = app
-        .dialog()
-        .file()
-        .set_title("Choose a program")
-        .add_filter("Programs", &["exe", "lnk", "bat", "cmd", "url"])
-        .blocking_pick_file()
-    else {
+    let mut dialog = app.dialog().file().set_title("Choose a program").add_filter("Programs", &["exe", "lnk", "bat", "cmd", "url"]);
+    if let Some(dock) = app.get_webview_window("dock") {
+        dialog = dialog.set_parent(&dock);
+    }
+    let Some(path) = dialog.blocking_pick_file() else {
         return Ok(None);
     };
     let path = path.into_path().map_err(|e| e.to_string())?;
-    let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("App").to_string();
+    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("App");
+    let mut chars = stem.chars();
+    let name = match chars.next() {
+        Some(first) if first.is_lowercase() => first.to_uppercase().chain(chars).collect(),
+        _ => stem.to_string(),
+    };
     Ok(Some((name, path.to_string_lossy().into_owned())))
 }
 

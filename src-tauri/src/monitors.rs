@@ -147,7 +147,7 @@ fn desired_extra_windows(app: &AppHandle, kind: WindowKind, monitors: &[Monitor]
     desired
 }
 
-fn destroy_monitor_window(app: &AppHandle, label: &str) {
+pub fn destroy_monitor_window(app: &AppHandle, label: &str) {
     if let Some(win) = app.get_webview_window(label) {
         if let Ok(hwnd) = win.hwnd() {
             crate::services::unregister_appbar_native(hwnd);
