@@ -20,15 +20,15 @@
 
 <br />
 
-<img src="docs/screenshots/desktop.webp" width="860" alt="Nectar's notch and dock on a Windows desktop" />
+<img src="docs/screenshots/desktop-150.webp" width="860" alt="Nectar's notch and dock on a Windows desktop" />
 
 <br /><br />
 
-<a href="https://nectar.kua8.lol/trailer/">
+<a href="https://nectar.kua8.lol/#trailer">
   <img src="docs/trailer-preview.svg" width="860" alt="Watch Nectar in action — 40-second trailer" />
 </a>
 
-[**▶ Watch Nectar in action**](https://nectar.kua8.lol/trailer/) · 40 seconds
+[**▶ Watch Nectar in action**](https://nectar.kua8.lol/#trailer) · 40 seconds
 
 </div>
 
