@@ -54,8 +54,8 @@
 <div align="center">
 <table>
   <tr>
-    <td align="center"><img src="docs/screenshots/island.png" height="130" alt="The Nectar notch" /></td>
-    <td align="center"><img src="docs/screenshots/dock.png" height="130" alt="The Nectar dock" /></td>
+    <td align="center"><img src="docs/screenshots/island.webp" width="420" alt="The Nectar notch" /></td>
+    <td align="center"><img src="docs/screenshots/dock.webp" width="420" alt="The Nectar dock" /></td>
   </tr>
   <tr>
     <td align="center"><sub>The notch</sub></td>
