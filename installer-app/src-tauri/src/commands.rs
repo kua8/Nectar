@@ -170,7 +170,10 @@ pub async fn start_install(
     crate::registry::write_uninstall_entry(all_users, &info)
         .map_err(|e| format!("Files were installed, but registering with Windows failed: {e}. Try running the installer as Administrator."))?;
 
-    run_agent_hooks(&exe_path, "install-hooks");
+    // No agent hooks here on purpose. Nectar adds its Claude Code hooks itself when the user
+    // turns AI agent status on in Settings, and removes them when it is turned off again.
+    // Installing used to write ~/.claude/settings.json for everyone, including users who never
+    // asked for the feature, which changed another tool's configuration behind their back.
 
     let _ = app.emit(
         "install-progress",

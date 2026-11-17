@@ -14,7 +14,7 @@ nectar.exe agent <working|needs-input|done|error|clear> [--name NAME] [--project
 
 ## Claude Code
 
-Nothing to set up. With the switch on, Nectar adds its hooks to `~/.claude/settings.json` when it starts, with the path to its own `nectar.exe`, and removes them when you turn the switch off and restart. Your other settings and hooks are not touched; the first time, the original file is saved next to it as `settings.json.nectar-backup`.
+Nothing to set up. With the switch on, Nectar adds its hooks to `~/.claude/settings.json` when it starts, with the path to its own `nectar.exe`, and removes them when you turn the switch off and restart. Installing Nectar leaves that file alone; nothing is written until you turn the switch on yourself. Your other settings and hooks are not touched; the first time, the original file is saved next to it as `settings.json.nectar-backup`.
 
 | Claude Code event | Notch |
 | --- | --- |
