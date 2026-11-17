@@ -21,10 +21,6 @@ use windows::Win32::Graphics::Dwm::{
     DwmSetWindowAttribute, DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND,
 };
 
-/// Corner radius of the settings and calendar panels, in logical pixels. Must not exceed the
-/// radius Windows gives a top-level window, or the acrylic behind it shows at the corners.
-pub const PANEL_CORNER_RADIUS: f64 = 8.0;
-
 /// Asks DWM to keep its standard rounding. It is the default for a frameless window on Windows
 /// 11, so this mainly documents the assumption and pins it against a future default change.
 pub fn round_like_system(hwnd: HWND) {
@@ -41,7 +37,6 @@ pub fn round_like_system(hwnd: HWND) {
 
 #[cfg(test)]
 mod tests {
-    use super::PANEL_CORNER_RADIUS;
 
     #[test]
     fn corner_preference_constants_are_what_the_comments_claim() {
@@ -49,12 +44,5 @@ mod tests {
         // whatever the default happens to be.
         assert_eq!(windows::Win32::Graphics::Dwm::DWMWA_WINDOW_CORNER_PREFERENCE.0, 33);
         assert_eq!(windows::Win32::Graphics::Dwm::DWMWCP_ROUND.0, 2);
-    }
-
-    #[test]
-    fn panel_radius_does_not_exceed_the_system_radius() {
-        // Keeps Settings.css and Calendar.css honest: they use this same 8 px. Raising the CSS
-        // radius alone brings the acrylic crescent back.
-        assert_eq!(PANEL_CORNER_RADIUS, 8.0);
     }
 }

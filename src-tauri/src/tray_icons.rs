@@ -463,3 +463,64 @@ pub fn schedule_taskbar_layout_refresh() {
     });
 }
 
+
+/// Icons currently in the notification area, for the dock to draw its own tray.
+///
+/// A scan walks every tray-host window and probes icon ids, so it is only run when the dock asks
+/// for it — on hover, when the tray opens, and after a short interval while it is open.
+#[tauri::command]
+pub async fn tray_list() -> Vec<crate::tray_host::TrayIcon> {
+    tauri::async_runtime::spawn_blocking(crate::tray_host::enumerate)
+        .await
+        .unwrap_or_default()
+}
+
+/// Clicks an icon in the notification area. `right` opens its context menu, which is how a
+/// USB drive is ejected and how most tray apps show their menu.
+#[tauri::command]
+pub async fn tray_click(key: String, right: bool) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let icon = crate::tray_host::find(&key).ok_or_else(|| "that tray icon is gone".to_string())?;
+        let result = crate::tray_host::click(&icon, right);
+        // Opening the app is what the user wanted, so its icon should stop asking for attention.
+        if result.is_ok() && !right {
+            crate::attention::clear_attention(icon.pid);
+        }
+        result
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Closes a tray icon's popup.
+#[tauri::command]
+pub fn tray_dismiss() {
+    crate::tray_host::dismiss_popups();
+}
+
+/// Brings back a running app whose window is hidden, without starting a second copy.
+///
+/// Returns `true` when a window was found and shown. The dock calls this before launching a
+/// pinned app: clicking WeChat after its close button should reopen it, not ask for a login.
+#[tauri::command]
+pub async fn restore_app_window(path: String) -> bool {
+    tauri::async_runtime::spawn_blocking(move || crate::tray_host::restore_hidden_window(&path))
+        .await
+        .unwrap_or(false)
+}
+
+/// Which of these executables are running with no visible window, i.e. hidden to the tray.
+///
+/// The dock marks a pinned app this way: it is still running, so clicking it should reopen it
+/// rather than start it again, and the icon shows it is alive.
+#[tauri::command]
+pub async fn background_apps(paths: Vec<String>) -> Vec<String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        paths
+            .into_iter()
+            .filter(|path| crate::tray_host::has_hidden_window(path))
+            .collect()
+    })
+    .await
+    .unwrap_or_default()
+}

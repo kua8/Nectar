@@ -15,6 +15,7 @@ mod native_uninstall;
 mod diagnostics;
 mod taskbar_pins;
 mod tray_icons;
+mod tray_host;
 mod caldav;
 mod calendar_sync;
 mod ics;
@@ -129,6 +130,11 @@ fn main() {
             open_tray_window,
             open_tray_at_cursor,
             open_tray_from_button,
+            tray_icons::tray_list,
+            tray_icons::tray_click,
+            tray_icons::tray_dismiss,
+            tray_icons::restore_app_window,
+            tray_icons::background_apps,
             show_desktop,
             open_wifi_settings,
             open_sound_settings,

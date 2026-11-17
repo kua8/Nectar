@@ -6,6 +6,7 @@ import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import './Dock.css';
 import './surfaces.css';
 import { SurfaceShape } from "./components/SurfaceShape";
+import { TrayFolder, useTrayIcons } from "./components/TrayFolder";
 import { initTheme } from './theme';
 import { useSettingsSync } from './hooks/useSettingsSync';
 import { useT } from './i18n';
@@ -23,6 +24,9 @@ interface AppInfo {
   executable?: string;
   all_hwnds?: [number, string][];
   args?: string;
+  // Running with only a hidden window: closed to the tray, still alive. The icon shows a mark
+  // and a click reopens the window instead of starting a second copy.
+  is_background?: boolean;
 }
 
 // Browser hosts (Edge/Chrome/Brave/ApplicationFrameHost) run every PWA/UWP window, so the
@@ -202,13 +206,6 @@ function CalendarIcon() {
   );
 }
 
-function ChevronUpIcon() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="6 15 12 9 18 15" />
-    </svg>
-  );
-}
 
 function TaskViewIcon() {
   return (
@@ -544,6 +541,14 @@ const Dock = memo(function Dock() {
   const [dockCalendarEnabled, setDockCalendarEnabled] = useState(() => localStorage.getItem("nectar-dock-calendar-enabled") !== "false");
   const [legacyMode, setLegacyMode] = useState(() => localStorage.getItem("nectar-legacy-mode") === "true");
   const [dockTray, setDockTray] = useState(() => localStorage.getItem("nectar-dock-tray-enabled") !== "false");
+  // The tray folder owns its own scan; it only runs while the feature is on.
+  const tray = useTrayIcons(dockTray);
+  // Executables that are running with their window hidden — closed to the tray, still alive.
+  // Refreshed alongside the window list so a pinned app can show it is running without a window.
+  const [backgroundPaths, setBackgroundPaths] = useState<string[]>([]);
+  // The poll reads the pinned list without depending on it, so pinning does not restart the poll.
+  const pinnedAppsRef = useRef<AppInfo[]>([]);
+  pinnedAppsRef.current = pinnedApps;
   const [dockTaskView, setDockTaskView] = useState(() => localStorage.getItem("nectar-dock-taskview-enabled") === "true");
   const [dockShowDesktop, setDockShowDesktop] = useState(() => localStorage.getItem("nectar-dock-show-desktop-corner") === "true");
   const [dockRecycle, setDockRecycle] = useState(() => localStorage.getItem("nectar-dock-recycle-enabled") === "true");
@@ -893,6 +898,18 @@ const Dock = memo(function Dock() {
       });
 
       running.forEach(app => fetchIcon(app.path, app.name, app.hwnd));
+
+      // Pinned apps stay in the dock when their window goes away, but they may still be
+      // running (closed to the tray). Ask the backend which of their executables have a hidden
+      // window so the icon can show it and a click can reopen it instead of relaunching.
+      const pinnedExes = pinnedAppsRef.current
+        .map((p) => p.path)
+        .filter((p) => /\.exe$/i.test(p));
+      if (pinnedExes.length > 0) {
+        invoke<string[]>('background_apps', { paths: pinnedExes })
+          .then((paths) => setBackgroundPaths(Array.isArray(paths) ? paths : []))
+          .catch(() => {});
+      }
     };
 
     poll();
@@ -1027,6 +1044,21 @@ const Dock = memo(function Dock() {
     }
   };
 
+/**
+ * Asks the backend to show a hidden window of an already-running app.
+ *
+ * Only real executable paths can be matched, so shell app ids and bare command names skip this
+ * and go straight to launching. That keeps the extra scan off the common path.
+ */
+const restoreOrFalse = async (path: string): Promise<boolean> => {
+  if (!path || path === 'start' || !/\.exe$/i.test(path)) return false;
+  try {
+    return await invoke<boolean>('restore_app_window', { path });
+  } catch {
+    return false;
+  }
+};
+
   const handleAppClick = async (app: AppInfo) => {
     try {
       if (app.path === 'start') {
@@ -1036,8 +1068,11 @@ const Dock = memo(function Dock() {
         await invoke('focus_app_windows', { hwnds: app.all_hwnds.map(([hwnd]) => hwnd) });
       } else if (app.hwnd) {
         await invoke('focus_window', { hwnd: app.hwnd });
-      } else {
-        await invoke('open_app', { appName: app.path, args: app.args ?? null });
+      } else if (await restoreOrFalse(app.path)) {
+        // No visible window, but the app is still running with one hidden — WeChat after its
+        // close button, for instance. Reopening is what the click means; launching the
+        // executable would start a second copy and show a fresh login prompt.
+      } else {        await invoke('open_app', { appName: app.path, args: app.args ?? null });
       }
     } catch (e) {
       console.error(`Failed to interact with ${app.name}:`, e);
@@ -1156,6 +1191,20 @@ const Dock = memo(function Dock() {
 
   }, [contextMenu, popupOpen, pinnedApps, activeApps, activeSubmenu, scale]);
 
+  // Tray icons, minus the ones whose app already has a place in the dock. A pinned app belongs
+  // to the dock's own row, so showing it again in the folder would be the same app twice.
+  const trayIconsShown = useMemo(() => {
+    const pinnedPaths = new Set(
+      pinnedApps
+        .map((p) => p.path.toLowerCase())
+        .filter((p) => p.includes('/') || p.includes('\\')),
+    );
+    return tray.icons.filter((icon) => {
+      const path = icon.path.toLowerCase();
+      return !pinnedPaths.has(path);
+    });
+  }, [tray.icons, pinnedApps]);
+
   const dockItems = useMemo(() => {
     const runningMap = new Map();
     activeApps.forEach(a => {
@@ -1213,7 +1262,15 @@ const Dock = memo(function Dock() {
       { name: 'Start', path: 'start', icon: null, is_running: false, is_pinned: true, hwnd: undefined, all_hwnds: undefined, executable: undefined },
       ...pinnedApps.map(p => {
         const running = findRunningApp(p);
-        return { ...p, is_running: !!running, hwnd: running?.hwnd, all_hwnds: running?.all_hwnds };
+        return {
+          ...p,
+          is_running: !!running,
+          hwnd: running?.hwnd,
+          all_hwnds: running?.all_hwnds,
+          // Running, but only its hidden window exists: closed to the tray. The icon stays and
+          // shows it is alive, and a click reopens it rather than starting a second copy.
+          is_background: !running && backgroundPaths.some((path) => path.toLowerCase() === p.path.toLowerCase()),
+        };
       }).filter(p => !hiddenApps.some(h => h.id === appIdentity(p.path, p.executable, p.name)))
     ];
 
@@ -1222,7 +1279,7 @@ const Dock = memo(function Dock() {
       .filter((a): a is AppInfo => !!a && !matchedRunningKeys.has(appIdentity(a.path, a.executable, a.name)) && !hiddenApps.some(h => h.id === appIdentity(a.path, a.executable, a.name)));
 
     return [...pinned, ...unpinned];
-  }, [pinnedApps, activeApps, activeOrder, hiddenApps]);
+  }, [pinnedApps, activeApps, activeOrder, hiddenApps, backgroundPaths]);
 
   const nectarOptionsMenu = () => {
     const on = (id: string) => menuItems.includes(id);
@@ -1706,15 +1763,6 @@ const Dock = memo(function Dock() {
                 </motion.div>
               )}
 
-              {!legacyMode && dockTray && renderShortcut(
-                'tray', t('dockmenu.hiddenIcons'), 0.21,
-                (rect, e) => invoke('open_tray_from_button', {
-                  dx: (rect.left + rect.width / 2 - e.clientX) * window.devicePixelRatio,
-                  dy: (rect.top - e.clientY) * window.devicePixelRatio,
-                }).catch((err) => console.error('Failed to open tray:', err)),
-                <ChevronUpIcon />
-              )}
-
               {!legacyMode && dockTaskView && renderShortcut(
                 'taskview', t('dockmenu.taskView'), 0.22,
                 () => invoke('open_app', { appName: 'taskview' }).catch((err) => console.error('Failed to open Task View:', err)),
@@ -1813,6 +1861,7 @@ const Dock = memo(function Dock() {
                   {attentionBadge(app)}
                 </motion.div>
                   {app.is_running && <WindowDots count={app.all_hwnds?.length ?? 1} mode={windowIndicator} />}
+{app.is_background && <span className="dock-background-mark" title={t('dock.runningInBackground')} />}
                     </motion.div>
                   </Reorder.Item>
                 ))}
@@ -1896,6 +1945,7 @@ const Dock = memo(function Dock() {
                         {attentionBadge(app)}
                       </motion.div>
                       {app.is_running && <WindowDots count={app.all_hwnds?.length ?? 1} mode={windowIndicator} />}
+{app.is_background && <span className="dock-background-mark" title={t('dock.runningInBackground')} />}
                     </motion.div>
                   </Reorder.Item>
                 ))}
@@ -1977,10 +2027,23 @@ const Dock = memo(function Dock() {
                         {attentionBadge(app)}
                       </motion.div>
                       {app.is_running && <WindowDots count={app.all_hwnds?.length ?? 1} mode={windowIndicator} />}
+{app.is_background && <span className="dock-background-mark" title={t('dock.runningInBackground')} />}
                     </motion.div>
                   </Reorder.Item>
                 ))}
               </Reorder.Group>
+              )}
+
+              {/* The notification area, kept at the right end like the real taskbar's. It is a
+                  folder the size of an app icon: the first four tray apps as a grid, everything
+                  else on hover. */}
+              {!legacyMode && dockTray && (
+                <TrayFolder
+                  icons={trayIconsShown}
+                  open={tray.open}
+                  onOpenChange={tray.setOpen}
+                  onHoverChange={(hovered) => { if (!hovered) tray.setOpen(false); }}
+                />
               )}
 
               {dockShowDesktop && (

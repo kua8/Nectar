@@ -163,6 +163,7 @@
   "dock.indicator.bar": "横条，窗口越多越长",
   "dock.indicator.fixed": "横条，长度固定",
   "dock.indicator.dots": "每个窗口一个圆点",
+  "dock.runningInBackground": "已启动但未打开窗口",
   "dock.menu.title": "右键菜单：Nectar 选项",
   "dock.winNumber": "Win+数字 快捷键",
   "dock.winNumber.desc": "用 Win+1 到 Win+9 打开固定的应用",

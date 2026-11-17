@@ -163,6 +163,7 @@
   "dock.indicator.bar": "Bar, longer with several windows",
   "dock.indicator.fixed": "Bar, always the same size",
   "dock.indicator.dots": "One dot per window",
+  "dock.runningInBackground": "Running with no window open",
   "dock.menu.title": "Right-click menu: Nectar Options",
   "dock.winNumber": "Win+Number Shortcuts",
   "dock.winNumber.desc": "Open pinned apps with Win+1 through Win+9",
