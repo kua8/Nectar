@@ -186,36 +186,65 @@ running              运行中
 
 **没有**：任务、最近文件、关闭所有窗口。
 
-### 4.3 实测结论：Jump List 无法读取
+### 4.3 Jump List：可以读，但要分两部分看
 
-这一条经过专门验证，不是凭印象下的结论。三条路线都试过：
+之前我写过"读不到"，那是错的。用官方接口 `IApplicationDocumentLists`（`CLSID_ApplicationDocumentLists`，`{86bec222-30f2-47e0-9f25-60d11cd75c28}`）实测：
 
-| 路线 | 结果 |
-|---|---|
-| `IShellItem` → `IShellFolder::GetUIObjectOf(IContextMenu)` | 能拿到 30 项菜单，但**全是文件操作**（打开/管理员运行/复制/剪切/删除/属性/发送到/第三方 shell 扩展），**没有任何 Jump List 条目** |
-| `CLSID_ApplicationDestinations` | 文档明确写"An application calls the methods of this interface when it wants to **remove items from** a Jump List's automatically generated destinations"，且 "not implemented by third parties"。**只写不读，只操作自己** |
-| 直接解析 `%APPDATA%\Microsoft\Windows\Recent\AutomaticDestinations\*.automaticDestinations-ms` | ✅ 能解出真实条目（实测从 Word 的列表里读到了 `https://d.docs.live.net/.../xxx.docx`），**但文件名是 AppUserModelID 的 CRC-64 哈希**，试了 4 种多项式 × 2 种编码 × refin/refout 组合共 16 种组合，**全部无法匹配已知 AUMID**。归属不到应用，列表就没有意义 |
+```rust
+let lists: IApplicationDocumentLists = CoCreateInstance(&ApplicationDocumentLists, None, CLSCTX_ALL)?;
+lists.SetAppID(PCWSTR(appid.as_ptr()))?;   // 关键：可以指定别人的 AppID
+let recent: IObjectArray = lists.GetList(APPDOCLISTTYPE(0), 12)?;   // 0=Recent 1=Frequent
+```
 
-**根因**：Jump List 属于"任务栏按钮"，不属于"文件"。`IContextMenu` 走的是"exe 作为文件"的路径，而任务栏按钮的菜单是 `ITaskbarList3` 的扩展，没有暴露给第三方。
+实测输出（真实数据）：
 
-所以：
+```
+SetAppID("Microsoft.Office.WINWORD.EXE.15") → ok
+  Recent: 12 items
+    [0] C:\Users\tjumx\Documents\xwechat_files\...\2026-11\学位申请相关注意事项汇总-国科大下发.docx
+    [1] C:\Users\tjumx\Documents\xwechat_files\...\2026-11\2027届毕业生离所通知单.docx
+SetAppID("Microsoft.Windows.Explorer") → ok
+  Recent: 12 items
+    [0] Z:\projects\rs3\202510\subtomo_arm300II\20261014_msperm_AK9-KO_HTF\warp_tiltseries
+    [1] C:\Users\tjumx\Desktop
+```
 
-- **任务条目的读取：做不到**
-- **最近文件的读取：技术上能做，但无法归属到应用，实际不可用**
+**所以"最近文件"完全可以做。**
 
-### 4.4 能做的部分
+#### 能读与不能读
+
+| 类别 | 能否读 | 依据 |
+|---|---|---|
+| **Recent**（最近文件） | ✅ **能** | `GetList(APPDOCLISTTYPE(0))` |
+| **Frequent**（常用） | ✅ **能** | `GetList(APPDOCLISTTYPE(1))` |
+| **用户固定的条目** | ❌ | 文档："That list cannot be retrieved programmatically because it cannot be manipulated programmatically; it is strictly under the user's control." |
+| **自定义分类（Tasks）** | ❌ | 文档："IApplicationDocumentLists also cannot access custom categories or the task list." |
+
+#### 实现要点
+
+1. **需要 AppID**。`SetAppID` 接受 AUMID 字符串。对于非打包应用，AppID 通常等于 exe 路径的某种形式，或应用自己注册的字符串（如 `Microsoft.Office.WINWORD.EXE.15`）。
+   - 拿不到 AppID 时，回退到"该 exe 的进程正在运行时，用其窗口的 AUMID"（`GetWindowAppUserModelID`，`utils.rs` 已有）。
+2. **不是所有条目都是 `IShellItem`**。实测 12 条里有 7 条返回 `E_NOINTERFACE`（0x80004002）——那些是相对路径/特殊项。需要：
+   - 先试 `IShellItem::GetDisplayName`
+   - 失败则用 `IShellItem2` 读 `System.ItemPathDisplay`
+   - 再失败就跳过（不阻塞其余条目）
+3. **读取是只读的**，不会改用户的 Jump List。
+
+#### Tasks 部分仍不可行
+
+文档明确 `IApplicationDocumentLists` 不能访问 task list，而 `ICustomDestinationList` 只写自己的。这一点维持原结论。
+
+#### 需要的改动
 
 | 项 | 可行性 | 做法 |
 |---|---|---|
+| **最近文件子菜单** | ✅ **可以做** | `IApplicationDocumentLists` + `SetAppID`，右键菜单里加一节"最近" |
+| 常用文件子菜单 | ✅ 可以做 | 同上，`APPDOCLISTTYPE(1)` |
 | **关闭所有窗口** | ✅ 容易 | 遍历 `all_hwnds` 逐个 `WM_CLOSE` |
-| **关闭窗口** | ✅ 已有 | `close_window` |
-| **新实例** | ✅ 已有 | `launch_new_instance` |
-| 任务（Jump List Tasks） | ❌ 读不到 | 见 4.3 |
-| 最近文件 | ⚠️ 不可用 | 能读但归属不到应用 |
+| Tasks | ❌ 读不到 | 见上 |
+| 用户固定的条目 | ❌ 读不到 | 用户私有 |
 
-**建议**：只做"关闭所有窗口"。
-
-> 如果将来想再试，唯一没验证过的方向是用 `ICustomDestinationList::BeginList` 的 `IObjectArray` 返回值——但它同样只针对调用者自己的 AppID，且需要把 Nectar 伪装成目标应用，不现实。
+**工作量**：中等。主要是 AppID 的获取（需要一个 exe → AppID 的映射，可从窗口的 AUMID 或注册表 `HKCU\Software\Classes\Applications\<exe>\Application` 的 `AppUserModelID` 值取），以及部分条目解析失败的容错。
 
 ## 5. 键盘与鼠标交互
 
@@ -443,14 +472,15 @@ Windows 11 的任务栏是 XAML，**没有 `ToolbarWindow32`**，所以：
 | 1 | **拖文件到图标打开**（半成品修复） | 高 | 中 | **P1** |
 | 2 | **Shift+点击新实例** | 中 | 很小 | **P1** |
 | 3 | **关闭所有窗口** | 中 | 小 | **P1** |
-| 4 | **Shift+右键经典菜单** | 中 | 小 | **P2** |
-| 5 | 托盘工具提示（用应用名生成） | 低 | 小 | **P2** |
-| 6 | Ctrl+Shift 管理员启动 | 中 | 中 | P2 |
-| 7 | Aero Peek 高亮 | 中 | 中 | P2 |
-| 8 | 按显示器过滤窗口 | 中 | 中 | P2 |
-| 9 | 可选日期（仅隐藏刘海时有用） | 低 | 小 | P3 |
-| 10 | 不合并模式 | 中 | 大 | P3 |
-| 11 | 托盘图标像素检测未读 | 中 | 中 | P3（可选） |
+| 4 | **右键显示最近文件**（`IApplicationDocumentLists`） | 中 | 中 | **P2** |
+| 5 | **Shift+右键经典菜单** | 中 | 小 | **P2** |
+| 6 | 托盘工具提示（用应用名生成） | 低 | 小 | **P2** |
+| 7 | Ctrl+Shift 管理员启动 | 中 | 中 | P2 |
+| 8 | Aero Peek 高亮 | 中 | 中 | P2 |
+| 9 | 按显示器过滤窗口 | 中 | 中 | P2 |
+| 10 | 可选日期（仅隐藏刘海时有用） | 低 | 小 | P3 |
+| 11 | 不合并模式 | 中 | 大 | P3 |
+| 12 | 托盘图标像素检测未读 | 中 | 中 | P3（可选） |
 
 ### 已实现，不需要再做
 
@@ -475,7 +505,7 @@ Windows 11 的任务栏是 XAML，**没有 `ToolbarWindow32`**，所以：
 | 任务栏进度条 | `ITaskbarList3::SetProgressValue` 由应用调用，替代任务栏收不到 |
 | 覆盖图标（overlay badge） | 同上，`SetOverlayIcon` |
 | Thumbnail Toolbar | `ThumbBarAddButtons`，同上 |
-| Jump List 任务与最近文件 | 见 §4.3 实测：无读取 API；`*.automaticDestinations-ms` 能解析但 AUMID 哈希无法破解 |
+| Jump List 的 Tasks 与用户固定项 | `IApplicationDocumentLists` 明确不提供；Tasks 走 `ICustomDestinationList`，只写自己 |
 | 原生托盘图标位图 | Win11 XAML 私有，只能拿坐标 |
 | 原生托盘工具提示文本 | `NOTIFYICONDATA.szTip` 不对外 |
 | 托盘"固定/溢出"分区 | 同上 |
