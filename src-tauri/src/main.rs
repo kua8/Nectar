@@ -33,6 +33,7 @@ mod on_demand_windows;
 mod wallpaper;
 mod live_preview;
 mod window_guard;
+mod window_corners;
 
 use tauri::Manager;
 use windows::Win32::System::Console::SetConsoleCtrlHandler;

@@ -31,3 +31,6 @@ dist-ssr
 # Marketing site — hosted separately (Apache, own domain), not part of this repo
 /website/
 
+
+# Portable build output
+/dist-portable
