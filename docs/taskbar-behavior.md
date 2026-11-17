@@ -186,20 +186,36 @@ running              运行中
 
 **没有**：任务、最近文件、关闭所有窗口。
 
-### 4.3 需要的改动
+### 4.3 实测结论：Jump List 无法读取
 
-| 项                    | 可行性     | 做法                                                                                                           |
-| --------------------- | ---------- | -------------------------------------------------------------------------------------------------------------- |
-| **关闭所有窗口**      | ✅ 容易     | 遍历 `all_hwnds` 逐个 `PostMessage(WM_CLOSE)`；已有的 `end_task` 可以做更彻底的版本                            |
-| **任务（Jump List）** | ❌ 不可行   | `ICustomDestinationList` 的数据归应用所有，第三方读不到                                                        |
-| **最近文件**          | ⚠️ 部分可行 | 可读 `%APPDATA%\Microsoft\Windows\Recent` 的 `.lnk`，但无法可靠归属到某个应用；Explorer 的"快速访问"有单独存储 |
+这一条经过专门验证，不是凭印象下的结论。三条路线都试过：
 
-**建议**：
-1. 加"关闭所有窗口"——纯收益，实现简单。
-2. Jump List 明确写进"架构限制"，不做。
-3. 最近文件做一个**可选实验**：解析 `.lnk` 的 `System.AppUserModel.ID` 尝试归属，效果不好就不做。
+| 路线 | 结果 |
+|---|---|
+| `IShellItem` → `IShellFolder::GetUIObjectOf(IContextMenu)` | 能拿到 30 项菜单，但**全是文件操作**（打开/管理员运行/复制/剪切/删除/属性/发送到/第三方 shell 扩展），**没有任何 Jump List 条目** |
+| `CLSID_ApplicationDestinations` | 文档明确写"An application calls the methods of this interface when it wants to **remove items from** a Jump List's automatically generated destinations"，且 "not implemented by third parties"。**只写不读，只操作自己** |
+| 直接解析 `%APPDATA%\Microsoft\Windows\Recent\AutomaticDestinations\*.automaticDestinations-ms` | ✅ 能解出真实条目（实测从 Word 的列表里读到了 `https://d.docs.live.net/.../xxx.docx`），**但文件名是 AppUserModelID 的 CRC-64 哈希**，试了 4 种多项式 × 2 种编码 × refin/refout 组合共 16 种组合，**全部无法匹配已知 AUMID**。归属不到应用，列表就没有意义 |
 
----
+**根因**：Jump List 属于"任务栏按钮"，不属于"文件"。`IContextMenu` 走的是"exe 作为文件"的路径，而任务栏按钮的菜单是 `ITaskbarList3` 的扩展，没有暴露给第三方。
+
+所以：
+
+- **任务条目的读取：做不到**
+- **最近文件的读取：技术上能做，但无法归属到应用，实际不可用**
+
+### 4.4 能做的部分
+
+| 项 | 可行性 | 做法 |
+|---|---|---|
+| **关闭所有窗口** | ✅ 容易 | 遍历 `all_hwnds` 逐个 `WM_CLOSE` |
+| **关闭窗口** | ✅ 已有 | `close_window` |
+| **新实例** | ✅ 已有 | `launch_new_instance` |
+| 任务（Jump List Tasks） | ❌ 读不到 | 见 4.3 |
+| 最近文件 | ⚠️ 不可用 | 能读但归属不到应用 |
+
+**建议**：只做"关闭所有窗口"。
+
+> 如果将来想再试，唯一没验证过的方向是用 `ICustomDestinationList::BeginList` 的 `IObjectArray` 返回值——但它同样只针对调用者自己的 AppID，且需要把 Nectar 伪装成目标应用，不现实。
 
 ## 5. 键盘与鼠标交互
 
@@ -459,7 +475,7 @@ Windows 11 的任务栏是 XAML，**没有 `ToolbarWindow32`**，所以：
 | 任务栏进度条 | `ITaskbarList3::SetProgressValue` 由应用调用，替代任务栏收不到 |
 | 覆盖图标（overlay badge） | 同上，`SetOverlayIcon` |
 | Thumbnail Toolbar | `ThumbBarAddButtons`，同上 |
-| Jump List 任务与最近文件 | `ICustomDestinationList`，数据归应用 |
+| Jump List 任务与最近文件 | 见 §4.3 实测：无读取 API；`*.automaticDestinations-ms` 能解析但 AUMID 哈希无法破解 |
 | 原生托盘图标位图 | Win11 XAML 私有，只能拿坐标 |
 | 原生托盘工具提示文本 | `NOTIFYICONDATA.szTip` 不对外 |
 | 托盘"固定/溢出"分区 | 同上 |
