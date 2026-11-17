@@ -32,6 +32,7 @@ mod webview_args;
 mod on_demand_windows;
 mod wallpaper;
 mod live_preview;
+mod window_guard;
 
 use tauri::Manager;
 use windows::Win32::System::Console::SetConsoleCtrlHandler;
@@ -250,8 +251,6 @@ fn main() {
             get_network_speed,
             get_running_processes,
             kill_process,
-            export_settings,
-            import_settings,
             reset_settings,
             export_settings_dialog,
             import_settings_dialog,
@@ -450,7 +449,9 @@ fn main() {
         if let tauri::RunEvent::Exit = event {
             set_taskbar_visibility(true, true);
             NATIVE_TASKBAR_HIDDEN.store(false, Ordering::Relaxed);
-
+            // Dropped text is written to %TEMP% so it can be dragged out as a file; it should
+            // not outlive the session.
+            crate::commands::clear_shelf_temp();
         }
     });
 }

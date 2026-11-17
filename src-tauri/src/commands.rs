@@ -566,7 +566,8 @@ pub fn get_drives() -> Vec<DockDrive> {
 }
 
 #[tauri::command]
-pub fn open_dock_extra(target: String) -> Result<(), String> {
+pub fn open_dock_extra(window: Window, target: String) -> Result<(), String> {
+    crate::window_guard::require(&window, &[crate::window_guard::Role::Dock])?;
     let path = if target == "recycle" {
         "shell:RecycleBinFolder".to_string()
     } else if target.len() == 1 && target.as_bytes()[0].is_ascii_uppercase() {
@@ -579,6 +580,10 @@ pub fn open_dock_extra(target: String) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn open_app(app: AppHandle, window: Window, app_name: String, args: Option<String>) {
+    // Runs any path the caller names, so only the dock's own UI may ask for it.
+    if crate::window_guard::require(&window, &[crate::window_guard::Role::Dock]).is_err() {
+        return;
+    }
     if app_name == "start" {
         toggle_start_menu();
         return;
@@ -636,7 +641,10 @@ pub async fn open_app(app: AppHandle, window: Window, app_name: String, args: Op
 /// Starts another instance of an app. Running PWAs go through their Start Menu
 /// shortcut so the new window belongs to the web app.
 #[tauri::command]
-pub async fn launch_new_instance(app_path: String, app_name: Option<String>, args: Option<String>) {
+pub async fn launch_new_instance(window: Window, app_path: String, app_name: Option<String>, args: Option<String>) {
+    if crate::window_guard::require(&window, &[crate::window_guard::Role::Dock]).is_err() {
+        return;
+    }
     tauri::async_runtime::spawn_blocking(move || {
         if app_path == "start" {
             return;
@@ -1898,9 +1906,16 @@ pub async fn clear_icon_cache(app: AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn set_custom_icon(app: AppHandle, cache_key: String, icon_data: String) -> Result<String, String> {
+pub async fn set_custom_icon(window: Window, app: AppHandle, cache_key: String, icon_data: String) -> Result<String, String> {
     use base64::Engine;
     use image::GenericImageView;
+
+    crate::window_guard::require(&window, &[crate::window_guard::Role::Dock])?;
+
+    // An icon is a few hundred KB at most. Without a cap, a huge payload or a decompression
+    // bomb in a tiny PNG would be decoded on the main process.
+    const MAX_ICON_BYTES: usize = 8 * 1024 * 1024;
+    const MAX_ICON_SIDE: u32 = 4096;
 
     // Validate and decode the base64 data URI
     let b64_str = if icon_data.starts_with("data:") {
@@ -1909,13 +1924,27 @@ pub async fn set_custom_icon(app: AppHandle, cache_key: String, icon_data: Strin
         &icon_data
     };
 
+    if b64_str.len() > MAX_ICON_BYTES * 4 / 3 + 4 {
+        return Err("Icon is too large".into());
+    }
+
     let raw_bytes = base64::engine::general_purpose::STANDARD
         .decode(b64_str)
         .map_err(|e| format!("Invalid base64: {}", e))?;
+    if raw_bytes.len() > MAX_ICON_BYTES {
+        return Err("Icon is too large".into());
+    }
 
     // Decode image to validate and get dimensions
-    let img = image::load_from_memory(&raw_bytes)
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(MAX_ICON_SIDE);
+    limits.max_image_height = Some(MAX_ICON_SIDE);
+    limits.max_alloc = Some(256 * 1024 * 1024);
+    let mut reader = image::ImageReader::new(std::io::Cursor::new(&raw_bytes))
+        .with_guessed_format()
         .map_err(|e| format!("Invalid image: {}", e))?;
+    reader.limits(limits);
+    let img = reader.decode().map_err(|e| format!("Invalid image: {}", e))?;
 
     let (w, h) = img.dimensions();
     if w < 16 || h < 16 {
@@ -2672,7 +2701,9 @@ fn registered_uninstaller() -> Option<std::path::PathBuf> {
 }
 
 #[tauri::command]
-pub async fn uninstall_nectar(handle: AppHandle) -> Result<(), String> {
+pub async fn uninstall_nectar(window: Window, handle: AppHandle) -> Result<(), String> {
+    // Uninstalling is a Settings › About action; nothing else should be able to start it.
+    crate::window_guard::require(&window, &[crate::window_guard::Role::Settings])?;
     crate::uninstall_registry::heal_uninstall_registration();
 
     let mut uninstaller = std::env::current_exe()
@@ -2792,7 +2823,12 @@ fn kill_elevated(pid: u32) -> bool {
 }
 
 #[tauri::command]
-pub async fn end_task(hwnd: isize, all_hwnds: Option<Vec<isize>>) {
+pub async fn end_task(window: Window, hwnd: isize, all_hwnds: Option<Vec<isize>>) {
+    // The dock's right-click menu. It force-terminates whatever window it is given, so it must
+    // not be reachable from a window the user is not looking at.
+    if crate::window_guard::require(&window, &[crate::window_guard::Role::Dock]).is_err() {
+        return;
+    }
     use std::os::windows::process::CommandExt;
     use windows::Win32::UI::WindowsAndMessaging::{
         EnumChildWindows, GetWindowThreadProcessId, PostMessageW, WM_CLOSE,
@@ -2829,6 +2865,16 @@ pub async fn end_task(hwnd: isize, all_hwnds: Option<Vec<isize>>) {
         if pid == 0 { return None; }
         let name = image_name(pid)?.to_lowercase();
         if name.ends_with("\\explorer.exe") { return None; }
+        // Same protected list kill_process uses: End task must not be able to take down the
+        // shell, a session process, or Nectar itself.
+        let exe = std::path::Path::new(&name)
+            .file_name()
+            .map(|n| n.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        if PROTECTED_PROCESS_NAMES.contains(&exe.as_str()) {
+            crate::diagnostics::log(&format!("end task: refusing protected process {exe}"));
+            return None;
+        }
         if name.ends_with("\\applicationframehost.exe") {
             let mut scan = HostScan { host_pid: pid, found: 0 };
             let _ = EnumChildWindows(Some(hwnd), Some(child_proc), LPARAM(&mut scan as *mut HostScan as isize));
@@ -3000,7 +3046,8 @@ pub fn load_settings(app: AppHandle) -> Result<HashMap<String, serde_json::Value
 }
 
 #[tauri::command]
-pub fn reset_settings(app: AppHandle) -> Result<(), String> {
+pub fn reset_settings(window: Window, app: AppHandle) -> Result<(), String> {
+    crate::window_guard::require(&window, &[crate::window_guard::Role::Settings])?;
     let path = app.path().app_config_dir().map_err(|e| e.to_string())?.join("settings.json");
     std::fs::write(&path, "{}").map_err(|e| e.to_string())?;
     crate::utils::replace_settings_cache(HashMap::new());
@@ -3501,7 +3548,9 @@ pub fn get_running_processes() -> Result<Vec<ProcessInfo>, String> {
 }
 
 #[tauri::command]
-pub fn kill_process(pid: u32, _name: Option<String>) -> Result<(), String> {
+pub fn kill_process(window: Window, pid: u32, _name: Option<String>) -> Result<(), String> {
+    // Ending a process is only offered in Settings › Diagnostics.
+    crate::window_guard::require(&window, &[crate::window_guard::Role::Settings])?;
     unsafe {
         use windows::Win32::Foundation::CloseHandle;
         use windows::Win32::System::Threading::{
@@ -3690,7 +3739,9 @@ pub fn windows_accent_backup_exists(app: AppHandle) -> bool {
     crate::windows_accent::has_backup(&app)
 }
 
-#[tauri::command]
+/// Returns settings.json verbatim, which includes the CalDAV address, username and the weather
+/// coordinates. Only `export_settings_dialog` uses it, and only after a native save dialog, so it
+/// is not an invokable command any window can call to read the file.
 pub fn export_settings(app: AppHandle) -> Result<String, String> {
     let path = app.path().app_config_dir().map_err(|e| e.to_string())?.join("settings.json");
     if let Ok(content) = std::fs::read_to_string(&path) {
@@ -3705,7 +3756,8 @@ pub fn export_settings(app: AppHandle) -> Result<String, String> {
 
 /// Opens native save dialog in Rust and exports settings directly to the chosen path
 #[tauri::command]
-pub async fn export_settings_dialog(app: AppHandle) -> Result<bool, String> {
+pub async fn export_settings_dialog(window: Window, app: AppHandle) -> Result<bool, String> {
+    crate::window_guard::require(&window, &[crate::window_guard::Role::Settings])?;
     let settings_json = export_settings(app.clone())?;
 
     let file_path = app
@@ -3727,7 +3779,8 @@ pub async fn export_settings_dialog(app: AppHandle) -> Result<bool, String> {
 
 /// Opens native file picker in Rust, validates content, and imports settings
 #[tauri::command]
-pub async fn import_settings_dialog(app: AppHandle) -> Result<bool, String> {
+pub async fn import_settings_dialog(window: Window, app: AppHandle) -> Result<bool, String> {
+    crate::window_guard::require(&window, &[crate::window_guard::Role::Settings])?;
     const MAX_SETTINGS_SIZE_BYTES: u64 = 2 * 1024 * 1024; // 2 MB limit
 
     let file_path = app
@@ -3753,10 +3806,33 @@ pub async fn import_settings_dialog(app: AppHandle) -> Result<bool, String> {
     }
 }
 
-#[tauri::command]
+/// Applies an imported settings file. Only reached through `import_settings_dialog`, after the
+/// user picked a file in the native dialog; it is deliberately not an invokable command, so no
+/// window can rewrite settings.json from script.
 pub fn import_settings(app: AppHandle, settings: String) -> Result<(), String> {
     let imported: HashMap<String, serde_json::Value> =
         serde_json::from_str(&settings).map_err(|e| format!("Invalid JSON: {}", e))?;
+
+    // Settings files are user data, and settings.json can be edited by hand anyway, so this is
+    // a sanity check rather than a security boundary: keys must look like Nectar settings and
+    // values must not be absurd, so a truncated or hand-mangled file cannot fill the config
+    // folder or plant a key that reads like something else.
+    const MAX_IMPORTED_KEYS: usize = 512;
+    const MAX_IMPORTED_VALUE_BYTES: usize = 256 * 1024;
+    if imported.len() > MAX_IMPORTED_KEYS {
+        return Err(format!("This file contains too many settings ({}).", imported.len()));
+    }
+    for (key, value) in &imported {
+        let valid_key = key.starts_with("nectar-")
+            && key.len() <= 64
+            && key.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_');
+        if !valid_key {
+            return Err(format!("This file contains a setting name Nectar doesn't use: {key}"));
+        }
+        if value.to_string().len() > MAX_IMPORTED_VALUE_BYTES {
+            return Err(format!("The value of {key} is too large to import."));
+        }
+    }
 
     let path = app.path().app_config_dir().map_err(|e| e.to_string())?.join("settings.json");
     if let Some(parent) = path.parent() {
@@ -4036,7 +4112,9 @@ pub fn setup_shelf_drop(app: AppHandle) {
 }
 
 #[tauri::command]
-pub async fn shelf_thumbnail(path: String) -> Option<String> {
+pub async fn shelf_thumbnail(window: Window, path: String) -> Option<String> {
+    // Reads any file the notch shelf is handed, so only the notch may ask.
+    crate::window_guard::require(&window, &[crate::window_guard::Role::Notch]).ok()?;
     tauri::async_runtime::spawn_blocking(move || shelf_image_thumbnail(&path).or_else(|| shelf_shell_thumbnail(&path)))
         .await
         .ok()
@@ -4122,7 +4200,9 @@ pub async fn shelf_text_preview(path: String) -> Option<String> {
 }
 
 #[tauri::command]
-pub async fn shelf_open(path: String) -> Result<(), String> {
+pub async fn shelf_open(window: Window, path: String) -> Result<(), String> {
+    // Opens whatever path it is given with the shell's default handler.
+    crate::window_guard::require(&window, &[crate::window_guard::Role::Notch])?;
     tauri_plugin_opener::open_path(&path, None::<&str>).map_err(|e| e.to_string())
 }
 
@@ -4156,8 +4236,15 @@ pub fn shelf_drag_icon() -> Option<String> {
     Some(format!("data:image/png;base64,{}", base64::engine::general_purpose::STANDARD.encode(&png_bytes)))
 }
 
+/// Writes dropped text to a scratch file so it can be dragged out as a real file. The name
+/// carries a counter, so dropping two notes that start with the same words can't overwrite the
+/// first one while it is still on the shelf, and every file is tracked so `clear_shelf_temp`
+/// can delete them on quit instead of leaving the text in %TEMP% forever.
+static SHELF_TEMP_FILES: std::sync::Mutex<Vec<std::path::PathBuf>> = std::sync::Mutex::new(Vec::new());
+
 #[tauri::command]
-pub fn shelf_text_file(text: String) -> Option<String> {
+pub fn shelf_text_file(window: Window, text: String) -> Option<String> {
+    crate::window_guard::require(&window, &[crate::window_guard::Role::Notch]).ok()?;
     let name: String = text
         .trim()
         .chars()
@@ -4167,9 +4254,33 @@ pub fn shelf_text_file(text: String) -> Option<String> {
     let name = if name.trim().is_empty() { "note".to_string() } else { name.trim().to_string() };
     let dir = std::env::temp_dir().join("nectar-shelf");
     std::fs::create_dir_all(&dir).ok()?;
-    let path = dir.join(format!("{name}.txt"));
+    let unique = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let path = dir.join(format!("{name}-{unique}.txt"));
     std::fs::write(&path, text).ok()?;
+    if let Ok(mut tracked) = SHELF_TEMP_FILES.lock() {
+        tracked.push(path.clone());
+        // A long session with a lot of drops should not grow the list without limit.
+        if tracked.len() > 64 {
+            let overflow = tracked.len() - 64;
+            let stale: Vec<_> = tracked.drain(..overflow).collect();
+            for old in stale {
+                let _ = std::fs::remove_file(old);
+            }
+        }
+    }
     Some(path.to_string_lossy().into_owned())
+}
+
+/// Deletes the scratch files written by `shelf_text_file`. Called on quit so dropped text does
+/// not survive the session in %TEMP%.
+pub fn clear_shelf_temp() {
+    let Ok(mut tracked) = SHELF_TEMP_FILES.lock() else { return };
+    for path in tracked.drain(..) {
+        let _ = std::fs::remove_file(path);
+    }
 }
 
 #[tauri::command]
@@ -4217,7 +4328,12 @@ pub async fn focus_agent_window(window: u64) {
 }
 
 #[tauri::command]
-pub fn agent_answer(id: u64, allow: bool, choices: Option<Vec<usize>>) {
+pub fn agent_answer(window: Window, id: u64, allow: bool, choices: Option<Vec<usize>>) {
+    // Only the notch shows the Allow/Deny panel. Without this check any window could approve a
+    // pending permission request the user never saw.
+    if crate::window_guard::require(&window, &[crate::window_guard::Role::Notch]).is_err() {
+        return;
+    }
     crate::agent_api::answer(id, allow, choices.unwrap_or_default());
 }
 
@@ -4233,7 +4349,8 @@ fn agent_sound_files(state: &str) -> Vec<std::path::PathBuf> {
 }
 
 #[tauri::command]
-pub async fn pick_program(app: AppHandle) -> Result<Option<(String, String)>, String> {
+pub async fn pick_program(window: Window, app: AppHandle) -> Result<Option<(String, String)>, String> {
+    crate::window_guard::require(&window, &[crate::window_guard::Role::Dock])?;
     let mut dialog = app.dialog().file().set_title("Choose a program").add_filter("Programs", &["exe", "lnk", "bat", "cmd", "url"]);
     if let Some(dock) = app.get_webview_window("dock") {
         dialog = dialog.set_parent(&dock);
@@ -4252,7 +4369,8 @@ pub async fn pick_program(app: AppHandle) -> Result<Option<(String, String)>, St
 }
 
 #[tauri::command]
-pub async fn pick_agent_sound(app: AppHandle, state: String) -> Result<bool, String> {
+pub async fn pick_agent_sound(window: Window, app: AppHandle, state: String) -> Result<bool, String> {
+    crate::window_guard::require(&window, &[crate::window_guard::Role::Settings])?;
     const MAX_SOUND_BYTES: u64 = 3 * 1024 * 1024;
     if !AGENT_SOUND_STATES.contains(&state.as_str()) {
         return Err("Unknown state".into());
