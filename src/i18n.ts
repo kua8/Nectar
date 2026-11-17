@@ -11,6 +11,7 @@ export const LANGUAGES: Record<string, { name: string }> = {
   ar: { name: "العربية" },
   es: { name: "Español" },
   fr: { name: "Français" },
+  zh: { name: "中文" },
 };
 
 const RTL_LANGUAGES = new Set(["ar"]);
@@ -29,6 +30,7 @@ const LAZY_LOCALES: Record<string, () => Promise<{ default: Messages }>> = {
   ar: () => import("./locales/ar.json"),
   es: () => import("./locales/es.json"),
   fr: () => import("./locales/fr.json"),
+  zh: () => import("./locales/zh.json"),
 };
 
 const loaded: Record<string, Messages> = { en: en as Messages };
