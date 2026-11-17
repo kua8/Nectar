@@ -18,7 +18,7 @@ body {
   position: relative;
   pointer-events: auto;
   /* Handled by backend ignore_cursor_events */
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Noto Sans SC", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
 }
 
 /* Dock Bar */
@@ -35,7 +35,7 @@ body {
   padding: 4px 10px;
   border-radius: 6px;
   font-size: 12px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Noto Sans SC", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
   pointer-events: none;
   opacity: 0;
   transition: all 0.2s ease;
@@ -74,7 +74,7 @@ body {
   border-radius: 6px;
   font-size: 11px;
   font-weight: 500;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Noto Sans SC", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
   white-space: nowrap;
   pointer-events: none;
   opacity: 0;
@@ -1136,9 +1136,13 @@ body {
   color: var(--nectar-bg-expanded, #000);
 }
 
-/* Source Han Sans / Noto Sans SC subset (public/fonts/noto-sans-sc-ui.woff2), SIL OFL 1.1.
-   unicode-range means this is only downloaded when one of these characters is on screen, so
-   the other languages never pay for it. Inter still handles Latin. */
+/* Fallback for Chinese, only used when the system has no CJK font of its own: the font stacks
+   ask for Microsoft YaHei UI, Microsoft YaHei, PingFang SC and Hiragino Sans GB first — using a
+   font already installed in Windows is allowed and gives the native look. This subset of Source
+   Han Sans / Noto Sans SC (SIL OFL 1.1) covers the case where none of those exist, e.g. an
+   English Windows install where someone switches Nectar to Chinese.
+   unicode-range means it is only downloaded when one of these characters is on screen, so the
+   other languages never pay for it. Inter still handles Latin. */
 @font-face {
     font-family: "Noto Sans SC";
     font-style: normal;

@@ -104,7 +104,7 @@ body,
 
 .update-splash-text {
     color: var(--nectar-text, rgba(255, 255, 255, 0.9));
-    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", sans-serif;
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
     font-size: 14px;
     font-weight: 500;
     margin-bottom: 16px;
@@ -311,6 +311,9 @@ body,
         -apple-system,
         BlinkMacSystemFont,
         "Segoe UI",
+        "Microsoft YaHei UI",
+        "Microsoft YaHei",
+        "PingFang SC",
         "Noto Sans SC",
         sans-serif;
   letter-spacing: -0.02em;
@@ -395,6 +398,9 @@ body,
         -apple-system,
         BlinkMacSystemFont,
         "Segoe UI",
+        "Microsoft YaHei UI",
+        "Microsoft YaHei",
+        "PingFang SC",
         "Noto Sans SC",
         sans-serif;
   text-align: left;
@@ -457,6 +463,9 @@ body,
         -apple-system,
         BlinkMacSystemFont,
         "Segoe UI",
+        "Microsoft YaHei UI",
+        "Microsoft YaHei",
+        "PingFang SC",
         "Noto Sans SC",
         sans-serif;
   text-align: left;
@@ -499,6 +508,9 @@ body,
         -apple-system,
         BlinkMacSystemFont,
         "Segoe UI",
+        "Microsoft YaHei UI",
+        "Microsoft YaHei",
+        "PingFang SC",
         "Noto Sans SC",
         sans-serif;
   text-align: center;
@@ -580,6 +592,9 @@ body,
         -apple-system,
         BlinkMacSystemFont,
         "Segoe UI",
+        "Microsoft YaHei UI",
+        "Microsoft YaHei",
+        "PingFang SC",
         "Noto Sans SC",
         sans-serif;
   transition: opacity 0.16s ease;
@@ -608,6 +623,9 @@ body,
         -apple-system,
         BlinkMacSystemFont,
         "Segoe UI",
+        "Microsoft YaHei UI",
+        "Microsoft YaHei",
+        "PingFang SC",
         "Noto Sans SC",
         sans-serif;
   opacity: 0;
@@ -814,9 +832,13 @@ body,
     var(--nectar-bg, rgba(0, 0, 0, 0.8));
 }
 
-/* Source Han Sans / Noto Sans SC subset (public/fonts/noto-sans-sc-ui.woff2), SIL OFL 1.1.
-   unicode-range means this is only downloaded when one of these characters is on screen, so
-   the other languages never pay for it. Inter still handles Latin. */
+/* Fallback for Chinese, only used when the system has no CJK font of its own: the font stacks
+   ask for Microsoft YaHei UI, Microsoft YaHei, PingFang SC and Hiragino Sans GB first — using a
+   font already installed in Windows is allowed and gives the native look. This subset of Source
+   Han Sans / Noto Sans SC (SIL OFL 1.1) covers the case where none of those exist, e.g. an
+   English Windows install where someone switches Nectar to Chinese.
+   unicode-range means it is only downloaded when one of these characters is on screen, so the
+   other languages never pay for it. Inter still handles Latin. */
 @font-face {
     font-family: "Noto Sans SC";
     font-style: normal;
