@@ -2042,7 +2042,6 @@ const restoreOrFalse = async (path: string): Promise<boolean> => {
                   icons={trayIconsShown}
                   open={tray.open}
                   onOpenChange={tray.setOpen}
-                  onHoverChange={(hovered) => { if (!hovered) tray.setOpen(false); }}
                 />
               )}
 

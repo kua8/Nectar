@@ -475,15 +475,22 @@ pub async fn tray_list() -> Vec<crate::tray_host::TrayIcon> {
         .unwrap_or_default()
 }
 
-/// Clicks an icon in the notification area. `right` opens its context menu, which is how a
-/// USB drive is ejected and how most tray apps show their menu.
+/// Clicks an icon in the notification area with the given mouse button.
+///
+/// The button carries its shell meaning: left opens the app, right opens its context menu (how a
+/// USB drive is ejected and how most tray apps show their menu), middle is the shell's third
+/// action. `double` sends the second click of a double-click, which some apps handle separately.
 #[tauri::command]
-pub async fn tray_click(key: String, right: bool) -> Result<(), String> {
+pub async fn tray_click(
+    key: String,
+    button: crate::tray_host::TrayButton,
+    double: Option<bool>,
+) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
         let icon = crate::tray_host::find(&key).ok_or_else(|| "that tray icon is gone".to_string())?;
-        let result = crate::tray_host::click(&icon, right);
+        let result = click_icon(&icon, button, double.unwrap_or(false));
         // Opening the app is what the user wanted, so its icon should stop asking for attention.
-        if result.is_ok() && !right {
+        if result.is_ok() && button == crate::tray_host::TrayButton::Left {
             crate::attention::clear_attention(icon.pid);
         }
         result
@@ -523,4 +530,65 @@ pub async fn background_apps(paths: Vec<String>) -> Vec<String> {
     })
     .await
     .unwrap_or_default()
+}
+
+/// Shows the taskbar for as long as it lives, then puts it back exactly as it was.
+///
+/// A tray icon only exists on screen while its notification area is there. Nectar hides the real
+/// taskbar, which leaves every icon's reported rectangle pointing at empty screen — a click
+/// there hits nothing. Clicks on the dock's tray folder therefore bracket the click with this,
+/// the same way opening the native flyout already does: the taskbar is made visible but fully
+/// transparent and click-through, so it is laid out (and the icons get real hit targets) without
+/// appearing on screen.
+struct TaskbarShown {
+    tray: HWND,
+    original_ex: i32,
+    was_hidden: bool,
+}
+
+impl TaskbarShown {
+    fn new() -> Option<Self> {
+        let tray = find_window(c"Shell_TrayWnd").ok()?;
+        let visible = unsafe { IsWindowVisible(tray) }.as_bool();
+        let original_ex = unsafe { GetWindowLongA(tray, GWL_EXSTYLE) };
+        if !visible {
+            unsafe {
+                SetWindowLongA(
+                    tray,
+                    GWL_EXSTYLE,
+                    original_ex | WS_EX_LAYERED.0 as i32 | WS_EX_TRANSPARENT.0 as i32,
+                );
+                let _ = SetLayeredWindowAttributes(
+                    tray,
+                    windows::Win32::Foundation::COLORREF(0),
+                    0,
+                    LWA_ALPHA,
+                );
+                let _ = ShowWindow(tray, SW_SHOWNA);
+            }
+            // Give the notification area a moment to lay its icons out again.
+            std::thread::sleep(std::time::Duration::from_millis(120));
+        }
+        Some(Self { tray, original_ex, was_hidden: !visible })
+    }
+}
+
+impl Drop for TaskbarShown {
+    fn drop(&mut self) {
+        if !self.was_hidden {
+            return;
+        }
+        unsafe {
+            let _ = ShowWindow(self.tray, SW_HIDE);
+            SetWindowLongA(self.tray, GWL_EXSTYLE, self.original_ex);
+        }
+        crate::utils::set_taskbar_visibility(false, false);
+        crate::state::NATIVE_TASKBAR_HIDDEN.store(true, Ordering::SeqCst);
+    }
+}
+
+/// Clicks a notification-area icon, making sure the icon has a real hit target first.
+pub fn click_icon(icon: &crate::tray_host::TrayIcon, button: crate::tray_host::TrayButton, double: bool) -> Result<(), String> {
+    let _shown = TaskbarShown::new();
+    crate::tray_host::click(icon, button, double)
 }

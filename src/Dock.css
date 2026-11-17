@@ -1207,6 +1207,15 @@ body {
   border-radius: 3px;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+
+.tray-folder-cell:not(:has(img)) {
+  cursor: default;
+}
+
+.tray-folder-cell:has(img):hover {
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .tray-folder-cell img {
@@ -1232,6 +1241,9 @@ body {
   position: absolute;
   bottom: calc(100% + 8px);
   right: 0;
+  /* The 8px gap between the folder and the list: the pointer crosses it on the way up, and the
+     ::before strip keeps that crossing inside the popover's own box. */
+
   padding: 8px;
   border-radius: 12px;
   background: var(--nectar-bg-expanded, rgba(20, 20, 24, 0.94));
@@ -1351,4 +1363,15 @@ body {
   border-radius: 1px;
   background: var(--nectar-text-muted, rgba(255, 255, 255, 0.45));
   pointer-events: none;
+}
+
+/* Bridges the gap between the folder and the popover, so moving the pointer from one to the
+   other never leaves the element the close check is watching. */
+.tray-popover::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 10px;
 }

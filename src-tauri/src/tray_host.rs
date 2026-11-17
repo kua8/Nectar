@@ -27,7 +27,8 @@ use windows::Win32::System::Threading::{
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     keybd_event, mouse_event, KEYEVENTF_KEYUP, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
-    MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP, VK_ESCAPE,
+    MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP,
+    VK_ESCAPE,
 };
 use windows::Win32::UI::Shell::{Shell_NotifyIconGetRect, NOTIFYICONIDENTIFIER};
 use windows::Win32::Foundation::LPARAM;
@@ -197,12 +198,28 @@ fn process_path(pid: u32) -> Option<String> {
     }
 }
 
-/// Sends a real click to the icon's own pixels. `right` opens the icon's context menu, which is
-/// where "Safely Remove Hardware" and similar entries live.
+/// A mouse button, with the meaning the shell gives each one on a notification-area icon.
+#[derive(Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TrayButton {
+    /// Opens the app or its menu — the everyday click.
+    Left,
+    /// The context menu, where "Safely Remove Hardware" lives.
+    Right,
+    /// The shell's third action; few apps use it.
+    Middle,
+}
+
+/// Sends a real click to the icon's own pixels.
 ///
-/// The cursor is put back afterwards so a click from the dock does not leave the pointer parked
+/// A tray icon only reacts to messages its own window receives, and the shell routes those from
+/// a click at the icon's screen position. Synthesising the click there is therefore the only way
+/// to trigger the same behaviour the user would get from clicking the icon in the notification
+/// area; `double` sends the second click of a double-click, which some apps treat separately.
+///
+/// The cursor is put back afterwards, so a click from the dock does not leave the pointer parked
 /// over the notification area.
-pub fn click(icon: &TrayIcon, right: bool) -> Result<(), String> {
+pub fn click(icon: &TrayIcon, button: TrayButton, double: bool) -> Result<(), String> {
     let x = icon.left + icon.width / 2;
     let y = icon.top + icon.height / 2;
 
@@ -219,6 +236,12 @@ pub fn click(icon: &TrayIcon, right: bool) -> Result<(), String> {
         return Err("that tray icon has moved".into());
     }
 
+    let (down, up) = match button {
+        TrayButton::Left => (MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP),
+        TrayButton::Right => (MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP),
+        TrayButton::Middle => (MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP),
+    };
+
     unsafe {
         let mut previous = POINT::default();
         if windows::Win32::UI::WindowsAndMessaging::GetCursorPos(&mut previous).is_err() {
@@ -227,14 +250,20 @@ pub fn click(icon: &TrayIcon, right: bool) -> Result<(), String> {
 
         let _ = SetCursorPos(x, y);
         std::thread::sleep(Duration::from_millis(30));
-        let (down, up) = if right {
-            (MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP)
-        } else {
-            (MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP)
-        };
+
+        // A single click. For a double-click this is the first half; the second follows below.
         mouse_event(down, 0, 0, 0, 0);
         std::thread::sleep(Duration::from_millis(30));
         mouse_event(up, 0, 0, 0, 0);
+
+        if double {
+            // Inside the system double-click interval, so the shell reports it as one.
+            std::thread::sleep(Duration::from_millis(60));
+            mouse_event(down, 0, 0, 0, 0);
+            std::thread::sleep(Duration::from_millis(30));
+            mouse_event(up, 0, 0, 0, 0);
+        }
+
         std::thread::sleep(Duration::from_millis(60));
         let _ = SetCursorPos(previous.x, previous.y);
     }

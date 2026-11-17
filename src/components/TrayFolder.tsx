@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { motion, AnimatePresence } from "framer-motion";
@@ -48,8 +48,6 @@ export function useTrayIcons(enabled: boolean) {
       .catch(() => setIcons([]));
   };
 
-  // Only scan while the dock is on screen and the feature is wanted; the scan walks every
-  // top-level window, so it should not run for a hidden dock.
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
@@ -61,7 +59,7 @@ export function useTrayIcons(enabled: boolean) {
     const timer = window.setInterval(tick, open ? REFRESH_MS : REFRESH_MS * 4);
 
     // A window flashing is the only "look at me" signal most apps send. Rescanning as soon as
-    // that happens means the pulse starts with the flash instead of up to a poll interval later.
+    // that happens means the pulse starts with the flash, not a poll interval later.
     const unlistenAttention = listen("app-attention", tick);
     const unlistenWindows = listen("windows-changed", tick);
 
@@ -76,9 +74,16 @@ export function useTrayIcons(enabled: boolean) {
   return { icons, open, setOpen, refresh: () => refresh.current() };
 }
 
-/** Sends a click to a tray icon's real location. */
-const clickIcon = (icon: TrayIcon, right: boolean) =>
-  invoke("tray_click", { key: icon.key, right }).catch(() => {});
+/**
+ * A click on a notification-area icon, with the meaning the real shell gives it:
+ *
+ *   left          open the app / its menu — what the icon does on a normal click
+ *   right         the context menu, where "Safely Remove Hardware" lives
+ *   double left   the shell's alternate action (usually the same as left)
+ *   middle        the shell's third action, rarely used
+ */
+const clickIcon = (icon: TrayIcon, button: "left" | "right" | "middle", double = false) =>
+  invoke("tray_click", { key: icon.key, button, double }).catch(() => {});
 
 /**
  * The dock is a click-through window: the backend decides per cursor position whether the dock
@@ -103,7 +108,6 @@ function useMenuHitArea(open: boolean) {
         rect: { x: r.left, y: r.top, width: r.width, height: r.height },
       }).catch(() => {});
     };
-    // The popover animates in, so measure after the first frame and again once it settles.
     const first = requestAnimationFrame(report);
     const second = window.setTimeout(report, 220);
     return () => {
@@ -117,78 +121,128 @@ function useMenuHitArea(open: boolean) {
 }
 
 /**
+ * Whether the pointer is over the folder or its popover.
+ *
+ * `onMouseLeave` is not enough: the popover is drawn above the folder with a gap between them,
+ * and moving across that gap fires a leave on one and an enter on the other. Closing is driven
+ * by where the pointer actually is instead, so the gap does not dismiss the list.
+ */
+function usePointerWithin(ref: React.RefObject<HTMLElement | null>, active: boolean, onOutside: () => void) {
+  useEffect(() => {
+    if (!active) return;
+    let timer = 0;
+    const check = (e: PointerEvent) => {
+      const el = ref.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      // A margin covers the gap between the folder and the popover and small cursor jitter.
+      const pad = 12;
+      const inside =
+        e.clientX >= r.left - pad && e.clientX <= r.right + pad &&
+        e.clientY >= r.top - pad && e.clientY <= r.bottom + pad;
+      if (inside) {
+        window.clearTimeout(timer);
+        timer = 0;
+      } else if (!timer) {
+        // Leave a moment to come back, the way the native tray waits before closing.
+        timer = window.setTimeout(() => {
+          timer = 0;
+          onOutside();
+        }, 220);
+      }
+    };
+    window.addEventListener("pointermove", check);
+    return () => {
+      window.removeEventListener("pointermove", check);
+      window.clearTimeout(timer);
+    };
+  }, [ref, active, onOutside]);
+}
+
+/**
  * The dock's notification area: a folder-shaped button the size of a dock icon, showing the
- * first four tray apps as a grid. Hovering opens the full list; clicking an icon opens that app.
+ * first four tray apps as a grid. Hovering opens the full list, and it stays open until the
+ * pointer leaves both the folder and the list.
  */
 export function TrayFolder({
   icons,
   open,
   onOpenChange,
-  onHoverChange,
 }: {
   icons: TrayIcon[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onHoverChange: (hovered: boolean) => void;
 }) {
   const t = useT();
   const images = useTrayIconImages(icons);
-  const [hovered, setHovered] = useState(false);
-  const closeTimer = useRef<number | undefined>(undefined);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useMenuHitArea(open);
+  const lastClick = useRef<{ key: string; at: number }>({ key: "", at: 0 });
 
-  const show = hovered || open;
-  const popoverRef = useMenuHitArea(show);
+  const close = useCallback(() => {
+    onOpenChange(false);
+  }, [onOpenChange]);
 
-  // The native notification area opens as soon as the pointer is over it, so this does too. A
-  // short close delay is the only concession: crossing the corner of the folder on the way to
-  // something else should not make the list appear and vanish twice.
-  const enter = () => {
-    window.clearTimeout(closeTimer.current);
-    setHovered(true);
-    onOpenChange(true);
-    onHoverChange(true);
-  };
-  const leave = () => {
-    window.clearTimeout(closeTimer.current);
-    closeTimer.current = window.setTimeout(() => {
-      setHovered(false);
-      onOpenChange(false);
-      onHoverChange(false);
-    }, 160);
-  };
-
-  useEffect(() => () => window.clearTimeout(closeTimer.current), []);
+  usePointerWithin(wrapperRef, open, close);
 
   const slots = icons.slice(0, GRID_SLOTS);
 
+  /**
+   * Native double-click is a second click on the same icon inside the system interval. The
+   * first click already went through, exactly as it would in the real tray.
+   */
+  const handleClick = (icon: TrayIcon, button: "left" | "right" | "middle") => {
+    const now = Date.now();
+    const isDouble =
+      button === "left" && lastClick.current.key === icon.key && now - lastClick.current.at < 500;
+    lastClick.current = { key: isDouble ? "" : icon.key, at: now };
+    clickIcon(icon, button, isDouble);
+  };
+
   return (
-    <div
-      className="tray-folder-wrapper"
-      onMouseEnter={enter}
-      onMouseLeave={leave}
-    >
-      <div className="tray-folder" role="button" aria-label={t("dockmenu.hiddenIcons")}>
+    <div ref={wrapperRef} className="tray-folder-wrapper">
+      <div
+        className="tray-folder"
+        role="button"
+        aria-label={t("dockmenu.hiddenIcons")}
+        onMouseEnter={() => onOpenChange(true)}
+      >
         <div className="tray-folder-grid">
           {Array.from({ length: GRID_SLOTS }).map((_, i) => {
             const icon = slots[i];
+            if (!icon) {
+              return <div key={`empty-${i}`} className="tray-folder-cell" />;
+            }
             return (
               <div
-                key={icon?.key ?? `empty-${i}`}
-                className={`tray-folder-cell${icon?.attention ? " attention" : ""}`}
+                key={icon.key}
+                className={`tray-folder-cell${icon.attention ? " attention" : ""}`}
+                title={icon.name || icon.app}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleClick(icon, "left");
+                }}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleClick(icon, "right");
+                }}
+                onAuxClick={(e) => {
+                  if (e.button !== 1) return;
+                  e.stopPropagation();
+                  handleClick(icon, "middle");
+                }}
               >
-                {icon ? (
-                  <img
-                    src={images[icon.key] || undefined}
-                    alt=""
-                    draggable={false}
-                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }}
-                  />
-                ) : null}
+                <img
+                  src={images[icon.key] || undefined}
+                  alt=""
+                  draggable={false}
+                  onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }}
+                />
               </div>
             );
           })}
         </div>
-        {/* A small chevron marks this as something that opens, not an app to launch. */}
         <span className="tray-folder-chevron" aria-hidden>
           <svg viewBox="0 0 8 8" width="8" height="8">
             <path d="M2 3 L4 5 L6 3" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
@@ -197,7 +251,7 @@ export function TrayFolder({
       </div>
 
       <AnimatePresence>
-        {show && icons.length > 0 && (
+        {open && icons.length > 0 && (
           <motion.div
             ref={popoverRef}
             className="tray-popover"
@@ -205,8 +259,6 @@ export function TrayFolder({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 4, scale: 0.97 }}
             transition={{ type: "spring", stiffness: 480, damping: 34 }}
-            onMouseEnter={enter}
-            onMouseLeave={leave}
           >
             <div className="tray-popover-grid">
               {icons.map((icon) => (
@@ -214,10 +266,14 @@ export function TrayFolder({
                   key={icon.key}
                   className={`tray-item${icon.attention ? " attention" : ""}`}
                   title={icon.name || icon.app}
-                  onClick={() => clickIcon(icon, false)}
+                  onClick={() => handleClick(icon, "left")}
                   onContextMenu={(e) => {
                     e.preventDefault();
-                    clickIcon(icon, true);
+                    handleClick(icon, "right");
+                  }}
+                  onAuxClick={(e) => {
+                    if (e.button !== 1) return;
+                    handleClick(icon, "middle");
                   }}
                 >
                   <img src={images[icon.key] || undefined} alt="" draggable={false} />
@@ -275,4 +331,3 @@ function useTrayIconImages(icons: TrayIcon[]) {
 
   return images;
 }
-
