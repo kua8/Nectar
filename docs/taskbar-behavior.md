@@ -92,9 +92,10 @@ Win11 任务栏从左到右分为四段。理解这个分区是理解后面所�
 | -------------------- | ------------------------------------------------------------------ |
 | **合并按钮**（默认） | 同一应用的所有窗口合成一个按钮；悬停显示预览画廊；点击在窗口间循环 |
 | **从不合并**         | 每个窗口一个独立按钮，带标题                                       |
-| **已满时合并**       | 空间不足时才合并                                                   |
 
-Win11 只提供"合并 / 不合并"两档（`TaskbarGlomLevel`），没有"已满时合并"了。
+Win11 在「设置 › 个性化 › 任务栏 › 任务栏行为」里提供「合并任务栏按钮」的开关，用户可见的是合并 / 不合并两档。
+
+> **未验证**：社区常用 `TaskbarGlomLevel` 这个注册表值来描述档位，但微软官方文档里找不到它的说明，本机 `HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced` 下也没有该值（只有 `TaskbarAl`、`TaskbarDa`、`TaskbarBadges` 等）。所以这里只按用户可见的行为描述，不引用该注册表值。
 
 ### 2.2 Nectar 现状
 
@@ -269,7 +270,7 @@ SetAppID("Microsoft.Windows.Explorer") → ok
 
 | 操作                         | 状态                                                                        |
 | ---------------------------- | --------------------------------------------------------------------------- |
-| 左键单击                     | ✅（含"已聚焦则最小化"？需确认——`focus_window` 里有 `should_minimize` 逻辑） |
+| 左键单击                     | ✅ 含"已聚焦则最小化"（`commands.rs` → `focus_window`，`should_minimize` 分三路判定：前台即目标、同进程、2 秒内重复点击） |
 | 中键                         | ✅ `handleMiddleClick` → `launch_new_instance`                               |
 | 右键                         | ✅ 自定义菜单                                                                |
 | **Shift + 左键**             | ❌                                                                           |
@@ -296,7 +297,7 @@ SetAppID("Microsoft.Windows.Explorer") → ok
 
 | 行为         | 说明                                               |
 | ------------ | -------------------------------------------------- |
-| 显示所有图标 | 用户可把图标"固定显示"在任务栏上，其余收进溢出面板 |
+| 显示所有图标 | 用户可把图标"固定显示"在任务栏上，其余收进溢出面板。**可见性只能由用户控制**，官方文档：Windows 7 起"All notification icons are now hidden by default and that visibility cannot be programmatically controlled. Only the user is allowed to choose which notification icons appear on the taskbar." |
 | 溢出面板     | 点击 `^` 或悬停展开，网格排列                      |
 | 拖动图标     | 在"显示"与"溢出"之间拖                             |
 | 图标左键     | 打开应用/菜单                                      |
@@ -509,7 +510,7 @@ Windows 11 的任务栏是 XAML，**没有 `ToolbarWindow32`**，所以：
 | 原生托盘图标位图 | Win11 XAML 私有，只能拿坐标 |
 | 原生托盘工具提示文本 | `NOTIFYICONDATA.szTip` 不对外 |
 | 托盘"固定/溢出"分区 | 同上 |
-| 自绘通知中心列表 | 非打包应用无法用 `UserNotificationListener` |
+| 自绘通知中心列表 | `UserNotificationListener` 要求包标识：实测在未打包进程里 `Package.Current` 抛 `0x80073D54`（该进程没有程序包标识符），`AppInfo.Current` 抛 `0x80073D57`。文档只写"requires explicit user permission"，未写必须打包，所以这条是实测结论而非文档明文 |
 | Widgets / 聊天 | 刘海已提供更强的状态展示，不打算复制 |
 
 ## 13. 建议的实施顺序
@@ -536,7 +537,25 @@ Windows 11 的任务栏是 XAML，**没有 `ToolbarWindow32`**，所以：
 
 **不做**：进度条、overlay、Thumbnail Toolbar、Jump List、通知中心自绘、Widgets。
 
-## 附录：当前实现索引
+## 附录 A：结论的 API 依据
+
+本文的每一条"能做 / 不能做"都应能追溯到下列官方文档。改动本文的结论时，请同时更新这张表。
+
+| 结论 | 依据 |
+|---|---|
+| 进度条、覆盖图标、Thumbnail Toolbar 只能由应用自己设置 | [`ITaskbarList3`](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nn-shobjidl_core-itaskbarlist3)：方法全是 `SetProgressValue` / `SetProgressState` / `SetOverlayIcon` / `ThumbBarAddButtons` 这类写入型，**没有任何 Get**。另注："That message must be received by your application before it calls any ITaskbarList3 method" |
+| 应用不能把自己固定到任务栏 | 同上；[`Taskbar Extensions`](https://learn.microsoft.com/en-us/windows/win32/shell/taskbar-extensions)："only the user can pin further applications; programmatic pinning by an application is not permitted" |
+| Jump List 的 Recent / Frequent **可以读** | [`IApplicationDocumentLists`](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nn-shobjidl_core-iapplicationdocumentlists)："retrieve the contents of the **Recent** or **Frequent** categories"；`SetAppID` 指定"the application whose destination lists are being retrieved" |
+| Jump List 的 Tasks **不能读** | 同上 Remarks："IApplicationDocumentLists also cannot access custom categories or **the task list**" |
+| 用户固定的条目不能读 | 同上："That list cannot be retrieved programmatically because it cannot be manipulated programmatically; it is strictly under the user's control" |
+| `ICustomDestinationList` 只能写自己 | [`ICustomDestinationList`](https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nn-shobjidl_core-icustomdestinationlist)：方法为 `BeginList`/`AppendCategory`/`AddUserTasks`/`CommitList`/`DeleteList`。唯一的读取型方法是 `GetRemovedDestinations`，返回的是"用户删掉的条目"，不是列表本身 |
+| 托盘图标位置**可以查别人的** | [`Shell_NotifyIconGetRect`](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/nf-shellapi-shell_notifyicongetrect)：接受 `NOTIFYICONIDENTIFIER{hWnd,uID}`，文档**没有任何"仅限自己"的限制**。已在微信上实测成功 |
+| 托盘图标位图与工具提示**读不到** | [`NOTIFYICONDATAW`](https://learn.microsoft.com/en-us/windows/win32/api/shellapi/ns-shellapi-notifyicondataw)：`szTip` 与 `hIcon` 都是调用方填充、shell 内部持有的副本，**没有对应的查询 API** |
+| 托盘图标的显示/隐藏只能由用户控制 | `Taskbar Extensions`："All notification icons are now hidden by default and that visibility cannot be programmatically controlled. Only the user is allowed to choose which notification icons appear on the taskbar." |
+| `DwmRegisterThumbnail` 可用于 Aero Peek | [`DwmRegisterThumbnail`](https://learn.microsoft.com/en-us/windows/win32/api/dwmapi/nf-dwmapi-dwmregisterthumbnail)："The window designated by hwndDestination must either be the desktop window itself or **be owned by the process that is calling**"。Nectar 的 overlay 是自己的窗口，满足条件 |
+| AppBar 可以预留屏幕空间 | [`Application Desktop Toolbars`](https://learn.microsoft.com/en-us/windows/win32/shell/application-desktop-toolbars)：`ABM_NEW`/`ABM_QUERYPOS`/`ABM_SETPOS`，系统会"block other applications from using the desktop area"。Nectar 的 `services.rs` → `register_appbar` 已在用 |
+
+## 附录 B：当前实现索引
 
 | 能力           | 位置                                                      |
 | -------------- | --------------------------------------------------------- |
