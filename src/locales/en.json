@@ -79,6 +79,7 @@
   "notch.weather.auto": "Auto-detect location (search a city if it can't be found)",
   "notch.weather.search": "Search city...",
   "notch.weather.clear": "Clear city",
+  "notch.weather.privacy": "Nectar sends your approximate location to Open-Meteo to get the forecast. With auto-detect, it also asks an IP geolocation service for your city. Pick a city above to avoid that request.",
   "notch.widgets.group": "Widgets",
   "dock.group": "Dock",
   "dock.enable": "Nectar Dock",

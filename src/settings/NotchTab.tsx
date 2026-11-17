@@ -561,6 +561,9 @@ export function NotchTab({
             )}
           </div>
         )}
+        {weatherEnabled && (
+          <div className="setting-note muted">{t("notch.weather.privacy")}</div>
+        )}
       </SettingSection>
 
       <SettingSection id="notch-hotkey" title={t("notch.hotkey.group")}>

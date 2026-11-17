@@ -694,7 +694,9 @@ function App() {
   }, [windowLabel]);
 
   // Settings state
-  const [settingsWeatherEnabled, setSettingsWeatherEnabled] = useState(() => localStorage.getItem("nectar-weather-enabled") !== "false");
+  // Weather is opt-in: switching it on is what makes Nectar look up the city and fetch the
+  // forecast, and an IP-based location guess should not happen before the user asks for it.
+  const [settingsWeatherEnabled, setSettingsWeatherEnabled] = useState(() => localStorage.getItem("nectar-weather-enabled") === "true");
   const [settingsCalendarEnabled, setSettingsCalendarEnabled] = useState(() => localStorage.getItem("nectar-calendar-enabled") !== "false");
   const [settingsTimerEnabled, setSettingsTimerEnabled] = useState(
     () => (localStorage.getItem("nectar-timer-enabled") ?? localStorage.getItem("nectar-calendar-enabled")) !== "false",
@@ -789,7 +791,7 @@ function App() {
         return fallback;
       };
 
-      setSettingsWeatherEnabled(getVal("nectar-weather-enabled", "true") !== "false");
+      setSettingsWeatherEnabled(getVal("nectar-weather-enabled", "false") === "true");
       setSettingsCalendarEnabled(getVal("nectar-calendar-enabled", "true") !== "false");
       setSettingsTimerEnabled((getVal("nectar-timer-enabled") ?? getVal("nectar-calendar-enabled", "true")) !== "false");
       setSettingsTimerSoundEnabled(getVal("nectar-timer-sound-enabled", "true") !== "false");

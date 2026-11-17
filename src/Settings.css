@@ -246,6 +246,14 @@ body {
   margin-top: 24px;
 }
 
+/* Small explanatory line under a group, e.g. what turning weather on contacts. */
+.setting-note {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--nectar-text-muted, rgba(255, 255, 255, 0.45));
+  margin: 8px 8px 0 8px;
+}
+
 .setting-group {
   background: var(--group-bg);
   border-radius: 12px;

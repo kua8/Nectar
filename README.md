@@ -189,6 +189,20 @@ See the [open issues](https://github.com/kua8/Nectar/issues) for requests and kn
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
 
+## Network requests
+
+Nectar has no telemetry and no analytics. It only makes these requests, and only when the feature that needs them is on:
+
+| What | Where | When |
+| --- | --- | --- |
+| Forecast | `api.open-meteo.com` | Weather widget, off by default |
+| City search | `geocoding-api.open-meteo.com` | While typing a city name in Settings, or in the dual clock picker |
+| Approximate location | `ipapi.co`, `freeipapi.com`, `ipwho.is`, `get.geojs.io` | Only when weather is on and no city has been picked — these services see your IP address |
+| Calendar sync | Your own CalDAV server or ICS link | While calendar sync is connected; https only |
+| Update check | `api.github.com`, `github.com` | Once a day, and when you ask in Settings › About |
+
+Fonts are bundled, so nothing is loaded from a font CDN. Settings are stored in `%APPDATA%\com.kua8.nectar`; calendar passwords and ICS links go to Windows Credential Manager, never into `settings.json`.
+
 ## Support
 
 Nectar is free and open source. If it makes your desktop nicer, you can support its development.
