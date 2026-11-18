@@ -707,10 +707,13 @@ const Dock = memo(function Dock() {
           width: Math.round(rect.width) + (hasPreview ? 1000 : 0),
           height: Math.round(rect.height) + (hasPreview ? 320 : 0)
         };
-        const key = `${next.x},${next.y},${next.width},${next.height}`;
+        // Only the shown, expanded dock (no preview padding) defines the overlap footprint. The hidden
+        // pill is much narrower, and testing overlap against it made the dock flicker in and out.
+        const expanded = isExpanded && !isHidden && !hasPreview;
+        const key = `${next.x},${next.y},${next.width},${next.height},${expanded}`;
         if (key === lastSent) return;
         lastSent = key;
-        invoke('update_dock_rect', { rect: next }).catch(() => { lastSent = ""; });
+        invoke('update_dock_rect', { rect: next, expanded }).catch(() => { lastSent = ""; });
       }
     };
 
@@ -726,7 +729,7 @@ const Dock = memo(function Dock() {
       observer.disconnect();
       clearInterval(poll);
     };
-  }, [isHidden, previewData, scale]);
+  }, [isHidden, isExpanded, previewData, scale]);
 
   const refreshDockMode = () => {
     invoke<string>('get_dock_mode_for_window').then(setDockMode).catch(() => {});
