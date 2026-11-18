@@ -647,11 +647,13 @@ const Dock = memo(function Dock() {
     }
   }, [isAnyInteraction, hideDelay]);
 
-  const isHidden = ((dockMode === 'smart' || dockMode === 'peek') && isFullscreen) || isShellSurfaceFocused ||
+  // Start/Search open on this monitor works like the Windows taskbar: the dock shows in every mode.
+  const isHidden = !isShellSurfaceFocused && (
+    ((dockMode === 'smart' || dockMode === 'peek') && isFullscreen) ||
     (!startupAnimating && (
       (dockMode === 'smart' && isOverlapped && interactionState === 'none') ||
       (dockMode === 'peek' && interactionState === 'none')
-    ));
+    )));
 
   // Adaptive mode (fixed dock): stretch to a full-width taskbar while a window is maximized.
   const isAdaptive = dockAdaptive && dockMode === 'fixed' && isMaximized && isExpanded && !isHidden;
@@ -817,10 +819,6 @@ const Dock = memo(function Dock() {
 
     const unlistenShellSurface = thisWindow.listen<boolean>("dock-shell-surface", (event) => {
       setIsShellSurfaceFocused(event.payload);
-      if (event.payload) {
-        setIsEdgeHovered(false);
-        setIsDockHovered(false);
-      }
     });
 
     const unlistenMonitors = listen("monitors-changed", refreshDockMode);
