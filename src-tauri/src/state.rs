@@ -23,6 +23,9 @@ macro_rules! label_map {
 }
 
 label_map!(dock_rects, IntRect);
+// Dock footprint while shown and expanded. Overlap checks use it so the collapsed pill a hidden
+// dock reports doesn't shrink the overlap area and make the dock flicker in and out.
+label_map!(dock_overlap_rects, IntRect);
 label_map!(notch_rects, IntRect);
 label_map!(dock_hovered, bool);
 label_map!(notch_hovered, bool);
@@ -89,6 +92,7 @@ pub fn set_i64(map: &'static Mutex<HashMap<String, i64>>, label: &str, value: i6
 
 pub fn clear_window_state(label: &str) {
     if let Ok(mut m) = dock_rects().lock() { m.remove(label); }
+    if let Ok(mut m) = dock_overlap_rects().lock() { m.remove(label); }
     if let Ok(mut m) = notch_rects().lock() { m.remove(label); }
     if let Ok(mut m) = dock_hovered().lock() { m.remove(label); }
     if let Ok(mut m) = notch_hovered().lock() { m.remove(label); }
@@ -183,3 +187,9 @@ pub static PROCESS_NAME_CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLo
 pub static THUMBNAIL_CACHE: OnceLock<Mutex<HashMap<isize, (String, i64)>>> = OnceLock::new();
 pub static FOCUS_TIMESTAMPS: OnceLock<Mutex<HashMap<isize, i64>>> = OnceLock::new();
 pub static SETTINGS_CACHE: OnceLock<Mutex<HashMap<String, serde_json::Value>>> = OnceLock::new();
+
+/// Rect to test window overlap against: the expanded footprint, or the live rect before one is known.
+pub fn dock_overlap_rect(label: &str) -> Option<IntRect> {
+    dock_overlap_rects().lock().ok().and_then(|m| m.get(label).copied())
+        .or_else(|| dock_rects().lock().ok().and_then(|m| m.get(label).copied()))
+}
