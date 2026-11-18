@@ -33,10 +33,18 @@ import {
   dayShiftLabel,
   formatZoneTime,
   measureDualClock,
+  measureNotchDate,
   zoneDayShift,
   zoneDifferenceLabel,
   zoneOffsetLabel,
 } from "./dualClock";
+import {
+  formatNotchDate,
+  parseNotchDateFormat,
+  parseNotchDatePosition,
+  type NotchDateFormat,
+  type NotchDatePosition,
+} from "./notchDate";
 import {
   ChevronRight,
   Cpu,
@@ -712,6 +720,10 @@ function App() {
   const [settingsDualClockEnabled, setSettingsDualClockEnabled] = useState(() => localStorage.getItem("nectar-dual-clock-enabled") === "true");
   const [dualClockZone, setDualClockZone] = useState(() => localStorage.getItem("nectar-dual-clock-zone") || DEFAULT_DUAL_CLOCK_ZONE);
   const [dualClockLabel, setDualClockLabel] = useState(() => localStorage.getItem("nectar-dual-clock-label") || DEFAULT_DUAL_CLOCK_ZONE);
+  const [settingsDateEnabled, setSettingsDateEnabled] = useState(() => localStorage.getItem("nectar-notch-date-enabled") === "true");
+  const [dateFormat, setDateFormat] = useState<NotchDateFormat>(() => parseNotchDateFormat(localStorage.getItem("nectar-notch-date-format")));
+  const [datePosition, setDatePosition] = useState<NotchDatePosition>(() => parseNotchDatePosition(localStorage.getItem("nectar-notch-date-position")));
+  const [dateText, setDateText] = useState("");
   const productivityEnabled = settingsCalendarEnabled || showClockColumn;
   const [settingsMusicModeEnabled, setSettingsMusicModeEnabled] = useState(() => localStorage.getItem("nectar-music-mode-enabled") !== "false");
   const [settingsMusicCompactNotch, setSettingsMusicCompactNotch] = useState(() => localStorage.getItem("nectar-music-compact-notch") !== "false");
@@ -797,6 +809,9 @@ function App() {
       setSettingsDualClockEnabled(getVal("nectar-dual-clock-enabled", "false") === "true");
       setDualClockZone(getVal("nectar-dual-clock-zone") || DEFAULT_DUAL_CLOCK_ZONE);
       setDualClockLabel(getVal("nectar-dual-clock-label") || DEFAULT_DUAL_CLOCK_ZONE);
+      setSettingsDateEnabled(getVal("nectar-notch-date-enabled", "false") === "true");
+      setDateFormat(parseNotchDateFormat(getVal("nectar-notch-date-format")));
+      setDatePosition(parseNotchDatePosition(getVal("nectar-notch-date-position")));
       setSettingsMusicModeEnabled(getVal("nectar-music-mode-enabled", "true") !== "false");
       setSettingsMusicCompactNotch(getVal("nectar-music-compact-notch", "true") !== "false");
       const viz = getVal("nectar-media-visualizer-enabled") ?? getVal("nectar-visualizer-enabled", "true");
@@ -951,6 +966,9 @@ function App() {
       "nectar-dual-clock-enabled": setSettingsDualClockEnabled,
       "nectar-dual-clock-zone": (value) => setDualClockZone(String(value)),
       "nectar-dual-clock-label": (value) => setDualClockLabel(String(value)),
+      "nectar-notch-date-enabled": (value) => setSettingsDateEnabled(value === true || value === "true"),
+      "nectar-notch-date-format": (value) => setDateFormat(parseNotchDateFormat(value)),
+      "nectar-notch-date-position": (value) => setDatePosition(parseNotchDatePosition(value)),
       "nectar-music-mode-enabled": setSettingsMusicModeEnabled,
       "nectar-music-compact-notch": setSettingsMusicCompactNotch,
       "nectar-notch-scroll-volume": setSettingsScrollVolume,
@@ -1360,6 +1378,15 @@ function App() {
       setNectarMode('music');
     }
   }, [settingsMusicModeEnabled, settingsMusicCompactNotch, mediaInfo.has_media, isPlaying, nectarMode, isHovered]);
+
+  // Date beside the time. Re-read every 30s so it rolls over at midnight.
+  useEffect(() => {
+    if (!settingsDateEnabled) { setDateText(""); return; }
+    const update = () => setDateText(formatNotchDate(new Date(), dateFormat));
+    update();
+    const interval = setVisibleInterval(update, 30000);
+    return () => clearInterval(interval);
+  }, [settingsDateEnabled, dateFormat]);
 
   // Update time
   useEffect(() => {
@@ -1957,7 +1984,10 @@ function App() {
     () => (showDualClock ? measureDualClock(time, dualClockLabel, dualTime, dualDayShift) : null),
     [showDualClock, time, dualClockLabel, dualTime, dualDayShift]
   );
-  const dualClockExtra = dualClockSize?.extra ?? 0;
+  const showDate = settingsDateEnabled && !settingsLegacyMode && dateText !== "";
+  const dateExtra = useMemo(() => (showDate ? measureNotchDate(dateText) : 0), [showDate, dateText]);
+  // Room the dual clock and the date take beside the time.
+  const dualClockExtra = (dualClockSize?.extra ?? 0) + dateExtra;
   const dualClockTooltip = useMemo(
     () => (showDualClock ? [dualClockLabel, zoneOffsetLabel(dualClockZone), zoneDifferenceLabel(dualClockZone)].filter(Boolean).join(" · ") : ""),
     // dualTime changes every minute, which picks up DST changes in either zone.
@@ -2435,6 +2465,9 @@ function App() {
 
                             {/* Center - Time (always visible) */}
                             <div className="time-center">
+                              {showDate && datePosition === "left" && (
+                                <span className="time-date left" onClick={toggleCalendarMode}>{dateText}</span>
+                              )}
                               <div
                                 className="time-flip-container"
                                 onClick={cycleNotchMode}
@@ -2485,6 +2518,9 @@ function App() {
                                   <span className="time-secondary-value">{dualTime}</span>
                                   {dualDayShift !== 0 && <span className="time-secondary-shift">{dayShiftLabel(dualDayShift)}</span>}
                                 </div>
+                              )}
+                              {showDate && datePosition === "right" && (
+                                <span className="time-date right" onClick={toggleCalendarMode}>{dateText}</span>
                               )}
                             </div>
 

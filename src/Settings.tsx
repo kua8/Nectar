@@ -215,6 +215,12 @@ function SettingsApp() {
               dualClockZone={settings.dualClockZone}
               dualClockLabel={settings.dualClockLabel}
               selectDualClockZone={settings.selectDualClockZone}
+              dateEnabled={settings.dateEnabled}
+              toggleDate={settings.toggleDate}
+              dateFormat={settings.dateFormat}
+              selectDateFormat={settings.selectDateFormat}
+              datePosition={settings.datePosition}
+              selectDatePosition={settings.selectDatePosition}
               musicModeEnabled={settings.musicModeEnabled}
               toggleMusicMode={settings.toggleMusicMode}
               musicCompactNotch={settings.musicCompactNotch}

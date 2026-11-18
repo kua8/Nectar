@@ -20,7 +20,7 @@ export const SEARCH_ENTRIES: SearchEntry[] = [
   ]),
   ...group("notch", [
     "notch.behavior", "notch.calendar", "notch.calendarSync", "notch.timer", "notch.timerSound", "notch.timerProgress",
-    "notch.stopwatch", "notch.dualClock", "notch.musicMode", "notch.compactMode", "notch.mediaLayout", "notch.artworkTheme",
+    "notch.stopwatch", "notch.dualClock", "notch.date", "notch.dateFormat", "notch.datePosition", "notch.musicMode", "notch.compactMode", "notch.mediaLayout", "notch.artworkTheme",
     "notch.ambientGlow", "notch.compactGlow", "notch.rememberMode",
     "notch.panelOrder", "notch.scrollDirection", "notch.agentApi", "notch.agentSounds", "notch.scrollVolume", "notch.shelfPersist", "notch.weather",
     "notch.hotkey", "notch.netWidget", "notch.edgeDelay", "notch.widgets.group", "notch.ccTiles", "notch.ccButtons", "notch.ccSliders",
