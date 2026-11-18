@@ -45,6 +45,12 @@ static WIN_KEY_DOWN: AtomicBool = AtomicBool::new(false);
 /// Digit of the held Win+Number combo (0 = none). Auto-repeat re-fires keydown, only the first press counts.
 static WIN_NUMBER_HELD: AtomicU8 = AtomicU8::new(0);
 static WIN_B_HELD: AtomicBool = AtomicBool::new(false);
+/// Another key went down while Win was held, so the Win release won't open Start.
+static WIN_COMBO_USED: AtomicBool = AtomicBool::new(false);
+/// When a lone Win tap was released (ms). Start opens cloaked and takes a moment to be detected as
+/// foreground, so the dock treats this as "Start opening" right away instead of waiting for it.
+static START_TAP_MS: AtomicI64 = AtomicI64::new(0);
+const START_TAP_GRACE_MS: i64 = 700;
 /// Unassigned virtual key used as the mask key (see send_start_menu_mask).
 const MASK_VK: u16 = 0xE8;
 
@@ -131,16 +137,27 @@ unsafe extern "system" fn keyboard_hook_proc(code: i32, wparam: windows::Win32::
         if (kb.flags.0 & LLKHF_INJECTED.0) == 0 {
             if vk_code == VK_LWIN || vk_code == VK_RWIN {
                 if is_down {
-                    WIN_KEY_DOWN.store(true, Ordering::Relaxed);
+                    // Auto-repeat re-sends keydown while held, only the first press starts a combo.
+                    if !WIN_KEY_DOWN.swap(true, Ordering::Relaxed) {
+                        WIN_COMBO_USED.store(false, Ordering::Relaxed);
+                    }
                     // A new Win press starts a fresh combo, even if a digit keyup got missed.
                     WIN_NUMBER_HELD.store(0, Ordering::Relaxed);
                     WIN_B_HELD.store(false, Ordering::Relaxed);
                 } else if is_up {
-                    WIN_KEY_DOWN.store(false, Ordering::Relaxed);
+                    let was_down = WIN_KEY_DOWN.swap(false, Ordering::Relaxed);
+                    // A lone tap opens Start, unless Start is already up (then it closes it).
+                    if was_down && !WIN_COMBO_USED.load(Ordering::Relaxed)
+                        && !CURRENT_FOREGROUND_SHELL_ON_DOCK.load(Ordering::Relaxed)
+                    {
+                        START_TAP_MS.store(now_ms(), Ordering::Relaxed);
+                        if let Some(t) = VISIBILITY_THREAD.get() { t.unpark(); }
+                    }
                     WIN_NUMBER_HELD.store(0, Ordering::Relaxed);
                     WIN_B_HELD.store(false, Ordering::Relaxed);
                 }
             } else if WIN_KEY_DOWN.load(Ordering::Relaxed) {
+                if is_down { WIN_COMBO_USED.store(true, Ordering::Relaxed); }
                 if vk_code.0 == 0x42 {
                     if is_up {
                         WIN_B_HELD.store(false, Ordering::Relaxed);
@@ -400,6 +417,8 @@ unsafe extern "system" fn focus_event_proc(
     _ms_event_time: u32,
 ) {
     if hwnd.0.is_null() { return; }
+    // Wake the visibility loop now so Start/Search reveals the dock without waiting for the next tick.
+    if let Some(t) = VISIBILITY_THREAD.get() { t.unpark(); }
     // Foreground moved — e.g. Snipping Tool opened/closed or got minimised.
     CAPTURE_RECHECK.store(true, Ordering::Relaxed);
     use windows::Win32::UI::WindowsAndMessaging::{IsWindow, GetWindowLongW, GWL_EXSTYLE, WS_EX_TOOLWINDOW};
@@ -1173,6 +1192,7 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
         use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowRect, IsZoomed, IsIconic, GetWindowLongW, GWL_STYLE, WS_MAXIMIZE, WS_CAPTION, GetClientRect};
         use windows::Win32::Graphics::Gdi::ClientToScreen;
         use windows::Win32::Foundation::{RECT, POINT};
+        let _ = VISIBILITY_THREAD.set(std::thread::current());
         let mut last_visible = true;
         let mut last_dock_overlap: Option<bool> = None;
         let mut last_dock_fullscreen: Option<bool> = None;
@@ -1372,9 +1392,23 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                     (Some((screen, _, _)), Some((mx, my, _, _))) => screen.left == mx && screen.top == my,
                     _ => true,
                 };
-                let shell_on = |label: &str| is_shell_launcher_focused && match (monitor_rect_for_hwnd(hwnd), monitor_of(label)) {
-                    (Some((sx, sy, _, _)), Some((mx, my, _, _))) => sx == mx && sy == my,
-                    _ => true,
+                // A fresh lone Win tap counts as Start on the cursor's monitor until Start is really detected.
+                let start_tap_monitor = if !is_shell_launcher_focused
+                    && now_ms() - START_TAP_MS.load(Ordering::Relaxed) < START_TAP_GRACE_MS
+                {
+                    cursor_monitor_origin()
+                } else {
+                    None
+                };
+                let shell_on = |label: &str| {
+                    let detected = is_shell_launcher_focused && match (monitor_rect_for_hwnd(hwnd), monitor_of(label)) {
+                        (Some((sx, sy, _, _)), Some((mx, my, _, _))) => sx == mx && sy == my,
+                        _ => true,
+                    };
+                    let tapped = start_tap_monitor.is_some_and(|(cx, cy)| {
+                        monitor_of(label).is_some_and(|(mx, my, _, _)| cx == mx && cy == my)
+                    });
+                    detected || tapped
                 };
                 if !fg_on("dock") {
                     should_overlap = false;
@@ -1539,7 +1573,8 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                     apply_capture_ui_state(&handle_visibility, active);
                 }
             }
-            std::thread::sleep(std::time::Duration::from_millis(150));
+            // Ticks every 150 ms, or sooner when focus_event_proc unparks it.
+            std::thread::park_timeout(std::time::Duration::from_millis(150));
         }
     });
 
@@ -1832,6 +1867,8 @@ static MH_CACHED_NOTCH_MON_POS: Mutex<Option<(i32, i32)>> = Mutex::new(None);
 static MH_CACHED_NOTCH_MON_SIZE: Mutex<Option<(u32, u32)>> = Mutex::new(None);
 static CAPTURE_UI_ACTIVE: AtomicBool = AtomicBool::new(false);
 static CAPTURE_RECHECK: AtomicBool = AtomicBool::new(true);
+/// Visibility/overlap loop thread, unparked on foreground changes.
+static VISIBILITY_THREAD: OnceLock<std::thread::Thread> = OnceLock::new();
 static CAPTURE_LAST_SCAN_MS: AtomicI64 = AtomicI64::new(0);
 
 pub fn now_ms() -> i64 {
@@ -2219,7 +2256,6 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
 
             let fg_fs = CURRENT_FOREGROUND_FULLSCREEN.load(Ordering::Relaxed);
             let dock_fg_fs = CURRENT_FOREGROUND_FULLSCREEN_ON_DOCK.load(Ordering::Relaxed);
-            let shell_focused = CURRENT_FOREGROUND_SHELL_ON_DOCK.load(Ordering::Relaxed);
 
             // --- Dock Interaction ---
             if let Some(dock_win) = app_handle.get_webview_window("dock") {
@@ -2290,17 +2326,17 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
                     let at_bottom_edge = cursor.y >= (dock_mon_y + dock_mon_h - (8.0 * scale) as i32) &&
                                          cursor.x >= dock_mon_x && cursor.x <= (dock_mon_x + dock_mon_w) && over_dock_span;
 
-                    if dock_fg_fs || shell_focused {
+                    if dock_fg_fs {
                         MH_DOCK_EXPIRY_MS.store(0, Ordering::Relaxed);
                     }
-                    if dock_edge_hover_allowed(dock_fg_fs || shell_focused, at_bottom_edge, in_dock_hover) {
+                    if dock_edge_hover_allowed(dock_fg_fs, at_bottom_edge, in_dock_hover) {
                         is_hovered = true;
                         MH_DOCK_EXPIRY_MS.store(now + 500, Ordering::Relaxed);
                     }
 
                     // Approaching along the bottom edge keeps the dock interactive
                     // while near its horizontal span, so the reveal can't be clicked
-                    if at_bottom_edge && !dock_fg_fs && !shell_focused {
+                    if at_bottom_edge && !dock_fg_fs {
                         if let Some((span_left, span_right)) = dock_span {
                             let edge_pad = (60.0 * scale) as i32;
                             if cursor.x >= span_left - edge_pad && cursor.x <= span_right + edge_pad {
@@ -2325,7 +2361,7 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
                         dbg_scale, dbg_box, is_click_interactive, MH_LAST_DOCK_IGNORE.load(Ordering::Relaxed),
                     ));
 
-                    let should_ignore = dock_fg_fs || shell_focused || (!is_click_interactive
+                    let should_ignore = dock_fg_fs || (!is_click_interactive
                         && !MENU_IS_OPEN.load(Ordering::Relaxed)
                         && !DOCK_IS_DRAGGING.load(Ordering::Relaxed));
                     let prev_ignore = MH_LAST_DOCK_IGNORE.load(Ordering::Relaxed);
@@ -2587,6 +2623,19 @@ unsafe fn process_mouse_move(app_handle: &AppHandle, cursor: windows::Win32::Fou
             hit_test_extra_dock_windows(app_handle, cursor, now, fg_fs);
             hit_test_extra_notch_windows(app_handle, cursor, now, fg_fs);
         }
+    }
+}
+
+/// Top-left of the monitor under the cursor.
+fn cursor_monitor_origin() -> Option<(i32, i32)> {
+    use windows::Win32::Graphics::Gdi::{MonitorFromPoint, GetMonitorInfoA, MONITORINFO, MONITOR_DEFAULTTONEAREST};
+    use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
+    unsafe {
+        let mut pt = windows::Win32::Foundation::POINT::default();
+        GetCursorPos(&mut pt).ok()?;
+        let h_monitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+        let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
+        GetMonitorInfoA(h_monitor, &mut mi).as_bool().then_some((mi.rcMonitor.left, mi.rcMonitor.top))
     }
 }
 
