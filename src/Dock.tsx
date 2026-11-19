@@ -574,7 +574,8 @@ const Dock = memo(function Dock() {
     }
   });
   const popupOpen = showAddPopup || !!renameApp;
-  const displayName = (app: AppInfo) => dockNames[itemKey(app)] || app.name;
+  const displayName = (app: AppInfo) =>
+    dockNames[itemKey(app)] || (app.path === 'nectar-settings' && app.name === 'Settings' ? t('settings.title') : app.name);
   const saveName = (app: AppInfo, name: string) => {
     const key = itemKey(app);
     const next = { ...dockNames };
@@ -1182,9 +1183,12 @@ const Dock = memo(function Dock() {
         return running;
       }
 
-      // 3. Try fallback match by executable name if defined
-      if (p.executable) {
-        const targetExe = p.executable.toLowerCase();
+      // 3. Try fallback match by executable name if defined. File Explorer pinned from Start is stored by
+      // its shell id, while its windows run as explorer.exe.
+      const pinExe = p.executable
+        ?? (/^(shell:appsfolder\\)?microsoft\.windows\.explorer$/i.test(p.path) ? 'explorer.exe' : undefined);
+      if (pinExe) {
+        const targetExe = pinExe.toLowerCase();
         const found = activeApps.find(a => !isIdentifier(a.path) && a.executable?.toLowerCase() === targetExe);
         if (found) {
           matchedRunningKeys.add(appIdentity(found.path, found.executable, found.name));

@@ -3389,7 +3389,7 @@ pub unsafe extern "system" fn enum_windows_proc(hwnd: HWND, lparam: LPARAM) -> B
                     } else if (name.eq_ignore_ascii_case("javaw") || name.eq_ignore_ascii_case("java")) && !title.is_empty() {
                         title.clone()
                     } else if name.eq_ignore_ascii_case("explorer") {
-                        "File Explorer".to_string()
+                        crate::taskbar_pins::shell_app_name("Microsoft.Windows.Explorer", "File Explorer")
                     } else {
                         let from_start_menu = INSTALLED_APPS_CACHE.get().and_then(|c| c.lock().ok()).and_then(|apps| {
                             apps.iter().find(|a| a.path.eq_ignore_ascii_case(&path)).map(|a| a.name.clone())
@@ -3422,7 +3422,7 @@ pub unsafe extern "system" fn enum_windows_proc(hwnd: HWND, lparam: LPARAM) -> B
                                 .map_or(false, |id| id.eq_ignore_ascii_case("Microsoft.Windows.ControlPanel"));
                         let (final_name, path, exe_name) = if is_control_panel {
                             let control = format!(r"{}\System32\control.exe", std::env::var("WINDIR").unwrap_or_else(|_| r"C:\Windows".into()));
-                            ("Control Panel".to_string(), control, Some("control.exe".to_string()))
+                            (crate::taskbar_pins::shell_app_name("Microsoft.Windows.ControlPanel", "Control Panel"), control, Some("control.exe".to_string()))
                         } else {
                             (final_name, path, exe_name)
                         };

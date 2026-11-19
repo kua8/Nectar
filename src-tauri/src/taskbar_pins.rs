@@ -144,6 +144,29 @@ unsafe fn store_display_name(aumid: &str) -> Option<String> {
     (!text.trim().is_empty()).then_some(text)
 }
 
+/// The Windows display name of a shell app (e.g. "Microsoft.Windows.Explorer" is "Dosya Gezgini" on
+/// Turkish Windows), cached per id, or `fallback` when the shell can't resolve it.
+pub fn shell_app_name(aumid: &str, fallback: &str) -> String {
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+    use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_MULTITHREADED};
+    static NAMES: OnceLock<Mutex<HashMap<String, Option<String>>>> = OnceLock::new();
+    let cache = NAMES.get_or_init(Default::default);
+    if let Some(cached) = cache.lock().ok().and_then(|c| c.get(aumid).cloned()) {
+        return cached.unwrap_or_else(|| fallback.to_string());
+    }
+    let resolved = unsafe {
+        let com = CoInitializeEx(None, COINIT_MULTITHREADED).is_ok();
+        let name = store_display_name(aumid);
+        if com { CoUninitialize(); }
+        name
+    };
+    if let Ok(mut c) = cache.lock() {
+        c.insert(aumid.to_string(), resolved.clone());
+    }
+    resolved.unwrap_or_else(|| fallback.to_string())
+}
+
 enum Pin {
     Shortcut(PathBuf),
     Store(String),
