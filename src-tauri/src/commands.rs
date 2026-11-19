@@ -1866,9 +1866,9 @@ pub async fn load_pinned_apps(app: AppHandle) -> Vec<AppInfo> {
     }
 
     vec![
-        AppInfo { name: "File Explorer".into(), path: "C:\\Windows\\explorer.exe".into(), icon: None, is_running: false, hwnd: None, executable: Some("explorer.exe".into()), all_hwnds: None, args: None },
+        AppInfo { name: crate::taskbar_pins::shell_app_name("Microsoft.Windows.Explorer", "File Explorer"), path: "C:\\Windows\\explorer.exe".into(), icon: None, is_running: false, hwnd: None, executable: Some("explorer.exe".into()), all_hwnds: None, args: None },
         AppInfo { name: "Microsoft Edge".into(), path: "msedge".into(), icon: None, is_running: false, hwnd: None, executable: Some("msedge.exe".into()), all_hwnds: None, args: None },
-        AppInfo { name: "Notepad".into(), path: "notepad.exe".into(), icon: None, is_running: false, hwnd: None, executable: Some("notepad.exe".into()), all_hwnds: None, args: None },
+        AppInfo { name: crate::taskbar_pins::shell_app_name("Microsoft.WindowsNotepad_8wekyb3d8bbwe!App", "Notepad"), path: "notepad.exe".into(), icon: None, is_running: false, hwnd: None, executable: Some("notepad.exe".into()), all_hwnds: None, args: None },
         AppInfo { name: "Settings".into(), path: "nectar-settings".into(), icon: None, is_running: false, hwnd: None, executable: None, all_hwnds: None, args: None },
     ]
 }
