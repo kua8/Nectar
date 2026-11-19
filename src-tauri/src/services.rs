@@ -1337,7 +1337,7 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                                         should_maximized = is_maximized && !current_is_fs;
                                     } else {
                                         should_overlap = false;
-                                        if let Some(dr) = crate::state::dock_rects().lock().ok().and_then(|m| m.get("dock").copied()) {
+                                        if let Some(dr) = crate::state::dock_overlap_rect("dock") {
                                             {
                                                 let scale = cached_scale;
                                                 let d_left = (dr.x as f64 * scale) as i32;
@@ -1494,7 +1494,7 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                             if covers {
                                 true
                             } else if is_dock {
-                                crate::state::dock_rects().lock().ok().and_then(|m| m.get(&label).copied()).is_some_and(|dr| {
+                                crate::state::dock_overlap_rect(&label).is_some_and(|dr| {
                                     let d_left = mx + (dr.x as f64 * cached_scale) as i32;
                                     let d_right = d_left + (dr.width as f64 * cached_scale) as i32;
                                     let trigger_y = screen.bottom - (56.0 * cached_scale) as i32;
