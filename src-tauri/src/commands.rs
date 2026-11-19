@@ -976,7 +976,7 @@ pub async fn focus_window(hwnd: isize) {
         return;
     }
     tauri::async_runtime::spawn_blocking(move || unsafe {
-        use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_RESTORE, SW_SHOW, SW_MINIMIZE, IsIconic, IsWindowVisible, GetForegroundWindow, GetWindowThreadProcessId};
+        use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_RESTORE, SW_SHOW, SW_MINIMIZE, IsIconic, IsWindowVisible, GetForegroundWindow, GetWindow, GetWindowThreadProcessId, GW_OWNER};
         let hwnd = HWND(hwnd as *mut _);
         let my_pid = std::process::id();
 
@@ -1005,12 +1005,17 @@ pub async fn focus_window(hwnd: isize) {
             if !fg.is_invalid() && fg == hwnd {
                 should_minimize = true;
             } else if !fg.is_invalid() {
-                let mut fg_pid = 0u32;
-                let mut target_pid = 0u32;
-                GetWindowThreadProcessId(fg, Some(&mut fg_pid));
-                GetWindowThreadProcessId(hwnd, Some(&mut target_pid));
-                if fg_pid == target_pid && fg_pid != 0 && fg_pid != my_pid {
-                    should_minimize = true;
+                // Only a window the target owns counts as in front; a sibling window of the same process must not.
+                let mut owner = GetWindow(fg, GW_OWNER).unwrap_or_default();
+                for _ in 0..8 {
+                    if owner.is_invalid() {
+                        break;
+                    }
+                    if owner == hwnd {
+                        should_minimize = true;
+                        break;
+                    }
+                    owner = GetWindow(owner, GW_OWNER).unwrap_or_default();
                 }
             }
 
