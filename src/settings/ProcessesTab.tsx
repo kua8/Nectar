@@ -35,7 +35,7 @@ export function ProcessesTab() {
   const [processes, setProcesses] = useState<ProcessInfo[]>([]);
   const [endingPid, setEndingPid] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const refreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const refreshTimer = useRef<number | null>(null);
 
   const refresh = () => {
     invoke<ProcessInfo[]>("get_running_processes")
