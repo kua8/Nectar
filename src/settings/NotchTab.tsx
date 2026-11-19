@@ -34,7 +34,10 @@ import {
   BellRing,
   Globe,
   Volume2,
+  CalendarClock,
+  ArrowLeftRight,
 } from "lucide-react";
+import { formatNotchDate, type NotchDateFormat, type NotchDatePosition } from "../notchDate";
 import { DEFAULT_PANEL_ORDER, type CcLayout, type PanelId } from "../panelOrder";
 import { ControlCenterConfig } from "../components/ControlCenterConfig";
 import { OrderList } from "./OrderList";
@@ -85,6 +88,12 @@ interface NotchTabProps {
   dualClockZone: string;
   dualClockLabel: string;
   selectDualClockZone: (option: { label: string; zone: string }) => void;
+  dateEnabled: boolean;
+  toggleDate: () => void;
+  dateFormat: NotchDateFormat;
+  selectDateFormat: (format: NotchDateFormat) => void;
+  datePosition: NotchDatePosition;
+  selectDatePosition: (position: NotchDatePosition) => void;
   musicModeEnabled: boolean;
   toggleMusicMode: () => void;
   musicCompactNotch: boolean;
@@ -164,6 +173,12 @@ export function NotchTab({
   dualClockZone,
   dualClockLabel,
   selectDualClockZone,
+  dateEnabled,
+  toggleDate,
+  dateFormat,
+  selectDateFormat,
+  datePosition,
+  selectDatePosition,
   musicModeEnabled,
   toggleMusicMode,
   musicCompactNotch,
@@ -361,6 +376,43 @@ export function NotchTab({
               <>
                 <DualClockPicker onSelect={selectDualClockZone} />
                 <div className="setting-divider" />
+              </>
+            )}
+
+            <SettingRow
+              icon={CalendarDays}
+              label={t("notch.date")}
+              desc={dateEnabled ? formatNotchDate(new Date(), dateFormat) : t("notch.date.desc")}
+            >
+              <label className="toggle-switch">
+                <input type="checkbox" checked={dateEnabled} onChange={toggleDate} />
+                <span className="slider"></span>
+              </label>
+            </SettingRow>
+
+            {dateEnabled && (
+              <>
+                <SettingRow icon={CalendarClock} label={t("notch.dateFormat")} desc={t("notch.dateFormat.desc")}>
+                  <div className="unit-toggle-minimal wide">
+                    <span className={dateFormat === "weekday" ? "active" : ""} onClick={() => selectDateFormat("weekday")}>
+                      {formatNotchDate(new Date(), "weekday")}
+                    </span>
+                    <span className={dateFormat === "date" ? "active" : ""} onClick={() => selectDateFormat("date")}>
+                      {formatNotchDate(new Date(), "date")}
+                    </span>
+                  </div>
+                </SettingRow>
+
+                <SettingRow icon={ArrowLeftRight} label={t("notch.datePosition")} desc={t("notch.datePosition.desc")}>
+                  <div className="unit-toggle-minimal wide">
+                    <span className={datePosition === "left" ? "active" : ""} onClick={() => selectDatePosition("left")}>
+                      {t("notch.datePosition.left")}
+                    </span>
+                    <span className={datePosition === "right" ? "active" : ""} onClick={() => selectDatePosition("right")}>
+                      {t("notch.datePosition.right")}
+                    </span>
+                  </div>
+                </SettingRow>
               </>
             )}
           </>

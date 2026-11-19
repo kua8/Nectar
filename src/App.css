@@ -281,6 +281,36 @@ img {
     color: var(--nectar-text-muted, rgba(255, 255, 255, 0.6));
 }
 
+/* Date beside the time. Widths here feed measureNotchDate in dualClock.ts. */
+.time-date {
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.2px;
+    line-height: 1;
+    white-space: nowrap;
+    color: var(--nectar-text-muted, rgba(255, 255, 255, 0.65));
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: color 0.2s ease;
+}
+
+.time-date:hover {
+    color: var(--nectar-text, white);
+}
+
+.time-date.left {
+    margin-right: 8px;
+    padding-right: 9px;
+    border-right: 1px solid var(--nectar-border, rgba(255, 255, 255, 0.12));
+}
+
+.time-date.right {
+    margin-left: 8px;
+    padding-left: 9px;
+    border-left: 1px solid var(--nectar-border, rgba(255, 255, 255, 0.12));
+}
+
 .time-flip-container {
     min-width: 60px;
     height: 24px;
