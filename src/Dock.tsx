@@ -647,11 +647,13 @@ const Dock = memo(function Dock() {
     }
   }, [isAnyInteraction, hideDelay]);
 
-  const isHidden = ((dockMode === 'smart' || dockMode === 'peek') && isFullscreen) || isShellSurfaceFocused ||
+  // Start/Search open on this monitor works like the Windows taskbar: the dock shows in every mode.
+  const isHidden = !isShellSurfaceFocused && (
+    ((dockMode === 'smart' || dockMode === 'peek') && isFullscreen) ||
     (!startupAnimating && (
       (dockMode === 'smart' && isOverlapped && interactionState === 'none') ||
       (dockMode === 'peek' && interactionState === 'none')
-    ));
+    )));
 
   // Adaptive mode (fixed dock): stretch to a full-width taskbar while a window is maximized.
   const isAdaptive = dockAdaptive && dockMode === 'fixed' && isMaximized && isExpanded && !isHidden;
@@ -707,10 +709,13 @@ const Dock = memo(function Dock() {
           width: Math.round(rect.width) + (hasPreview ? 1000 : 0),
           height: Math.round(rect.height) + (hasPreview ? 320 : 0)
         };
-        const key = `${next.x},${next.y},${next.width},${next.height}`;
+        // Only the shown, expanded dock (no preview padding) defines the overlap footprint. The hidden
+        // pill is much narrower, and testing overlap against it made the dock flicker in and out.
+        const expanded = isExpanded && !isHidden && !hasPreview;
+        const key = `${next.x},${next.y},${next.width},${next.height},${expanded}`;
         if (key === lastSent) return;
         lastSent = key;
-        invoke('update_dock_rect', { rect: next }).catch(() => { lastSent = ""; });
+        invoke('update_dock_rect', { rect: next, expanded }).catch(() => { lastSent = ""; });
       }
     };
 
@@ -726,7 +731,7 @@ const Dock = memo(function Dock() {
       observer.disconnect();
       clearInterval(poll);
     };
-  }, [isHidden, previewData, scale]);
+  }, [isHidden, isExpanded, previewData, scale]);
 
   const refreshDockMode = () => {
     invoke<string>('get_dock_mode_for_window').then(setDockMode).catch(() => {});
@@ -817,10 +822,6 @@ const Dock = memo(function Dock() {
 
     const unlistenShellSurface = thisWindow.listen<boolean>("dock-shell-surface", (event) => {
       setIsShellSurfaceFocused(event.payload);
-      if (event.payload) {
-        setIsEdgeHovered(false);
-        setIsDockHovered(false);
-      }
     });
 
     const unlistenMonitors = listen("monitors-changed", refreshDockMode);
