@@ -695,6 +695,12 @@ fn gui_launcher_for(path: &str) -> Option<String> {
     (twin.exists() && pe_subsystem(twin_str) == Some(2)).then(|| twin_str.to_string())
 }
 
+/// ShellExecuteW can't resolve some shell:AppsFolder ids; explorer.exe can.
+fn open_with_explorer(target: &str) {
+    use std::os::windows::process::CommandExt;
+    let _ = std::process::Command::new("explorer.exe").arg(target).creation_flags(0x0800_0000).spawn();
+}
+
 /// Opens a path, shortcut or shell app id through the shell.
 fn launch_path(path: &str, args: Option<&str>) {
     unsafe {
@@ -724,6 +730,9 @@ fn launch_path(path: &str, args: Option<&str>) {
             );
             if res.0 as usize <= 32 {
                 eprintln!("Failed to open {}: error code {}", target, res.0 as usize);
+                if target.starts_with("shell:AppsFolder\\") {
+                    open_with_explorer(&target);
+                }
             }
             return;
         }
@@ -742,6 +751,7 @@ fn launch_path(path: &str, args: Option<&str>) {
             
             if res.0 as usize <= 32 {
                 eprintln!("Failed to open UWP app {}: error code {}", uwp_cmd, res.0 as usize);
+                open_with_explorer(&uwp_cmd);
             }
             return;
         }
