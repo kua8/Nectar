@@ -23,8 +23,7 @@ macro_rules! label_map {
 }
 
 label_map!(dock_rects, IntRect);
-// Dock footprint while shown and expanded. Overlap checks use it so the collapsed pill a hidden
-// dock reports doesn't shrink the overlap area and make the dock flicker in and out.
+// Dock footprint while shown and expanded, used for overlap checks.
 label_map!(dock_overlap_rects, IntRect);
 label_map!(notch_rects, IntRect);
 label_map!(dock_hovered, bool);

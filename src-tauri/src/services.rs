@@ -47,8 +47,7 @@ static WIN_NUMBER_HELD: AtomicU8 = AtomicU8::new(0);
 static WIN_B_HELD: AtomicBool = AtomicBool::new(false);
 /// Another key went down while Win was held, so the Win release won't open Start.
 static WIN_COMBO_USED: AtomicBool = AtomicBool::new(false);
-/// When a lone Win tap was released (ms). Start opens cloaked and takes a moment to be detected as
-/// foreground, so the dock treats this as "Start opening" right away instead of waiting for it.
+/// Time of the last lone Win tap (ms), so Start counts as opening before it is detected.
 static START_TAP_MS: AtomicI64 = AtomicI64::new(0);
 const START_TAP_GRACE_MS: i64 = 700;
 /// Unassigned virtual key used as the mask key (see send_start_menu_mask).
@@ -1413,10 +1412,7 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                     });
                     detected || tapped
                 };
-                // Fullscreen and maximized windows are tracked per monitor: clicking an app on another
-                // monitor must not bring the panels back over them. The desktop has no monitor of its
-                // own, so with it focused every monitor goes by the scan. Start and Search count as
-                // the cursor's monitor, like the Start tap above, so the dock still shows with them.
+                // Fullscreen and maximized windows are tracked per monitor, so another monitor's focus doesn't bring the panels back.
                 let focused_monitor = if hwnd.is_invalid() || is_desktop_focused {
                     None
                 } else if is_known_shell {
@@ -1426,9 +1422,7 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                 };
                 let covers = scan_monitor_covers(my_process_id);
                 let fullscreen_monitors: Vec<(i32, i32)> = covers.iter().filter(|c| c.fullscreen).map(|c| c.origin).collect();
-                // Smart-mode overlap for a panel whose monitor doesn't have focus (None when it does):
-                // covered by a maximized or fullscreen window, or a window in front reaches into
-                // the panel's strip.
+                // Smart-mode overlap for a panel whose monitor lacks focus (None when it has it).
                 let unfocused_panel_overlap = |label: &str, is_dock: bool| -> Option<bool> {
                     let (mx, my, _, _) = monitor_of(label)?;
                     if focused_monitor == Some((mx, my)) {
@@ -2700,8 +2694,7 @@ fn monitor_rect_for_hwnd(hwnd: HWND) -> Option<(i32, i32, i32, i32)> {
     }
 }
 
-/// What the z-order shows on one monitor: the windows down to (and including) the first maximized
-/// or monitor-sized one, which hides everything below it.
+/// Windows down to the first maximized or monitor-sized one on a monitor.
 struct MonitorCover {
     origin: (i32, i32),
     bottom: i32,
@@ -2763,8 +2756,7 @@ unsafe extern "system" fn cover_scan_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
         return true.into();
     }
     entry.rects.push(rect);
-    // Small windows (popups, picture-in-picture) above a fullscreen app don't decide whether the
-    // monitor is fullscreen; a maximized or monitor-sized window does.
+    // Small windows above a fullscreen app don't decide fullscreen.
     let covers = rect.left <= screen.left && rect.top <= screen.top && rect.right >= screen.right && rect.bottom >= screen.bottom;
     if covers || IsZoomed(hwnd).as_bool() {
         entry.covered = true;
@@ -2773,9 +2765,7 @@ unsafe extern "system" fn cover_scan_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
     true.into()
 }
 
-/// Per monitor, the windows that are not hidden behind a maximized or monitor-sized one. Read from
-/// the z-order rather than focus, so a window keeps its monitor's panels hidden while another
-/// monitor has focus.
+/// Per monitor, the windows not hidden behind a maximized or monitor-sized one.
 fn scan_monitor_covers(own_pid: u32) -> Vec<MonitorCover> {
     use windows::Win32::UI::WindowsAndMessaging::EnumWindows;
     let mut scan = CoverScan { own_pid, monitors: Vec::new() };
@@ -2785,8 +2775,7 @@ fn scan_monitor_covers(own_pid: u32) -> Vec<MonitorCover> {
     scan.monitors
 }
 
-/// A window reaches into the dock's strip at the bottom of the monitor. `dock` is in the dock
-/// window's logical pixels, relative to the monitor's left edge.
+/// A window reaches into the dock's strip (dock rect in logical pixels, monitor-relative).
 fn rect_hits_dock(rect: &windows::Win32::Foundation::RECT, monitor_left: i32, monitor_bottom: i32, dock: IntRect, scale: f64) -> bool {
     let d_left = monitor_left + (dock.x as f64 * scale) as i32;
     let d_right = d_left + (dock.width as f64 * scale) as i32;
@@ -2802,8 +2791,7 @@ fn rect_hits_notch(rect: &windows::Win32::Foundation::RECT, monitor_left: i32, m
     rect.left < n_right - 4 && rect.right > n_left + 4 && rect.top < trigger_y - 4
 }
 
-/// Fullscreen state of the monitor at `origin`. The focused monitor keeps the foreground check;
-/// the others use the z-order scan.
+/// Fullscreen state of the monitor at `origin`.
 fn monitor_fullscreen(origin: (i32, i32), focused_monitor: Option<(i32, i32)>, focused_is_fullscreen: bool, covered: &[(i32, i32)]) -> bool {
     if focused_monitor == Some(origin) { focused_is_fullscreen } else { covered.contains(&origin) }
 }

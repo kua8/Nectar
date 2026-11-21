@@ -144,8 +144,7 @@ unsafe fn store_display_name(aumid: &str) -> Option<String> {
     (!text.trim().is_empty()).then_some(text)
 }
 
-/// The Windows display name of a shell app (e.g. "Microsoft.Windows.Explorer" is "Dosya Gezgini" on
-/// Turkish Windows), cached per id, or `fallback` when the shell can't resolve it.
+/// The shell's display name for an app id, cached, or `fallback`.
 pub fn shell_app_name(aumid: &str, fallback: &str) -> String {
     use std::collections::HashMap;
     use std::sync::Mutex;

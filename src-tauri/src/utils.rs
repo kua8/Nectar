@@ -609,8 +609,7 @@ fn encode_thumbnail(mut pixels: Vec<u8>, width: u32, height: u32, max_width: u32
 }
 
 /// Captures an HWND to a base64-encoded PNG thumbnail, scaling it down if it exceeds max_width x max_height.
-/// The screen and PrintWindow copy goes first; a Windows.Graphics.Capture session per frame leaks
-/// GPU memory, so it only runs when that copy fails.
+/// Screen and PrintWindow copy first; a capture session per frame leaks GPU memory.
 pub fn capture_hwnd_to_base64(hwnd: HWND, max_width: u32, max_height: u32) -> Option<String> {
     capture_hwnd_gdi(hwnd, max_width, max_height).or_else(|| {
         let (pixels, w, h) = crate::capture::capture_window_bgra(hwnd)?;

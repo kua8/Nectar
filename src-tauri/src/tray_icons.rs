@@ -192,8 +192,7 @@ fn open_with_shortcut(anchor: Option<(i32, i32)>) -> bool {
         return false;
     }
 
-    // Right after Explorer starts, Win+B can leave keyboard focus on the Start button
-    // instead of the hidden icons button, and Return would then open Start.
+    // Right after Explorer starts, Win+B can leave focus on the Start button.
     let Ok(auto) = automation() else {
         crate::diagnostics::log("tray: UI Automation unavailable, not sending Return");
         give_focus_back();

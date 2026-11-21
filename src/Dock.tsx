@@ -46,14 +46,13 @@ export function appIdentity(p: string, executable?: string, name?: string) {
   return normalized;
 }
 
-// "shell:AppsFolder\Microsoft.WindowsTerminal_8wekyb3d8bbwe!App" -> "microsoft.windowsterminal_8wekyb3d8bbwe"
+// AUMID -> package family, e.g. "microsoft.windowsterminal_8wekyb3d8bbwe"
 export function packageFamilyFromAumid(path: string): string | undefined {
   const m = path.match(/^(?:shell:appsfolder\\)?([a-z0-9.-]+_[a-z0-9]{13})!/i);
   return m?.[1].toLowerCase();
 }
 
-// "C:\Program Files\WindowsApps\Microsoft.WindowsTerminal_1.25.3131.0_x64__8wekyb3d8bbwe\WindowsTerminal.exe"
-// -> "microsoft.windowsterminal_8wekyb3d8bbwe"
+// WindowsApps exe path -> the same package family
 export function packageFamilyFromWindowsAppsPath(path: string): string | undefined {
   const m = path.match(/[\\/]windowsapps[\\/]([a-z0-9.-]+)_[^\\/]*__([a-z0-9]{13})[\\/]/i);
   return m ? `${m[1]}_${m[2]}`.toLowerCase() : undefined;
@@ -723,8 +722,7 @@ const Dock = memo(function Dock() {
           width: Math.round(rect.width) + (hasPreview ? 1000 : 0),
           height: Math.round(rect.height) + (hasPreview ? 320 : 0)
         };
-        // Only the shown, expanded dock (no preview padding) defines the overlap footprint. The hidden
-        // pill is much narrower, and testing overlap against it made the dock flicker in and out.
+        // Only the shown, expanded dock defines the overlap footprint.
         const expanded = isExpanded && !isHidden && !hasPreview;
         const key = `${next.x},${next.y},${next.width},${next.height},${expanded}`;
         if (key === lastSent) return;
@@ -1198,7 +1196,6 @@ const Dock = memo(function Dock() {
       }
 
       // 3. Try fallback match by executable name if defined. File Explorer pinned from Start is stored by
-      // its shell id, while its windows run as explorer.exe.
       const pinExe = p.executable
         ?? (/^(shell:appsfolder\\)?microsoft\.windows\.explorer$/i.test(p.path) ? 'explorer.exe' : undefined);
       if (pinExe) {
@@ -1224,8 +1221,7 @@ const Dock = memo(function Dock() {
         }
       }
 
-      // 5. Store app pins are stored by AUMID, but apps that set no AUMID on their windows (Windows Terminal)
-      // report their exe under WindowsApps. Match on the package family instead.
+      // 5. Store pins use the AUMID; match on package family when the window has none.
       const pinFamily = packageFamilyFromAumid(p.path);
       if (pinFamily) {
         const found = activeApps.find(a => (packageFamilyFromAumid(a.path) ?? packageFamilyFromWindowsAppsPath(a.path)) === pinFamily);
