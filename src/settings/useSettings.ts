@@ -7,6 +7,7 @@ import type { UpdateCheckResult } from "../updater";
 import { useSettingsSync } from "../hooks/useSettingsSync";
 import { hexToHsl, DEFAULT_ACCENT_COLOR, STYLE_OPACITY, type ThemePreset } from "../theme";
 import { DEFAULT_DUAL_CLOCK_ZONE } from "../dualClock";
+import { parseNotchDateFormat, parseNotchDatePosition, type NotchDateFormat, type NotchDatePosition } from "../notchDate";
 import type { WidgetConfig, MonitorInfo, MonitorMode } from "./types";
 
 function saveSetting(key: string, value: string) {
@@ -63,6 +64,15 @@ export function useSettings() {
   const [stopwatchEnabled, setStopwatchEnabled] = useState(true);
   const [dualClockEnabled, setDualClockEnabled] = useState(
     () => localStorage.getItem("nectar-dual-clock-enabled") === "true"
+  );
+  const [dateEnabled, setDateEnabled] = useState(
+    () => localStorage.getItem("nectar-notch-date-enabled") === "true"
+  );
+  const [dateFormat, setDateFormat] = useState<NotchDateFormat>(
+    () => parseNotchDateFormat(localStorage.getItem("nectar-notch-date-format"))
+  );
+  const [datePosition, setDatePosition] = useState<NotchDatePosition>(
+    () => parseNotchDatePosition(localStorage.getItem("nectar-notch-date-position"))
   );
   const [dualClockZone, setDualClockZone] = useState(
     () => localStorage.getItem("nectar-dual-clock-zone") || DEFAULT_DUAL_CLOCK_ZONE
@@ -277,6 +287,9 @@ export function useSettings() {
       apply(getVal("nectar-dual-clock-enabled"), setDualClockEnabled, readBool);
       apply(getVal("nectar-dual-clock-zone"), setDualClockZone, (v) => v);
       apply(getVal("nectar-dual-clock-label"), setDualClockLabel, (v) => v);
+      apply(getVal("nectar-notch-date-enabled"), setDateEnabled, readBool);
+      apply(getVal("nectar-notch-date-format"), setDateFormat, parseNotchDateFormat);
+      apply(getVal("nectar-notch-date-position"), setDatePosition, parseNotchDatePosition);
       apply(getVal("nectar-music-mode-enabled"), setMusicModeEnabled, readBool);
       apply(getVal("nectar-music-compact-notch"), setMusicCompactNotch, readBool);
       apply(getVal("nectar-notch-scroll-volume"), setNotchScrollVolume, (v) => v === "true");
@@ -455,6 +468,9 @@ export function useSettings() {
     "nectar-dual-clock-enabled": setDualClockEnabled,
     "nectar-dual-clock-zone": (v) => setDualClockZone(String(v)),
     "nectar-dual-clock-label": (v) => setDualClockLabel(String(v)),
+    "nectar-notch-date-enabled": (v) => setDateEnabled(v === true || v === "true"),
+    "nectar-notch-date-format": (v) => setDateFormat(parseNotchDateFormat(v)),
+    "nectar-notch-date-position": (v) => setDatePosition(parseNotchDatePosition(v)),
     "nectar-music-mode-enabled": setMusicModeEnabled,
     "nectar-music-compact-notch": setMusicCompactNotch,
     "nectar-notch-scroll-volume": setNotchScrollVolume,
@@ -646,6 +662,22 @@ export function useSettings() {
     const next = !dualClockEnabled;
     setDualClockEnabled(next);
     saveSetting("nectar-dual-clock-enabled", String(next));
+  };
+
+  const toggleDate = () => {
+    const next = !dateEnabled;
+    setDateEnabled(next);
+    saveSetting("nectar-notch-date-enabled", String(next));
+  };
+
+  const selectDateFormat = (format: NotchDateFormat) => {
+    setDateFormat(format);
+    saveSetting("nectar-notch-date-format", format);
+  };
+
+  const selectDatePosition = (position: NotchDatePosition) => {
+    setDatePosition(position);
+    saveSetting("nectar-notch-date-position", position);
   };
 
   const selectDualClockZone = ({ label, zone }: { label: string; zone: string }) => {
@@ -1296,6 +1328,12 @@ export function useSettings() {
     dualClockZone,
     dualClockLabel,
     selectDualClockZone,
+    dateEnabled,
+    toggleDate,
+    dateFormat,
+    selectDateFormat,
+    datePosition,
+    selectDatePosition,
     musicModeEnabled,
     toggleMusicMode,
     musicCompactNotch,
