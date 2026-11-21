@@ -98,8 +98,16 @@ fn remove_app_files_command(install_dir: &Path, all_users: bool) -> String {
     )
 }
 
+fn remove_logon_task() {
+    let _ = std::process::Command::new("schtasks")
+        .args(["/delete", "/tn", "Nectar", "/f"])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output();
+}
+
 pub fn uninstall(install_dir: &Path, all_users: bool, shortcuts: &[PathBuf]) -> Result<(), String> {
     stop_running_nectar();
+    remove_logon_task();
 
     let exe = crate::payload::app_exe_path(install_dir);
     if exe.is_file() {
