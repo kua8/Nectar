@@ -46,6 +46,19 @@ export function appIdentity(p: string, executable?: string, name?: string) {
   return normalized;
 }
 
+// "shell:AppsFolder\Microsoft.WindowsTerminal_8wekyb3d8bbwe!App" -> "microsoft.windowsterminal_8wekyb3d8bbwe"
+export function packageFamilyFromAumid(path: string): string | undefined {
+  const m = path.match(/^(?:shell:appsfolder\\)?([a-z0-9.-]+_[a-z0-9]{13})!/i);
+  return m?.[1].toLowerCase();
+}
+
+// "C:\Program Files\WindowsApps\Microsoft.WindowsTerminal_1.25.3131.0_x64__8wekyb3d8bbwe\WindowsTerminal.exe"
+// -> "microsoft.windowsterminal_8wekyb3d8bbwe"
+export function packageFamilyFromWindowsAppsPath(path: string): string | undefined {
+  const m = path.match(/[\\/]windowsapps[\\/]([a-z0-9.-]+)_[^\\/]*__([a-z0-9]{13})[\\/]/i);
+  return m ? `${m[1]}_${m[2]}`.toLowerCase() : undefined;
+}
+
 const itemKey = (app: AppInfo) => appIdentity(app.path, app.executable, app.name);
 
 // Fuzzy identity: a running window and its installed or pinned entry can have different
@@ -1200,6 +1213,17 @@ const Dock = memo(function Dock() {
           const runExe = a.executable?.toLowerCase() || a.path.split('/').pop()?.split('\\').pop()?.toLowerCase() || "";
           return runExe === pinFilename || runExe === `${pinFilename}.exe` || `${runExe}.exe` === pinFilename;
         });
+        if (found) {
+          matchedRunningKeys.add(appIdentity(found.path, found.executable, found.name));
+          return found;
+        }
+      }
+
+      // 5. Store app pins are stored by AUMID, but apps that set no AUMID on their windows (Windows Terminal)
+      // report their exe under WindowsApps. Match on the package family instead.
+      const pinFamily = packageFamilyFromAumid(p.path);
+      if (pinFamily) {
+        const found = activeApps.find(a => (packageFamilyFromAumid(a.path) ?? packageFamilyFromWindowsAppsPath(a.path)) === pinFamily);
         if (found) {
           matchedRunningKeys.add(appIdentity(found.path, found.executable, found.name));
           return found;
