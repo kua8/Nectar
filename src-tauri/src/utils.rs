@@ -609,7 +609,23 @@ fn encode_thumbnail(mut pixels: Vec<u8>, width: u32, height: u32, max_width: u32
 }
 
 /// Captures an HWND to a base64-encoded PNG thumbnail, scaling it down if it exceeds max_width x max_height.
+/// The screen and PrintWindow copy goes first; a Windows.Graphics.Capture session per frame leaks
+/// GPU memory, so it only runs when that copy fails.
 pub fn capture_hwnd_to_base64(hwnd: HWND, max_width: u32, max_height: u32) -> Option<String> {
+    capture_hwnd_gdi(hwnd, max_width, max_height).or_else(|| {
+        let (pixels, w, h) = crate::capture::capture_window_bgra(hwnd)?;
+        if !mostly_painted(&pixels) { return None; }
+        encode_thumbnail(pixels, w, h, max_width, max_height)
+    })
+}
+
+fn is_chrome_window(hwnd: HWND) -> bool {
+    let mut buf = [0u16; 64];
+    let len = unsafe { windows::Win32::UI::WindowsAndMessaging::GetClassNameW(hwnd, &mut buf) } as usize;
+    String::from_utf16_lossy(&buf[..len]).starts_with("Chrome_WidgetWin")
+}
+
+fn capture_hwnd_gdi(hwnd: HWND, max_width: u32, max_height: u32) -> Option<String> {
     unsafe {
         use windows::Win32::Foundation::RECT;
         use windows::Win32::Graphics::Gdi::{
@@ -622,14 +638,6 @@ pub fn capture_hwnd_to_base64(hwnd: HWND, max_width: u32, max_height: u32) -> Op
         extern "system" { pub fn PrintWindow(hwnd: HWND, hdcBlt: HDC, nFlags: u32) -> i32; }
 
         if !IsWindow(Some(hwnd)).as_bool() { return None; }
-
-        if let Some((pixels, w, h)) = crate::capture::capture_window_bgra(hwnd) {
-            if mostly_painted(&pixels) {
-                if let Some(png) = encode_thumbnail(pixels, w, h, max_width, max_height) {
-                    return Some(png);
-                }
-            }
-        }
 
         let mut rect = RECT::default();
         let _ = DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &mut rect as *mut _ as *mut _, std::mem::size_of::<RECT>() as u32);
@@ -671,7 +679,7 @@ pub fn capture_hwnd_to_base64(hwnd: HWND, max_width: u32, max_height: u32) -> Op
                 && pixels.chunks_exact(4).step_by(7).filter(|c| c[0] != 0 || c[1] != 0 || c[2] != 0).count() * 50 > pixels.len() / 28
         };
 
-        let mut captured = PrintWindow(hwnd, hdc_mem, 2) != 0 && read_bits(&mut pixels);
+        let mut captured = !is_chrome_window(hwnd) && PrintWindow(hwnd, hdc_mem, 2) != 0 && read_bits(&mut pixels);
         // PrintWindow fails on elevated and GPU-composited windows, so copy from the screen.
         if !captured {
             let center = windows::Win32::Foundation::POINT { x: (rect.left + rect.right) / 2, y: (rect.top + rect.bottom) / 2 };
