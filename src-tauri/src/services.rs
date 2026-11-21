@@ -1206,6 +1206,7 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
         let mut last_hwnd = HWND(std::ptr::null_mut());
         let mut last_emit = Instant::now();
         let mut is_known_shell = false;
+        let mut is_desktop_focused = false;
         let mut is_shell_launcher_focused = false;
         let my_process_id = std::process::id();
         let mut last_monitor_update = Instant::now() - Duration::from_secs(5);
@@ -1284,6 +1285,7 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                     let is_shell = class_str == "Shell_TrayWnd" || class_str == "Shell_SecondaryTrayWnd" || is_start;
 
                     is_known_shell = is_desktop || is_shell || is_shell_launcher_focused;
+                    is_desktop_focused = is_desktop;
                 }
 
                 if !hwnd.is_invalid() {
@@ -1379,6 +1381,7 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                     should_overlap = false;
                     current_is_fs = false;
                     is_known_shell = false;
+                    is_desktop_focused = false;
                     is_shell_launcher_focused = false;
                 }
 
@@ -1410,12 +1413,51 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                     });
                     detected || tapped
                 };
+                // Fullscreen and maximized windows are tracked per monitor: clicking an app on another
+                // monitor must not bring the panels back over them. The desktop has no monitor of its
+                // own, so with it focused every monitor goes by the scan. Start and Search count as
+                // the cursor's monitor, like the Start tap above, so the dock still shows with them.
+                let focused_monitor = if hwnd.is_invalid() || is_desktop_focused {
+                    None
+                } else if is_known_shell {
+                    cursor_monitor_origin()
+                } else {
+                    monitor_rect_for_hwnd(hwnd).map(|(x, y, _, _)| (x, y))
+                };
+                let covers = scan_monitor_covers(my_process_id);
+                let fullscreen_monitors: Vec<(i32, i32)> = covers.iter().filter(|c| c.fullscreen).map(|c| c.origin).collect();
+                // Smart-mode overlap for a panel whose monitor doesn't have focus (None when it does):
+                // covered by a maximized or fullscreen window, or a window in front reaches into
+                // the panel's strip.
+                let unfocused_panel_overlap = |label: &str, is_dock: bool| -> Option<bool> {
+                    let (mx, my, _, _) = monitor_of(label)?;
+                    if focused_monitor == Some((mx, my)) {
+                        return None;
+                    }
+                    let Some(cover) = covers.iter().find(|c| c.origin == (mx, my)) else { return Some(false) };
+                    if cover.covered {
+                        return Some(true);
+                    }
+                    Some(if is_dock {
+                        crate::state::dock_overlap_rect(label)
+                            .is_some_and(|dr| cover.rects.iter().any(|r| rect_hits_dock(r, mx, cover.bottom, dr, cached_scale)))
+                    } else {
+                        crate::state::notch_rects().lock().ok().and_then(|m| m.get(label).copied())
+                            .is_some_and(|nr| cover.rects.iter().any(|r| rect_hits_notch(r, mx, my, nr, cached_scale)))
+                    })
+                };
                 if !fg_on("dock") {
                     should_overlap = false;
                     should_maximized = false;
                 }
                 if !fg_on("main") {
                     should_notch_overlap = false;
+                }
+                if let Some(overlap) = unfocused_panel_overlap("dock", true) {
+                    should_overlap = overlap;
+                }
+                if let Some(overlap) = unfocused_panel_overlap("main", false) {
+                    should_notch_overlap = overlap;
                 }
 
                 // Only report dock overlap when the dock window is actually visible.
@@ -1435,13 +1477,17 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                     last_dock_shell_surface = Some(shell_on_dock);
                 }
                 CURRENT_FOREGROUND_FULLSCREEN.store(current_is_fs, Ordering::Relaxed);
-                let fullscreen_on_dock = current_is_fs && fg_on("dock");
+                let fullscreen_on = |label: &str| match monitor_of(label) {
+                    Some((mx, my, _, _)) => monitor_fullscreen((mx, my), focused_monitor, current_is_fs, &fullscreen_monitors),
+                    None => current_is_fs && fg_on(label),
+                };
+                let fullscreen_on_dock = fullscreen_on("dock");
                 CURRENT_FOREGROUND_FULLSCREEN_ON_DOCK.store(fullscreen_on_dock, Ordering::Relaxed);
                 if Some(fullscreen_on_dock) != last_dock_fullscreen || last_emit.elapsed() >= Duration::from_secs(3) {
                     let _ = handle_visibility.emit_to("dock", "dock-fullscreen", fullscreen_on_dock);
                     last_dock_fullscreen = Some(fullscreen_on_dock);
                 }
-                let fullscreen_on_notch = current_is_fs && fg_on("main");
+                let fullscreen_on_notch = fullscreen_on("main");
                 crate::state::set_flag(crate::state::notch_fullscreen(), "main", fullscreen_on_notch);
                 if Some(fullscreen_on_notch) != last_notch_fullscreen || last_emit.elapsed() >= Duration::from_secs(3) {
                     let _ = handle_visibility.emit_to("main", "notch-fullscreen", fullscreen_on_notch);
@@ -1468,7 +1514,7 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                     let Ok(w_hwnd) = win.hwnd() else { continue };
                     let Some((mx, my, _mw, _mh)) = monitor_rect_for_hwnd(w_hwnd) else { continue };
                     {
-                        let fullscreen_here = current_is_fs && fg_info.is_some_and(|(screen, _, _)| screen.left == mx && screen.top == my);
+                        let fullscreen_here = monitor_fullscreen((mx, my), focused_monitor, current_is_fs, &fullscreen_monitors);
                         if !is_dock {
                             crate::state::set_flag(crate::state::notch_fullscreen(), &label, fullscreen_here);
                         }
@@ -1509,7 +1555,8 @@ pub fn setup_system_worker(app_handle: AppHandle) -> Sender<SystemCommand> {
                                 })
                             }
                         }
-                        _ => false,
+                        // Another monitor has focus: a maximized or fullscreen window there still covers the panel.
+                        _ => unfocused_panel_overlap(label.as_str(), is_dock).unwrap_or(false),
                     };
                     // Same visibility guard as the primary dock.
                     let overlap = overlap && (!is_dock || win.is_visible().unwrap_or(false));
@@ -2651,6 +2698,114 @@ fn monitor_rect_for_hwnd(hwnd: HWND) -> Option<(i32, i32, i32, i32)> {
             None
         }
     }
+}
+
+/// What the z-order shows on one monitor: the windows down to (and including) the first maximized
+/// or monitor-sized one, which hides everything below it.
+struct MonitorCover {
+    origin: (i32, i32),
+    bottom: i32,
+    rects: Vec<windows::Win32::Foundation::RECT>,
+    covered: bool,
+    fullscreen: bool,
+}
+
+struct CoverScan {
+    own_pid: u32,
+    monitors: Vec<MonitorCover>,
+}
+
+unsafe extern "system" fn cover_scan_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
+    use windows::Win32::Foundation::RECT;
+    use windows::Win32::Graphics::Dwm::DWMWA_CLOAKED;
+    use windows::Win32::Graphics::Gdi::{GetMonitorInfoA, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST};
+    use windows::Win32::UI::WindowsAndMessaging::{GetClassNameW, GetWindowRect, IsIconic, IsZoomed};
+    let scan = &mut *(lparam.0 as *mut CoverScan);
+    if !IsWindowVisible(hwnd).as_bool() || IsIconic(hwnd).as_bool() {
+        return true.into();
+    }
+    let mut pid = 0u32;
+    GetWindowThreadProcessId(hwnd, Some(&mut pid));
+    if pid == scan.own_pid || (GetWindowLongW(hwnd, GWL_EXSTYLE) as u32 & WS_EX_TOOLWINDOW.0) != 0 {
+        return true.into();
+    }
+    let mut cloaked = 0u32;
+    if DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, &mut cloaked as *mut _ as *mut _, 4).is_ok() && cloaked != 0 {
+        return true.into();
+    }
+    let mut class = [0u16; 64];
+    let len = GetClassNameW(hwnd, &mut class).max(0) as usize;
+    if matches!(String::from_utf16_lossy(&class[..len]).as_str(), "Progman" | "WorkerW" | "Shell_TrayWnd" | "Shell_SecondaryTrayWnd") {
+        return true.into();
+    }
+    let monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+    let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
+    if !GetMonitorInfoA(monitor, &mut mi).as_bool() {
+        return true.into();
+    }
+    let screen = mi.rcMonitor;
+    let origin = (screen.left, screen.top);
+    let index = match scan.monitors.iter().position(|m| m.origin == origin) {
+        Some(i) => i,
+        None => {
+            scan.monitors.push(MonitorCover { origin, bottom: screen.bottom, rects: Vec::new(), covered: false, fullscreen: false });
+            scan.monitors.len() - 1
+        }
+    };
+    let entry = &mut scan.monitors[index];
+    if entry.covered {
+        return true.into();
+    }
+    let mut rect = RECT::default();
+    let has_rect = DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS, &mut rect as *mut _ as *mut _, std::mem::size_of::<RECT>() as u32).is_ok()
+        || GetWindowRect(hwnd, &mut rect).is_ok();
+    if !has_rect {
+        return true.into();
+    }
+    entry.rects.push(rect);
+    // Small windows (popups, picture-in-picture) above a fullscreen app don't decide whether the
+    // monitor is fullscreen; a maximized or monitor-sized window does.
+    let covers = rect.left <= screen.left && rect.top <= screen.top && rect.right >= screen.right && rect.bottom >= screen.bottom;
+    if covers || IsZoomed(hwnd).as_bool() {
+        entry.covered = true;
+        entry.fullscreen = crate::utils::is_window_fullscreen(hwnd);
+    }
+    true.into()
+}
+
+/// Per monitor, the windows that are not hidden behind a maximized or monitor-sized one. Read from
+/// the z-order rather than focus, so a window keeps its monitor's panels hidden while another
+/// monitor has focus.
+fn scan_monitor_covers(own_pid: u32) -> Vec<MonitorCover> {
+    use windows::Win32::UI::WindowsAndMessaging::EnumWindows;
+    let mut scan = CoverScan { own_pid, monitors: Vec::new() };
+    unsafe {
+        let _ = EnumWindows(Some(cover_scan_proc), LPARAM(&mut scan as *mut CoverScan as isize));
+    }
+    scan.monitors
+}
+
+/// A window reaches into the dock's strip at the bottom of the monitor. `dock` is in the dock
+/// window's logical pixels, relative to the monitor's left edge.
+fn rect_hits_dock(rect: &windows::Win32::Foundation::RECT, monitor_left: i32, monitor_bottom: i32, dock: IntRect, scale: f64) -> bool {
+    let d_left = monitor_left + (dock.x as f64 * scale) as i32;
+    let d_right = d_left + (dock.width as f64 * scale) as i32;
+    let trigger_y = monitor_bottom - (56.0 * scale) as i32;
+    rect.left < d_right - 4 && rect.right > d_left + 4 && rect.bottom > trigger_y + 4
+}
+
+/// A window reaches into the notch's strip at the top of the monitor.
+fn rect_hits_notch(rect: &windows::Win32::Foundation::RECT, monitor_left: i32, monitor_top: i32, notch: IntRect, scale: f64) -> bool {
+    let n_left = monitor_left + (notch.x as f64 * scale) as i32;
+    let n_right = n_left + (notch.width as f64 * scale) as i32;
+    let trigger_y = monitor_top + (36.0 * scale) as i32;
+    rect.left < n_right - 4 && rect.right > n_left + 4 && rect.top < trigger_y - 4
+}
+
+/// Fullscreen state of the monitor at `origin`. The focused monitor keeps the foreground check;
+/// the others use the z-order scan.
+fn monitor_fullscreen(origin: (i32, i32), focused_monitor: Option<(i32, i32)>, focused_is_fullscreen: bool, covered: &[(i32, i32)]) -> bool {
+    if focused_monitor == Some(origin) { focused_is_fullscreen } else { covered.contains(&origin) }
 }
 
 struct CaptionProbe {
@@ -3963,7 +4118,42 @@ fn recover_from_webview_failure(handle: &AppHandle) {
 
 #[cfg(test)]
 mod tests {
-    use super::{dock_edge_hover_allowed, is_helper_name, is_launchable_entry, is_windows_shell_launcher_process, win_number_index};
+    use super::{dock_edge_hover_allowed, monitor_fullscreen, rect_hits_dock, rect_hits_notch, is_helper_name, is_launchable_entry, is_windows_shell_launcher_process, win_number_index};
+
+    #[test]
+    fn fullscreen_monitor_stays_hidden_when_focus_moves_to_another_monitor() {
+        let covered = [(0, 0)];
+        // Focus on the second monitor, which has no fullscreen app.
+        assert!(monitor_fullscreen((0, 0), Some((1920, 0)), false, &covered));
+        assert!(!monitor_fullscreen((1920, 0), Some((1920, 0)), false, &covered));
+    }
+
+    #[test]
+    fn window_over_the_panel_strip_counts_as_overlap_on_any_monitor() {
+        use windows::Win32::Foundation::RECT;
+        // Dock 800px wide centred on a 2560x1440 monitor to the right of the primary one.
+        let dock = crate::types::IntRect { x: 880, y: 0, width: 800, height: 64 };
+        let near_bottom = RECT { left: 2560 + 1000, top: 600, right: 2560 + 1600, bottom: 1420 };
+        let above_dock = RECT { left: 2560 + 1000, top: 200, right: 2560 + 1600, bottom: 900 };
+        let beside_dock = RECT { left: 2560 + 100, top: 600, right: 2560 + 600, bottom: 1420 };
+        assert!(rect_hits_dock(&near_bottom, 2560, 1440, dock, 1.0));
+        assert!(!rect_hits_dock(&above_dock, 2560, 1440, dock, 1.0));
+        assert!(!rect_hits_dock(&beside_dock, 2560, 1440, dock, 1.0));
+
+        let notch = crate::types::IntRect { x: 1080, y: 0, width: 400, height: 40 };
+        let at_top = RECT { left: 2560 + 1200, top: 0, right: 2560 + 1800, bottom: 700 };
+        let lower = RECT { left: 2560 + 1200, top: 300, right: 2560 + 1800, bottom: 900 };
+        assert!(rect_hits_notch(&at_top, 2560, 0, notch, 1.0));
+        assert!(!rect_hits_notch(&lower, 2560, 0, notch, 1.0));
+    }
+
+    #[test]
+    fn focused_monitor_follows_the_foreground_window() {
+        // A non-fullscreen window focused above the fullscreen app shows the panels again.
+        assert!(!monitor_fullscreen((0, 0), Some((0, 0)), false, &[(0, 0)]));
+        assert!(monitor_fullscreen((0, 0), Some((0, 0)), true, &[]));
+        assert!(!monitor_fullscreen((0, 0), None, false, &[]));
+    }
 
     #[test]
     fn fullscreen_dock_does_not_reveal_on_edge_or_hover() {
