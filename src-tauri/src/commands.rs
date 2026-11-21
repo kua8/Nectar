@@ -67,7 +67,12 @@ pub async fn set_dock_dragging(dragging: bool) {
 }
 
 #[tauri::command]
-pub async fn update_dock_rect(window: Window, rect: IntRect) {
+pub async fn update_dock_rect(window: Window, rect: IntRect, expanded: Option<bool>) {
+    if expanded == Some(true) {
+        if let Ok(mut m) = crate::state::dock_overlap_rects().lock() {
+            m.insert(window.label().to_string(), rect);
+        }
+    }
     if let Ok(mut m) = crate::state::dock_rects().lock() {
         m.insert(window.label().to_string(), rect);
     }
