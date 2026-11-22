@@ -48,7 +48,7 @@
 | **A dock that replaces your taskbar** | Mirrors your real taskbar, same pinned apps and order, with real icons and names, and a dot on apps that want your attention. |
 | **Native where it counts** | The tray opens the real Windows flyout, and Quit ends an app like Task Manager's End task. |
 | **Out of your way** | Fixed, Smart or Peek modes, and both stay hidden over fullscreen games. |
-| **Made for your setup** | Every monitor, one monitor, or a specific one. Solid, glass or Material You styles with your own accent color. English and Turkish. Every option lives in a plain `settings.json`. |
+| **Made for your setup** | Every monitor, one monitor, or a specific one. Solid, glass or Material You styles with your own accent color. English, Turkish, German, Arabic, Spanish, French and Simplified Chinese. Every option lives in a plain `settings.json`. |
 | **Light on the system** | Audio capture, cursor tracking and thumbnail work pause themselves when nothing needs them. |
 
 <div align="center">
@@ -188,6 +188,20 @@ See the [open issues](https://github.com/kua8/Nectar/issues) for requests and kn
 [![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)](https://vitejs.dev/)
+
+## Network requests
+
+Nectar has no telemetry and no analytics. It only makes these requests, and only when the feature that needs them is on:
+
+| What | Where | When |
+| --- | --- | --- |
+| Forecast | `api.open-meteo.com` | Weather widget, off by default |
+| City search | `geocoding-api.open-meteo.com` | While typing a city name in Settings, or in the dual clock picker |
+| Approximate location | `ipapi.co`, `freeipapi.com`, `ipwho.is`, `get.geojs.io` | Only when weather is on and no city has been picked — these services see your IP address |
+| Calendar sync | Your own CalDAV server or ICS link | While calendar sync is connected; https only |
+| Update check | `api.github.com`, `github.com` | Once a day, and when you ask in Settings › About |
+
+Fonts are bundled, so nothing is loaded from a font CDN. Settings are stored in `%APPDATA%\com.kua8.nectar`; calendar passwords and ICS links go to Windows Credential Manager, never into `settings.json`.
 
 ## Support
 

@@ -103,8 +103,8 @@ fn normalize_link(raw: &str) -> Result<Url, String> {
     };
     text = text.replace(' ', "");
     let mut url = Url::parse(&text).map_err(|_| "That doesn't look like a valid link.".to_string())?;
-    if url.scheme() != "https" && url.scheme() != "http" {
-        return Err("Only http, https and webcal links are supported.".to_string());
+    if let Some(problem) = crate::caldav::insecure_url_error(&url, "calendar link") {
+        return Err(problem);
     }
     const SHARE_PAGE: &str = "/apps/calendar/p/";
     if let Some(at) = url.path().find(SHARE_PAGE) {
@@ -668,6 +668,8 @@ mod tests {
         let outlook = normalize_link("https://outlook.live.com/owa/calendar/x/y/cid-1/calendar.ics").unwrap();
         assert_eq!(detect(&outlook).0, "outlook");
         assert!(normalize_link("ftp://example.com/a.ics").is_err());
+        assert!(normalize_link("http://example.com/a.ics").is_err());
+        assert!(normalize_link("http://localhost:8080/a.ics").is_ok());
     }
 
     #[test]

@@ -18,7 +18,7 @@ body {
   position: relative;
   pointer-events: auto;
   /* Handled by backend ignore_cursor_events */
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
 }
 
 /* Dock Bar */
@@ -35,7 +35,7 @@ body {
   padding: 4px 10px;
   border-radius: 6px;
   font-size: 12px;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
   pointer-events: none;
   opacity: 0;
   transition: all 0.2s ease;
@@ -74,7 +74,7 @@ body {
   border-radius: 6px;
   font-size: 11px;
   font-weight: 500;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
   white-space: nowrap;
   pointer-events: none;
   opacity: 0;
@@ -1134,4 +1134,244 @@ body {
 .rename-btn.primary {
   background: var(--nectar-text, #fff);
   color: var(--nectar-bg-expanded, #000);
+}
+
+/* Fallback for Chinese, only used when the system has no CJK font of its own: the font stacks
+   ask for Microsoft YaHei UI, Microsoft YaHei, PingFang SC and Hiragino Sans GB first — using a
+   font already installed in Windows is allowed and gives the native look. This subset of Source
+   Han Sans / Noto Sans SC (SIL OFL 1.1) covers the case where none of those exist, e.g. an
+   English Windows install where someone switches Nectar to Chinese.
+   unicode-range means it is only downloaded when one of these characters is on screen, so the
+   other languages never pay for it. Inter still handles Latin. */
+@font-face {
+    font-family: "Noto Sans SC";
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url("/fonts/noto-sans-sc-ui.woff2") format("woff2");
+    unicode-range: U+2E80-2EFF, U+3000-303F, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF,
+        U+FF00-FFEF, U+2018-201D, U+2026, U+203A, U+2192, U+00B7;
+}
+
+/* ── Notification area ────────────────────────────────────────────────────────────────────
+   A folder the size of a dock icon. The four most recent tray apps show as a 2x2 grid, and
+   hovering opens the full list. The real tray icons cannot be read from Windows 11's taskbar,
+   so each cell shows the owning app's executable icon instead. */
+
+.tray-folder-wrapper {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  -webkit-app-region: no-drag;
+}
+
+.tray-folder {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+
+.tray-folder-wrapper:hover .tray-folder {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.dock-icon-only .tray-folder {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* 2x2 grid of the first four icons. Cells are sized so the grid sits inside the icon's padding
+   the way a real folder preview does. */
+.tray-folder-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 1px;
+  width: 24px;
+  height: 24px;
+}
+
+.tray-folder-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+
+.tray-folder-cell:not(:has(img)) {
+  cursor: default;
+}
+
+.tray-folder-cell:has(img):hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.tray-folder-cell img {
+  width: 11px;
+  height: 11px;
+  object-fit: contain;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+/* The chevron says "this opens", so the folder is not mistaken for an app to launch. */
+.tray-folder-chevron {
+  position: absolute;
+  bottom: 1px;
+  right: 2px;
+  color: var(--nectar-text-muted, rgba(255, 255, 255, 0.6));
+  line-height: 0;
+  pointer-events: none;
+}
+
+/* Full list, above the dock. Anchored to the folder so it opens upward from it. */
+.tray-popover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  /* The 8px gap between the folder and the list: the pointer crosses it on the way up, and the
+     ::before strip keeps that crossing inside the popover's own box. */
+
+  padding: 8px;
+  border-radius: 12px;
+  background: var(--nectar-bg-expanded, rgba(20, 20, 24, 0.94));
+  border: 1px solid var(--nectar-border, rgba(255, 255, 255, 0.1));
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  z-index: 20;
+  max-width: 260px;
+  -webkit-app-region: no-drag;
+}
+
+.tray-popover-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 2px;
+}
+
+.tray-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 4px 6px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--nectar-text, #fff);
+  cursor: pointer;
+  font: inherit;
+  transition: background 0.15s ease;
+}
+
+.tray-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.tray-item img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+.tray-item-name {
+  font-size: 10px;
+  line-height: 1.15;
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--nectar-text-muted, rgba(255, 255, 255, 0.7));
+}
+
+.light-mode .tray-folder {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.light-mode .tray-folder-wrapper:hover .tray-folder {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.light-mode .tray-folder-cell {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.light-mode .tray-item:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* ── Attention on tray icons ──────────────────────────────────────────────────────────────
+   A tray app that flashed a window, or whose unread count went up, pulses until it is opened.
+   The native notification area blinks the icon; this tints and brightens it instead, because
+   swapping the image on every frame would cost a layout per icon. */
+
+@keyframes tray-attention {
+  0%, 100% { background-color: rgba(255, 159, 10, 0); }
+  50%      { background-color: rgba(255, 159, 10, 0.85); }
+}
+
+.tray-folder-cell.attention {
+  animation: tray-attention 1.1s ease-in-out infinite;
+}
+
+.tray-folder-cell.attention img {
+  filter: brightness(1.15);
+}
+
+.tray-item.attention img {
+  animation: tray-icon-attention 1.1s ease-in-out infinite;
+}
+
+@keyframes tray-icon-attention {
+  0%, 100% { transform: scale(1); filter: brightness(1); }
+  50%      { transform: scale(1.12); filter: brightness(1.35) saturate(1.3); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tray-folder-cell.attention,
+  .tray-item.attention img {
+    animation: none;
+    background-color: rgba(255, 159, 10, 0.5);
+  }
+}
+
+/* A pinned app that is running but has no window on screen: closed to the tray. The dot row
+   would claim a window, so this is a thin dash instead — it says "still running, nothing open",
+   which is also what clicking it resolves by reopening the window. */
+.dock-background-mark {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 12px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--nectar-text-muted, rgba(255, 255, 255, 0.45));
+  pointer-events: none;
+}
+
+/* Bridges the gap between the folder and the popover, so moving the pointer from one to the
+   other never leaves the element the close check is watching. */
+.tray-popover::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 10px;
 }

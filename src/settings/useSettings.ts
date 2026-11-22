@@ -53,7 +53,7 @@ function parseDrives(val: string | null): string[] {
 
 export function useSettings() {
   const [autostart, setAutostart] = useState(false);
-  const [weatherEnabled, setWeatherEnabled] = useState(true);
+  const [weatherEnabled, setWeatherEnabled] = useState(false);
   const [calendarEnabled, setCalendarEnabled] = useState(true);
   const [timerEnabled, setTimerEnabled] = useState(true);
   const [timerSoundEnabled, setTimerSoundEnabled] = useState(true);

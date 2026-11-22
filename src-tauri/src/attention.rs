@@ -5,7 +5,8 @@ use std::sync::{Mutex, OnceLock};
 use tauri::{AppHandle, Emitter};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetAncestor, GetForegroundWindow, GetWindowTextW, IsWindow, GA_ROOTOWNER,
+    GetAncestor, GetForegroundWindow, GetWindowTextW, GetWindowThreadProcessId, IsWindow,
+    GA_ROOTOWNER,
 };
 
 const HSHELL_WINDOWDESTROYED: usize = 2;
@@ -177,6 +178,44 @@ pub fn get_attention_windows() -> Vec<isize> {
     let Ok(mut list) = FLASHING.lock() else { return Vec::new() };
     list.retain(|&h| unsafe { IsWindow(Some(hwnd(h))) }.as_bool());
     list.clone()
+}
+
+/// Whether any window belonging to `pid` is asking for attention.
+///
+/// The tray folder uses this so an icon pulses when its app wants the user, the way a taskbar
+/// button does — a flashing window is the only signal most apps give, and a tray-only app such
+/// as WeChat may not send one at all, in which case nothing pulses and the icon stays still.
+pub fn process_wants_attention(pid: u32) -> bool {
+    if pid == 0 {
+        return false;
+    }
+    let Ok(list) = FLASHING.lock() else { return false };
+    list.iter().any(|&raw| {
+        if !unsafe { IsWindow(Some(hwnd(raw))) }.as_bool() {
+            return false;
+        }
+        let mut window_pid = 0u32;
+        unsafe { GetWindowThreadProcessId(hwnd(raw), Some(&mut window_pid)) };
+        window_pid == pid
+    })
+}
+
+/// Clears the attention mark for a process, so its tray icon stops pulsing once the user has
+/// looked at it.
+pub fn clear_attention(pid: u32) {
+    if pid == 0 {
+        return;
+    }
+    let Ok(mut list) = FLASHING.lock() else { return };
+    let before = list.len();
+    list.retain(|&raw| {
+        let mut window_pid = 0u32;
+        unsafe { GetWindowThreadProcessId(hwnd(raw), Some(&mut window_pid)) };
+        window_pid != pid
+    });
+    if list.len() != before {
+        emit(list.clone());
+    }
 }
 
 #[cfg(test)]

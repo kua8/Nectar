@@ -53,12 +53,35 @@ pub fn error_chain(e: &dyn std::error::Error) -> String {
     parts.join(": ")
 }
 
+fn is_loopback(host: &str) -> bool {
+    let host = host.trim_start_matches('[').trim_end_matches(']');
+    matches!(host.to_ascii_lowercase().as_str(), "localhost" | "127.0.0.1" | "::1")
+}
+
+/// CalDAV sends the account password in a Basic auth header, and an ICS link is a bearer token
+/// in the URL. Both are readable by anything on the network over plain http, so only https is
+/// accepted — with loopback kept as an exception for a server running on this machine.
+/// `secret` names what would be exposed, so the message fits a password or a calendar link.
+pub fn insecure_url_error(url: &Url, secret: &str) -> Option<String> {
+    match url.scheme() {
+        "https" => None,
+        "http" if url.host_str().is_some_and(is_loopback) => None,
+        "http" => Some(format!(
+            "Use an https:// address. Over http, the {secret} would be sent unencrypted and could be read on the network."
+        )),
+        _ => Some("Only https:// addresses are supported.".to_string()),
+    }
+}
+
 fn normalize_base(raw: &str) -> Result<Url, String> {
     let mut s = raw.trim().to_string();
     if !s.contains("://") {
         s = format!("https://{}", s);
     }
     let mut url = Url::parse(&s).map_err(|_| "That server address isn't valid.".to_string())?;
+    if let Some(problem) = insecure_url_error(&url, "password") {
+        return Err(problem);
+    }
     if url.path().is_empty() || url.path() == "/" {
         url.set_path("/remote.php/dav/");
     }
@@ -477,6 +500,14 @@ mod tests {
             normalize_base(" https://cloud.example.com/remote.php/dav ").unwrap().as_str(),
             "https://cloud.example.com/remote.php/dav"
         );
+        assert_eq!(normalize_base("http://localhost:8080").unwrap().as_str(), "http://localhost:8080/remote.php/dav/");
+    }
+
+    #[test]
+    fn refuses_to_send_credentials_over_plain_http() {
+        let err = normalize_base("http://cloud.example.com/remote.php/dav").unwrap_err();
+        assert!(err.contains("https"), "got {err}");
+        assert!(normalize_base("ftp://cloud.example.com").is_err());
     }
 
     const LIST_XML: &str = r##"<?xml version="1.0"?>

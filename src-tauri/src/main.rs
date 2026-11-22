@@ -15,6 +15,7 @@ mod native_uninstall;
 mod diagnostics;
 mod taskbar_pins;
 mod tray_icons;
+mod tray_host;
 mod caldav;
 mod calendar_sync;
 mod ics;
@@ -32,6 +33,8 @@ mod webview_args;
 mod on_demand_windows;
 mod wallpaper;
 mod live_preview;
+mod window_guard;
+mod window_corners;
 
 use tauri::Manager;
 use windows::Win32::System::Console::SetConsoleCtrlHandler;
@@ -127,6 +130,11 @@ fn main() {
             open_tray_window,
             open_tray_at_cursor,
             open_tray_from_button,
+            tray_icons::tray_list,
+            tray_icons::tray_click,
+            tray_icons::tray_dismiss,
+            tray_icons::restore_app_window,
+            tray_icons::background_apps,
             show_desktop,
             open_wifi_settings,
             open_sound_settings,
@@ -250,8 +258,6 @@ fn main() {
             get_network_speed,
             get_running_processes,
             kill_process,
-            export_settings,
-            import_settings,
             reset_settings,
             export_settings_dialog,
             import_settings_dialog,
@@ -450,7 +456,9 @@ fn main() {
         if let tauri::RunEvent::Exit = event {
             set_taskbar_visibility(true, true);
             NATIVE_TASKBAR_HIDDEN.store(false, Ordering::Relaxed);
-
+            // Dropped text is written to %TEMP% so it can be dragged out as a file; it should
+            // not outlive the session.
+            crate::commands::clear_shelf_temp();
         }
     });
 }

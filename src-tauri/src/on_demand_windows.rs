@@ -98,6 +98,9 @@ fn build(app: &AppHandle, spec: &Spec) -> Option<WebviewWindow> {
         let _ = window_vibrancy::apply_acrylic(&window, Some((10, 10, 15, 20)));
     }
     if let Ok(hwnd) = window.hwnd() {
+        // The acrylic behind this window is painted across the whole rectangle. DWM is what
+        // rounds it, so the panel inside uses the same 8 px radius; see window_corners.
+        crate::window_corners::round_like_system(hwnd);
         crate::active_look::keep_active_look(hwnd);
     }
 

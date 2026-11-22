@@ -421,14 +421,20 @@ unsafe extern "system" fn focus_event_proc(
     }
 
     // Keep the focused window's thumbnail warm so a later minimized one has a cached image.
+    // Only while dock previews are on: with them off nobody ever looks at these captures, and
+    // screenshotting every window that takes focus is not something to do unasked.
     std::thread::spawn(move || {
         use windows::Win32::UI::WindowsAndMessaging::{GetWindowTextW, IsIconic, IsWindow};
+
+        if !dock_previews_enabled() { return; }
 
         std::thread::sleep(std::time::Duration::from_millis(200));
         let hwnd = HWND(hwnd_raw as *mut _);
         unsafe {
             if !IsWindow(Some(hwnd)).as_bool() || IsIconic(hwnd).as_bool() { return; }
         }
+        // The setting may have been turned off while this thread was waiting.
+        if !dock_previews_enabled() { return; }
 
         // Skip fullscreen windows (games, video players): capturing them can hitch.
         if crate::utils::is_window_fullscreen(hwnd) { return; }
@@ -461,6 +467,15 @@ unsafe extern "system" fn focus_event_proc(
 }
 
 static THUMB_CAPTURE_IN_FLIGHT: AtomicBool = AtomicBool::new(false);
+
+/// Whether the dock shows window previews. Default is on, matching the setting's documented
+/// default; turning it off stops the background thumbnail capture as well.
+fn dock_previews_enabled() -> bool {
+    let Some(app) = KEYBOARD_HOOK_APP_HANDLE.get() else { return true };
+    crate::utils::get_setting_str(app, "nectar-dock-preview-enabled")
+        .map(|v| v != "false")
+        .unwrap_or(true)
+}
 
 struct ThumbnailCaptureGuard;
 
@@ -504,6 +519,8 @@ unsafe extern "system" fn thumbnail_capture_proc(
 
     std::thread::spawn(move || {
         std::thread::sleep(std::time::Duration::from_millis(150));
+
+        if !dock_previews_enabled() { return; }
 
         // Skip if another capture refreshed this window very recently
         if let Some(cache) = crate::state::THUMBNAIL_CACHE.get() {

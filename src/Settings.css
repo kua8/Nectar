@@ -22,7 +22,7 @@
 body {
   margin: 0;
   padding: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", sans-serif;
   background-color: transparent;
   color: var(--text-color);
   user-select: none;
@@ -45,7 +45,7 @@ body {
   background: var(--bg-color);
   backdrop-filter: blur(25px) saturate(140%);
   -webkit-backdrop-filter: blur(25px) saturate(140%);
-  border-radius: 12px;
+  border-radius: 8px;
   overflow: hidden;
   border: 1px solid var(--window-line);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
@@ -244,6 +244,14 @@ body {
 
 .setting-group-label--spaced {
   margin-top: 24px;
+}
+
+/* Small explanatory line under a group, e.g. what turning weather on contacts. */
+.setting-note {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--nectar-text-muted, rgba(255, 255, 255, 0.45));
+  margin: 8px 8px 0 8px;
 }
 
 .setting-group {
@@ -1969,4 +1977,21 @@ input:checked + .slider:before {
   margin-left: auto;
   margin-right: 10px;
   flex: none;
+}
+
+/* Fallback for Chinese, only used when the system has no CJK font of its own: the font stacks
+   ask for Microsoft YaHei UI, Microsoft YaHei, PingFang SC and Hiragino Sans GB first — using a
+   font already installed in Windows is allowed and gives the native look. This subset of Source
+   Han Sans / Noto Sans SC (SIL OFL 1.1) covers the case where none of those exist, e.g. an
+   English Windows install where someone switches Nectar to Chinese.
+   unicode-range means it is only downloaded when one of these characters is on screen, so the
+   other languages never pay for it. Inter still handles Latin. */
+@font-face {
+    font-family: "Noto Sans SC";
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url("/fonts/noto-sans-sc-ui.woff2") format("woff2");
+    unicode-range: U+2E80-2EFF, U+3000-303F, U+3400-4DBF, U+4E00-9FFF, U+F900-FAFF,
+        U+FF00-FFEF, U+2018-201D, U+2026, U+203A, U+2192, U+00B7;
 }

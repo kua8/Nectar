@@ -12,7 +12,11 @@ const MAX_HEAD: usize = 8192;
 const MAX_BODY: usize = 8192;
 const MAX_CONNECTIONS: usize = 8;
 const ASK_WAIT: u64 = 120;
+/// Status lines are short and land in a one-line label.
 const DETAIL_MAX: usize = 600;
+/// A permission request is what the user is agreeing to, so it gets far more room than a status
+/// line. The panel scrolls, so the whole command can be read before Allow is clicked.
+const ASK_DETAIL_MAX: usize = 4000;
 const SETTING: &str = "nectar-agent-api";
 
 static ACTIVE: AtomicUsize = AtomicUsize::new(0);
@@ -88,6 +92,25 @@ fn clean(text: Option<String>, limit: usize) -> Option<String> {
     let cleaned: String = text?.chars().filter(|c| !c.is_control()).take(limit).collect();
     let cleaned = cleaned.trim().to_string();
     (!cleaned.is_empty()).then_some(cleaned)
+}
+
+/// Same as `clean`, but keeps newlines and tabs. A multi-line shell command means something
+/// different once its lines are joined, and this text is what the user approves.
+fn clean_script(text: Option<String>, limit: usize) -> Option<String> {
+    let raw = text?;
+    let mut out = String::with_capacity(raw.len().min(limit));
+    for (used, c) in raw.chars().enumerate() {
+        if used >= limit {
+            break;
+        }
+        match c {
+            '\n' | '\t' => out.push(c),
+            c if c.is_control() => out.push(' '),
+            c => out.push(c),
+        }
+    }
+    let trimmed = out.trim().to_string();
+    (!trimmed.is_empty()).then_some(trimmed)
 }
 
 fn random_token() -> Option<String> {
@@ -214,7 +237,7 @@ fn handle(mut stream: TcpStream, app: &AppHandle, token: &str) {
                 ask: Some(Ask {
                     id,
                     tool: clean(incoming.tool, 40),
-                    detail: clean(incoming.detail, DETAIL_MAX),
+                    detail: clean_script(incoming.detail, ASK_DETAIL_MAX),
                     questions: incoming.questions.map(|list| {
                         list.into_iter()
                             .take(4)
@@ -356,6 +379,85 @@ pub fn set_hooks(enable: bool) {
     sync_claude_hooks(enable);
 }
 
+/// Writes the port and token where the `nectar.exe agent` CLI can read them.
+///
+/// The token is a bearer credential: anything that can read this file can post activity and
+/// permission requests to Nectar. `agent.json` therefore gets an explicit DACL for the current
+/// user only, instead of inheriting whatever the roaming profile happens to allow. The file is
+/// rewritten on every start, so a loosened ACL from an earlier version does not survive.
+fn write_config(path: &std::path::Path, json: &str) -> std::io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows::core::PCWSTR;
+    use windows::Win32::Foundation::{CloseHandle, LocalFree, HLOCAL};
+    use windows::Win32::Security::Authorization::{
+        SetEntriesInAclW, SetNamedSecurityInfoW, EXPLICIT_ACCESS_W, SE_FILE_OBJECT, SET_ACCESS,
+        TRUSTEE_IS_USER, TRUSTEE_W,
+    };
+    use windows::Win32::Security::{
+        ACL, DACL_SECURITY_INFORMATION, NO_INHERITANCE, PROTECTED_DACL_SECURITY_INFORMATION,
+    };
+    use windows::Win32::Security::{GetTokenInformation, TokenUser, TOKEN_QUERY, TOKEN_USER};
+    use windows::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
+
+    // FILE_GENERIC_READ | FILE_GENERIC_WRITE | DELETE: read it, update it, replace it.
+    const ACCESS: u32 = 0x0012_0089 | 0x1_0000;
+
+    std::fs::write(path, json)?;
+
+    unsafe {
+        let mut token = windows::Win32::Foundation::HANDLE::default();
+        if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token).is_err() {
+            return Ok(());
+        }
+        let mut needed = 0u32;
+        let _ = GetTokenInformation(token, TokenUser, None, 0, &mut needed);
+        let mut buf = vec![0u8; needed as usize];
+        let ok = GetTokenInformation(
+            token,
+            TokenUser,
+            Some(buf.as_mut_ptr() as *mut _),
+            needed,
+            &mut needed,
+        );
+        let _ = CloseHandle(token);
+        if ok.is_err() {
+            return Ok(());
+        }
+        let user = &*(buf.as_ptr() as *const TOKEN_USER);
+
+        let access = EXPLICIT_ACCESS_W {
+            grfAccessPermissions: ACCESS,
+            grfAccessMode: SET_ACCESS,
+            grfInheritance: NO_INHERITANCE,
+            Trustee: TRUSTEE_W {
+                TrusteeForm: windows::Win32::Security::Authorization::TRUSTEE_FORM(
+                    TRUSTEE_IS_USER.0,
+                ),
+                ptstrName: windows::core::PWSTR(user.User.Sid.0 as *mut u16),
+                ..Default::default()
+            },
+        };
+
+        let mut acl: *mut ACL = std::ptr::null_mut();
+        if SetEntriesInAclW(Some(&[access]), None, &mut acl).is_err() || acl.is_null() {
+            return Ok(());
+        }
+
+        let path_w: Vec<u16> = path.as_os_str().encode_wide().chain(std::iter::once(0)).collect();
+        let _ = SetNamedSecurityInfoW(
+            PCWSTR(path_w.as_ptr()),
+            SE_FILE_OBJECT,
+            DACL_SECURITY_INFORMATION | PROTECTED_DACL_SECURITY_INFORMATION,
+            None,
+            None,
+            Some(acl),
+            None,
+        );
+        let _ = LocalFree(Some(HLOCAL(acl as *mut _)));
+    }
+    Ok(())
+}
+
 pub fn start(app: AppHandle) {
     let enabled = crate::utils::get_setting_str(&app, SETTING).as_deref() == Some("true");
     if !enabled {
@@ -367,7 +469,7 @@ pub fn start(app: AppHandle) {
     let Ok(addr) = listener.local_addr() else { return };
     let Some(path) = config_path() else { return };
     let config = serde_json::json!({ "port": addr.port(), "token": token }).to_string();
-    if std::fs::write(&path, config).is_err() {
+    if write_config(&path, &config).is_err() {
         return;
     }
 
@@ -516,13 +618,41 @@ fn ask(args: &[String]) {
         detail = None;
         asked = Some(parsed);
     } else {
-        detail = ["command", "file_path", "url", "pattern", "description"]
-            .iter()
-            .find_map(|key| tool_input.get(*key).and_then(|v| v.as_str()))
-            .map(str::to_string)
-            .or_else(|| (!tool_input.is_null()).then(|| tool_input.to_string()));
+        // Everything the tool is about to do, not just the first field that happens to be
+        // present: a request can carry a command and a description, or a path and a URL, and
+        // approving it means approving all of it.
+        let mut parts: Vec<String> = Vec::new();
+        match tool_input {
+            serde_json::Value::Object(map) => {
+                for (key, value) in map {
+                    match value {
+                        serde_json::Value::String(s) if !s.trim().is_empty() => {
+                            parts.push(format!("{key}: {s}"));
+                        }
+                        serde_json::Value::Null | serde_json::Value::String(_) => {}
+                        serde_json::Value::Array(_) | serde_json::Value::Object(_) => {
+                            parts.push(format!("{key}: {value}"));
+                        }
+                        other => parts.push(format!("{key}: {other}")),
+                    }
+                }
+            }
+            serde_json::Value::Null => {}
+            other => parts.push(other.to_string()),
+        }
+        detail = (!parts.is_empty()).then(|| parts.join("\n"));
     }
-    let detail = detail.map(|d| d.chars().take(DETAIL_MAX).collect::<String>());
+    // The full text goes through; only an absurdly long payload is cut, and then it says so
+    // rather than quietly showing a prefix the user might mistake for the whole thing.
+    let detail = detail.map(|d| {
+        if d.chars().count() > ASK_DETAIL_MAX {
+            let mut cut: String = d.chars().take(ASK_DETAIL_MAX).collect();
+            cut.push_str("\n… (truncated)");
+            cut
+        } else {
+            d
+        }
+    });
     let questions = asked.as_ref().map(|list| list.iter().map(|(q, o)| serde_json::json!({ "question": q, "options": o })).collect::<Vec<_>>());
     let body = serde_json::json!({
         "name": name,

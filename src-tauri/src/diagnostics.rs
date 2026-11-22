@@ -48,7 +48,13 @@ pub fn log(msg: &str) {
     }
     if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(&path) {
         let stamp = chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f");
-        let _ = writeln!(f, "[{stamp}] {msg}");
+        // Some messages embed a window title or hotkey the user chose. Keeping those on one
+        // line means a crafted name cannot add something that looks like a separate log entry.
+        let single_line: String = msg
+            .chars()
+            .map(|c| if c.is_control() { ' ' } else { c })
+            .collect();
+        let _ = writeln!(f, "[{stamp}] {single_line}");
     }
 }
 
@@ -137,19 +143,141 @@ fn running_conflicts() -> String {
     found.join(", ")
 }
 
-fn sensitive_key(key: &str) -> bool {
-    let k = key.to_lowercase();
-    ["caldav", "ics", "token", "password", "email", "account", "url", "location", "weather-cached"]
-        .iter()
-        .any(|s| k.contains(s))
+/// Settings safe to print in full. This is an allowlist on purpose: diagnostics get pasted into
+/// public bug reports, so a setting added later must be listed here before its value can appear.
+/// Keys that are not listed are only counted, never printed — that is what keeps coordinates,
+/// city names, server addresses and account names out of a report nobody re-reads before posting.
+const PUBLIC_SETTINGS: &[&str] = &[
+    "nectar-accent",
+    "nectar-agent-api",
+    "nectar-agent-intro-seen",
+    "nectar-app-version",
+    "nectar-auto-update",
+    "nectar-brightness-edge-enabled",
+    "nectar-brightness-overlay-enabled",
+    "nectar-brightness-side",
+    "nectar-caldav-interval",
+    "nectar-calendar-enabled",
+    "nectar-calendar-view",
+    "nectar-calendar-window-view",
+    "nectar-cc-layout",
+    "nectar-clock-tab",
+    "nectar-corners-enabled",
+    "nectar-debug-battery",
+    "nectar-dock-adaptive",
+    "nectar-dock-attention-enabled",
+    "nectar-dock-calendar-enabled",
+    "nectar-dock-console-windows",
+    "nectar-dock-drives",
+    "nectar-dock-edge-area",
+    "nectar-dock-enabled",
+    "nectar-dock-hide-delay",
+    "nectar-dock-icon-only",
+    "nectar-dock-indicator",
+    "nectar-dock-menu-items",
+    "nectar-dock-mixed-reorder",
+    "nectar-dock-mode",
+    "nectar-dock-monitor-mode",
+    "nectar-dock-preview-delay",
+    "nectar-dock-preview-enabled",
+    "nectar-dock-recycle-enabled",
+    "nectar-dock-search-enabled",
+    "nectar-dock-search-provider",
+    "nectar-dock-search-shortcut",
+    "nectar-dock-show-desktop-corner",
+    "nectar-dock-taskview-enabled",
+    "nectar-dock-tray-enabled",
+    "nectar-dock-win-number-enabled",
+    "nectar-dual-clock-enabled",
+    "nectar-edge-delay",
+    "nectar-first-run",
+    "nectar-glass-wallpaper",
+    "nectar-group-bg",
+    "nectar-has-battery",
+    "nectar-highlight",
+    "nectar-language",
+    "nectar-legacy-mode",
+    "nectar-logon-task",
+    "nectar-low-battery-threshold",
+    "nectar-media-album-art-enabled",
+    "nectar-media-ambience-enabled",
+    "nectar-media-artwork-theme",
+    "nectar-media-compact-glow-enabled",
+    "nectar-media-layout",
+    "nectar-media-visualizer-enabled",
+    "nectar-music-compact-notch",
+    "nectar-music-mode-enabled",
+    "nectar-net-widget-mode",
+    "nectar-notch-edge-area",
+    "nectar-notch-edge-delay",
+    "nectar-notch-mode",
+    "nectar-notch-monitor-mode",
+    "nectar-notch-remember-mode",
+    "nectar-notch-scroll-direction",
+    "nectar-notch-scroll-volume",
+    "nectar-notch-timer-progress",
+    "nectar-on-highlight",
+    "nectar-opacity",
+    "nectar-opacity-expanded",
+    "nectar-panel-control-center-enabled",
+    "nectar-panel-order",
+    "nectar-panel-shelf-enabled",
+    "nectar-panel-status-enabled",
+    "nectar-ram-saver",
+    "nectar-ram-ultra",
+    "nectar-scale",
+    "nectar-shelf-persist",
+    "nectar-show-update-indicator",
+    "nectar-start-icon",
+    "nectar-status-widgets",
+    "nectar-stopwatch-enabled",
+    "nectar-sync-windows-accent",
+    "nectar-temp-unit",
+    "nectar-text",
+    "nectar-text-muted",
+    "nectar-theme-accent",
+    "nectar-theme-accent-color",
+    "nectar-theme-brightness",
+    "nectar-theme-color",
+    "nectar-theme-mode",
+    "nectar-theme-opacity",
+    "nectar-theme-saturation",
+    "nectar-theme-style",
+    "nectar-time-format-24h",
+    "nectar-timer-enabled",
+    "nectar-timer-sound-enabled",
+    "nectar-tour-seen",
+    "nectar-update-channel",
+    "nectar-visualizer-enabled",
+    "nectar-volume-edge-enabled",
+    "nectar-volume-overlay-enabled",
+    "nectar-volume-side",
+    "nectar-week-start",
+];
+
+/// Section collapse state is one boolean per settings group; the suffix is a fixed UI id.
+const PUBLIC_SETTING_PREFIXES: &[&str] = &["nectar-settings-section-"];
+
+fn public_setting(key: &str) -> bool {
+    PUBLIC_SETTINGS.contains(&key)
+        || PUBLIC_SETTING_PREFIXES.iter().any(|prefix| key.starts_with(prefix))
 }
 
 fn settings_snapshot() -> String {
     let Some(cache) = crate::state::SETTINGS_CACHE.get() else { return "(settings not loaded)".into() };
     let Ok(guard) = cache.lock() else { return "(settings locked)".into() };
-    let mut keys: Vec<&String> = guard.keys().filter(|k| !sensitive_key(k)).collect();
-    keys.sort();
-    keys.iter().map(|k| format!("  {k} = {}", guard[*k])).collect::<Vec<_>>().join("\n")
+    let mut shown: Vec<(&String, &serde_json::Value)> =
+        guard.iter().filter(|(k, _)| public_setting(k)).collect();
+    shown.sort_by(|a, b| a.0.cmp(b.0));
+    let hidden = guard.len() - shown.len();
+    let mut out: Vec<String> = shown
+        .into_iter()
+        .map(|(k, v)| format!("  {k} = {v}"))
+        .collect();
+    if hidden > 0 {
+        out.push(format!("  ({hidden} other settings hidden: they may identify this PC or its owner)"));
+    }
+    out.join("\n")
 }
 
 fn tail(max_bytes: usize) -> String {

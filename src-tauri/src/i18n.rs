@@ -11,6 +11,9 @@ const LOCALES: &[(&str, &str)] = &[
     ("ar", include_str!("../../src/locales/ar.json")),
     ("es", include_str!("../../src/locales/es.json")),
     ("fr", include_str!("../../src/locales/fr.json")),
+    // Simplified Chinese. system_language() keeps only the first tag of a locale, so zh-CN,
+    // zh-Hans and zh-SG all land here; zh-TW/zh-HK would too, and get these characters.
+    ("zh", include_str!("../../src/locales/zh.json")),
 ];
 
 type Messages = HashMap<String, String>;
