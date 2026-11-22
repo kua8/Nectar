@@ -49,6 +49,7 @@ import {
   ChevronRight,
   Cpu,
   MemoryStick,
+  Activity,
   HardDrive,
   ArrowUpDown,
   Wifi,
@@ -485,6 +486,8 @@ function App() {
   const [netWidgetMode, setNetWidgetMode] = useState(() => localStorage.getItem("nectar-net-widget-mode") === "status" ? "status" : "speed");
   const [netUpSpeed, setNetUpSpeed] = useState(0);
   const [netDownSpeed, setNetDownSpeed] = useState(0);
+  const [pingMs, setPingMs] = useState<number | null>(null);
+  const [notchEnabled, setNotchEnabled] = useState(() => localStorage.getItem("nectar-notch-enabled") !== "false");
   const [statusWidgets, setStatusWidgets] = useState<WidgetConfig>({ left: ["weather"], right: ["battery"] });
 
   const [windowLabel, setWindowLabel] = useState<string>("");
@@ -991,6 +994,7 @@ function App() {
       "nectar-scale": setScale,
       "nectar-low-battery-threshold": setLowBatteryThreshold,
       "nectar-dock-enabled": setDockEnabled,
+      "nectar-notch-enabled": (v) => setNotchEnabled(String(v) !== "false"),
       "nectar-dock-mode": refreshDockMode,
       "nectar-dock-mode-by-monitor": refreshDockMode,
       "nectar-dock-monitor-mode": refreshDockMode,
@@ -1565,6 +1569,15 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
+  const pingActive = statusWidgets.left.includes("ping") || statusWidgets.right.includes("ping");
+  useEffect(() => {
+    if (!pingActive) return;
+    const measure = () => invoke<number | null>("get_ping_ms").then(setPingMs).catch(() => setPingMs(null));
+    measure();
+    const interval = setVisibleInterval(measure, 5000);
+    return () => clearInterval(interval);
+  }, [pingActive]);
+
   // Listen for brightness changes
   useEffect(() => {
     const unlisten = listen<{ brightness: number }>("brightness-change", (event) => {
@@ -1906,6 +1919,13 @@ function App() {
             <span className="label">{Math.round(ramUsage)}%</span>
           </div>
         );
+      case "ping":
+        return (
+          <div className="passive-feature" key="ping" {...tip(t("widgets.ping.tip"))}>
+            <Activity size={12} strokeWidth={2} />
+            <span className="label">{pingMs === null ? "—" : `${pingMs}ms`}</span>
+          </div>
+        );
       case "disk":
         return (
           <div className="passive-feature" key="disk" {...tip(t("widgets.disk.tip"))}>
@@ -2106,7 +2126,7 @@ function App() {
     <div className="screen" style={{ overflow: 'hidden' }}>
       {/* Screen Corners (Top) */}
       <AnimatePresence>
-        {isVisible && settingsCornersEnabled && (
+        {isVisible && settingsCornersEnabled && notchEnabled && (
           <>
             <motion.div
               className="screen-corner top-left"
@@ -2124,7 +2144,7 @@ function App() {
         )}
       </AnimatePresence>
 
-      <div style={{ zoom: scale, width: '100%', display: 'flex', justifyContent: 'center' }}>
+      <div style={{ zoom: scale, width: '100%', display: notchEnabled ? 'flex' : 'none', justifyContent: 'center' }}>
         <motion.div
           ref={nectarRef}
           className={`nectar ${isHovered ? 'expanded' : ''} ${isImpacted ? 'is-impacted' : ''} ${isPanelOpen ? 'panel-open' : ''}`}

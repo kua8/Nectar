@@ -190,6 +190,9 @@ export function useSettings() {
   const [startIcon, setStartIcon] = useState(
     () => localStorage.getItem("nectar-start-icon") || "default"
   );
+  const [notchEnabled, setNotchEnabled] = useState(
+    () => localStorage.getItem("nectar-notch-enabled") !== "false"
+  );
   const [dockAdaptive, setDockAdaptive] = useState(
     () => localStorage.getItem("nectar-dock-adaptive") === "true"
   );
@@ -340,6 +343,7 @@ export function useSettings() {
       apply(getVal("nectar-dock-icon-only"), setDockIconOnly, readBool);
       apply(getVal("nectar-start-icon"), setStartIcon, (v) => v);
       apply(getVal("nectar-dock-adaptive"), setDockAdaptive, readBool);
+      apply(getVal("nectar-notch-enabled"), setNotchEnabled, (v) => String(v) !== "false");
       apply(getVal("nectar-dock-float-gap"), setDockFloatGap, (v) => String(v ?? "0"));
       apply(getVal("nectar-dock-win-number-enabled"), setDockWinNumberEnabled, readBool);
       apply(getVal("nectar-dock-mixed-reorder"), setDockMixedReorder, readBool);
@@ -454,6 +458,7 @@ export function useSettings() {
     "nectar-dock-icon-only": setDockIconOnly,
     "nectar-start-icon": setStartIcon,
     "nectar-dock-adaptive": setDockAdaptive,
+    "nectar-notch-enabled": (v) => setNotchEnabled(String(v) !== "false"),
     "nectar-dock-float-gap": (v) => setDockFloatGap(String(v)),
     "nectar-dock-win-number-enabled": setDockWinNumberEnabled,
     "nectar-dock-preview-enabled": setDockPreviewEnabled,
@@ -982,6 +987,12 @@ export function useSettings() {
     saveSetting("nectar-dock-float-gap", value);
   };
 
+  const toggleNotchEnabled = () => {
+    const next = !notchEnabled;
+    setNotchEnabled(next);
+    saveSetting("nectar-notch-enabled", String(next));
+  };
+
   const toggleDockAdaptive = () => {
     const next = !dockAdaptive;
     setDockAdaptive(next);
@@ -1441,6 +1452,8 @@ export function useSettings() {
     handleStartIconChange,
     dockAdaptive,
     toggleDockAdaptive,
+    notchEnabled,
+    toggleNotchEnabled,
     dockFloatGap,
     changeDockFloatGap,
     dockWinNumberEnabled,

@@ -23,6 +23,7 @@ import {
   BatteryFull,
   Cpu,
   MemoryStick,
+  Activity,
   HardDrive,
   ArrowUpDown,
   X,
@@ -51,6 +52,7 @@ const WIDGET_DEFS: WidgetDef[] = [
   { id: "ram", icon: MemoryStick, color: "#a78bfa" },
   { id: "disk", icon: HardDrive, color: "#38bdf8" },
   { id: "net", icon: ArrowUpDown, color: "#2dd4bf" },
+  { id: "ping", icon: Activity, color: "#facc15" },
 ];
 
 const DEFAULT_CONFIG: WidgetConfig = {

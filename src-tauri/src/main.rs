@@ -248,6 +248,7 @@ fn main() {
             get_ram_usage,
             get_disk_space,
             get_network_speed,
+            get_ping_ms,
             get_running_processes,
             kill_process,
             export_settings,

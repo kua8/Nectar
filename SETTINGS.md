@@ -22,6 +22,7 @@ Edit `settings.json` with any text editor while Nectar is running. Changes are a
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `nectar-dock-enabled` | `"true"` / `"false"` | `"true"` | Show or hide the Nectar Dock (taskbar replacement). |
+| `nectar-notch-enabled` | `"true"` / `"false"` | `"true"` | Show or hide the notch. The dock and the hotkeys keep working. |
 | `nectar-dock-mode` | `"fixed"` / `"smart"` / `"peek"` | `"smart"` | Dock visibility behavior. **fixed** = always visible as AppBar. **smart** = auto-hide when overlapped by another window or a fullscreen app. **peek** = hidden until cursor approaches bottom edge. Smart/peek still reveal on hover and are clickable even over a fullscreen app — only a thin pre-emptive strip right at the screen edge stays click-through, so other apps' own edge-hugging UI (e.g. a Snipping Tool selection) is never intercepted. |
 | `nectar-dock-preview-enabled` | `"true"` / `"false"` | `"true"` | Show window thumbnail previews when hovering dock icons. |
 | `nectar-dock-hide-delay` | number string (ms) | `"800"` | Smart and peek dock only. How long the dock stays up after the cursor leaves. Options from `800` up to `10800000` (3 h). |
@@ -191,7 +192,8 @@ Removing a link or disconnecting the account deletes its stored secret and cache
 |-----|------|---------|-------------|
 | `nectar-net-widget-mode` | `"speed"` / `"status"` | `"speed"` | What the `net` status widget shows. **speed** = live upload and download speed. **status** = an icon for Wi-Fi, Ethernet or offline, with a tooltip. Set in Settings > Notch > Network widget. |
 | `nectar-notch-hotkey` | string | `""` | Global shortcut that hides the notch until pressed again, written like `"Ctrl+Alt+N"`: any of Win, Ctrl, Alt, Shift, then one key (same keys as `nectar-dock-search-shortcut`). Empty is off. If another program already uses the shortcut, Nectar logs it and the shortcut does nothing. Set in Settings > Notch > Shortcut by clicking the box and pressing the keys. The hidden state is not saved: the notch is back after a restart. |
-| `nectar-status-widgets` | JSON string | `{"left":["weather"],"right":["battery"]}` | Widget layout in collapsed notch. Available: `"weather"`, `"battery"`, `"cpu"`, `"ram"`, `"disk"`, `"net"`. The `"battery"` widget (and its low-battery/charging pulses) is automatically suppressed on desktops with no physical battery — detected via Windows' `PowerManager.BatteryStatus`, not the browser's Battery API (which fakes a permanent "100%, charging" reading on desktops). It's also silently dropped from a placed config on such machines, even if set manually or imported from a laptop's settings file. |
+| `nectar-status-widgets` | JSON string | `{"left":["weather"],"right":["battery"]}` | Widget layout in collapsed notch. Available: `"weather"`, `"battery"`, `"cpu"`, `"ram"`, `"disk"`, `"net"`, `"ping"`. The `"battery"` widget (and its low-battery/charging pulses) is automatically suppressed on desktops with no physical battery — detected via Windows' `PowerManager.BatteryStatus`, not the browser's Battery API (which fakes a permanent "100%, charging" reading on desktops). It's also silently dropped from a placed config on such machines, even if set manually or imported from a laptop's settings file. |
+| `nectar-ping-host` | `"host:port"` | `"1.1.1.1:443"` | Target of the `"ping"` status widget. It measures how long a TCP connection takes every 5 seconds, only while the widget is placed. |
 
 Example:
 ```json

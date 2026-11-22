@@ -3389,6 +3389,21 @@ pub fn get_system_metrics() -> SystemMetrics {
 }
 
 #[tauri::command]
+pub async fn get_ping_ms(app: AppHandle) -> Option<u32> {
+    let target = crate::utils::get_setting_str(&app, "nectar-ping-host").unwrap_or_else(|| "1.1.1.1:443".to_string());
+    tauri::async_runtime::spawn_blocking(move || {
+        use std::net::{TcpStream, ToSocketAddrs};
+        let addr = target.to_socket_addrs().ok()?.next()?;
+        let start = std::time::Instant::now();
+        TcpStream::connect_timeout(&addr, std::time::Duration::from_millis(1500)).ok()?;
+        Some(start.elapsed().as_millis() as u32)
+    })
+    .await
+    .ok()
+    .flatten()
+}
+
+#[tauri::command]
 pub fn get_cpu_usage() -> Result<u32, String> {
     use std::sync::atomic::{AtomicU64, Ordering};
     static LAST_IDLE: AtomicU64 = AtomicU64::new(0);

@@ -62,6 +62,8 @@ import { usePerMonitor } from "./usePerMonitor";
 import { useT } from "../i18n";
 
 interface NotchTabProps {
+  notchEnabled: boolean;
+  toggleNotchEnabled: () => void;
   notchMode: string;
   setNotchModeValue: (mode: string) => void;
   monitors: MonitorInfo[];
@@ -229,6 +231,8 @@ export function NotchTab({
   handleWidgetsChange,
   hasBattery,
   onOpenCalendarSync,
+  notchEnabled,
+  toggleNotchEnabled,
 }: NotchTabProps) {
   const t = useT();
   const caldav = useCaldav();
@@ -239,6 +243,13 @@ export function NotchTab({
   return (
     <>
       <SettingSection id="notch-display" title={t("notch.section.display")} defaultOpen>
+        <SettingRow icon={PanelTop} label={t("notch.enabled")} desc={t("notch.enabled.desc")}>
+          <label className="toggle-switch">
+            <input type="checkbox" checked={notchEnabled} onChange={toggleNotchEnabled} />
+            <span className="slider"></span>
+          </label>
+        </SettingRow>
+
         {!showPerMonitor && (
           <SettingRow icon={PanelTop} label={t("notch.behavior")} desc={t("notch.behavior.desc")}>
             <Dropdown

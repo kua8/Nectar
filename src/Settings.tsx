@@ -189,6 +189,8 @@ function SettingsApp() {
           {!query.trim() && activeTab === "notch" && (
             <NotchTab
               onOpenCalendarSync={() => setActiveTab("calendar-sync")}
+              notchEnabled={settings.notchEnabled}
+              toggleNotchEnabled={settings.toggleNotchEnabled}
               notchMode={settings.notchMode}
               setNotchModeValue={settings.setNotchModeValue}
               monitors={settings.monitors}
