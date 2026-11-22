@@ -1019,6 +1019,7 @@ pub async fn focus_window(hwnd: isize) {
         } else if IsIconic(hwnd).as_bool() {
             let _ = ShowWindow(hwnd, SW_RESTORE);
             force_set_foreground(hwnd);
+            crate::diagnostics::log(&format!("focus: restored {:?}", hwnd.0));
         } else {
             let fg = GetForegroundWindow();
             let mut should_minimize = false;
@@ -1106,10 +1107,12 @@ pub async fn focus_app_windows(hwnds: Vec<isize>) {
         if !IsWindowVisible(hwnd).as_bool() {
             let _ = ShowWindow(hwnd, SW_SHOW);
         }
-        if IsIconic(hwnd).as_bool() {
+        let was_minimized = IsIconic(hwnd).as_bool();
+        if was_minimized {
             let _ = ShowWindow(hwnd, SW_RESTORE);
         }
         let _ = SetForegroundWindow(hwnd);
+        crate::diagnostics::log(&format!("focus: app windows brought {:?} forward, restored: {was_minimized}", hwnd.0));
     })
     .await
     .unwrap_or_default();
