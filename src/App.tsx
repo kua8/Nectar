@@ -1135,6 +1135,10 @@ function App() {
   }, [ccView]);
 
   useEffect(() => {
+    if (tourActive && windowLabel === 'main' && TOUR_STEPS[tourStep].key === 'controlCenter') setNectarMode('command-center');
+  }, [tourActive, tourStep, windowLabel]);
+
+  useEffect(() => {
     if (!tourActive || windowLabel !== 'main') return;
     const win = getCurrentWebviewWindow();
     let original: number | null = null;

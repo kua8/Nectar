@@ -737,7 +737,11 @@ fn launch_path(path: &str, args: Option<&str>) {
             return;
         }
 
-        if let Some(uwp_cmd) = crate::commands::get_uwp_launch_cmd(path) {
+        if let Some(derived_cmd) = crate::commands::get_uwp_launch_cmd(path) {
+            let exact = package_family_from_windows_apps_path(path)
+                .and_then(|family| find_aumid_by_family(&family))
+                .map(|id| format!("shell:AppsFolder\\{}", id.trim_start_matches("shell:AppsFolder\\")));
+            let uwp_cmd = exact.clone().unwrap_or(derived_cmd);
             let wide_cmd: Vec<u16> = uwp_cmd.encode_utf16().chain(std::iter::once(0)).collect();
             
             let res = ShellExecuteW(
@@ -751,7 +755,9 @@ fn launch_path(path: &str, args: Option<&str>) {
             
             if res.0 as usize <= 32 {
                 eprintln!("Failed to open UWP app {}: error code {}", uwp_cmd, res.0 as usize);
-                open_with_explorer(&uwp_cmd);
+                if exact.is_some() {
+                    open_with_explorer(&uwp_cmd);
+                }
             }
             return;
         }
