@@ -612,11 +612,26 @@ fn encode_thumbnail(mut pixels: Vec<u8>, width: u32, height: u32, max_width: u32
 /// Screen and PrintWindow copy first; a capture session per frame leaks GPU memory.
 pub fn capture_hwnd_to_base64(hwnd: HWND, max_width: u32, max_height: u32) -> Option<String> {
     capture_hwnd_gdi(hwnd, max_width, max_height).or_else(|| {
+        if !wgc_allowed(hwnd) { return None; }
         crate::diagnostics::log("capture: window copy failed, using Graphics Capture");
         let (pixels, w, h) = crate::capture::capture_window_bgra(hwnd)?;
         if !mostly_painted(&pixels) { return None; }
         encode_thumbnail(pixels, w, h, max_width, max_height)
     })
+}
+
+/// Each Graphics Capture session leaks about 4 MB of GPU memory, so it is limited per window and in total.
+fn wgc_allowed(hwnd: HWND) -> bool {
+    use std::sync::atomic::{AtomicU32, Ordering};
+    static TOTAL: AtomicU32 = AtomicU32::new(0);
+    static LAST: std::sync::Mutex<Option<std::collections::HashMap<isize, i64>>> = std::sync::Mutex::new(None);
+    let now = crate::services::now_ms();
+    let Ok(mut guard) = LAST.lock() else { return false };
+    let map = guard.get_or_insert_with(Default::default);
+    if TOTAL.load(Ordering::Relaxed) >= 12 || map.get(&(hwnd.0 as isize)).is_some_and(|t| now - t < 600_000) { return false; }
+    map.insert(hwnd.0 as isize, now);
+    TOTAL.fetch_add(1, Ordering::Relaxed);
+    true
 }
 
 fn is_chrome_window(hwnd: HWND) -> bool {
