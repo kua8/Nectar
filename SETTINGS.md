@@ -45,6 +45,7 @@ Edit `settings.json` with any text editor while Nectar is running. Changes are a
 | `nectar-dock-icon-only` | `"true"` / `"false"` | `"false"` | Minimal icon-only style (no background/padding around icons). |
 | `nectar-start-icon` | `"default"` / `"windows"` / `custom:<data URI>` | `"default"` | Start button icon in the dock: the Nectar logo, the Windows logo, or an uploaded image (`custom:` followed by its data URI). |
 | `nectar-dock-adaptive` | `"true"` / `"false"` | `"false"` | Fixed dock only. Stretch the dock to full width like a traditional taskbar while a window is maximized, and contract back when it's restored. |
+| `nectar-dock-float-gap` | `"0"` / `"8"` / `"16"` / `"28"` | `"0"` | Lifts the dock off the bottom edge by this many pixels so it floats like an island, with rounded corners all round. `"0"` keeps it attached. Ignored while the adaptive dock is stretched.|
 | `nectar-dock-win-number-enabled` | `"true"` / `"false"` | `"true"` | When the taskbar is replaced, Win+1 through Win+9 activate the matching pinned dock app (focus/minimize if running, launch otherwise) instead of the native taskbar slots. |
 | `nectar-dock-mixed-reorder` | `"true"` / `"false"` | `"false"` | `"false"` = pinned and running icons stay in two separate groups with a divider between them. `"true"` = a single group — any icon, pinned or not, can be dragged anywhere. |
 

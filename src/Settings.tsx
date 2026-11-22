@@ -313,6 +313,8 @@ function SettingsApp() {
               toggleDockIconOnly={settings.toggleDockIconOnly}
               dockAdaptive={settings.dockAdaptive}
               toggleDockAdaptive={settings.toggleDockAdaptive}
+              dockFloatGap={settings.dockFloatGap}
+              changeDockFloatGap={settings.changeDockFloatGap}
               startIcon={settings.startIcon}
               handleStartIconChange={settings.handleStartIconChange}
               dockWinNumberEnabled={settings.dockWinNumberEnabled}

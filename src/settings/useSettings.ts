@@ -193,6 +193,9 @@ export function useSettings() {
   const [dockAdaptive, setDockAdaptive] = useState(
     () => localStorage.getItem("nectar-dock-adaptive") === "true"
   );
+  const [dockFloatGap, setDockFloatGap] = useState(
+    () => localStorage.getItem("nectar-dock-float-gap") ?? "0"
+  );
   const [dockWinNumberEnabled, setDockWinNumberEnabled] = useState(
     () => localStorage.getItem("nectar-dock-win-number-enabled") !== "false"
   );
@@ -337,6 +340,7 @@ export function useSettings() {
       apply(getVal("nectar-dock-icon-only"), setDockIconOnly, readBool);
       apply(getVal("nectar-start-icon"), setStartIcon, (v) => v);
       apply(getVal("nectar-dock-adaptive"), setDockAdaptive, readBool);
+      apply(getVal("nectar-dock-float-gap"), setDockFloatGap, (v) => String(v ?? "0"));
       apply(getVal("nectar-dock-win-number-enabled"), setDockWinNumberEnabled, readBool);
       apply(getVal("nectar-dock-mixed-reorder"), setDockMixedReorder, readBool);
 
@@ -450,6 +454,7 @@ export function useSettings() {
     "nectar-dock-icon-only": setDockIconOnly,
     "nectar-start-icon": setStartIcon,
     "nectar-dock-adaptive": setDockAdaptive,
+    "nectar-dock-float-gap": (v) => setDockFloatGap(String(v)),
     "nectar-dock-win-number-enabled": setDockWinNumberEnabled,
     "nectar-dock-preview-enabled": setDockPreviewEnabled,
     "nectar-dock-attention-enabled": (v) => setDockAttentionEnabled(v !== false && v !== "false"),
@@ -972,6 +977,11 @@ export function useSettings() {
     saveSetting("nectar-start-icon", icon);
   };
 
+  const changeDockFloatGap = (value: string) => {
+    setDockFloatGap(value);
+    saveSetting("nectar-dock-float-gap", value);
+  };
+
   const toggleDockAdaptive = () => {
     const next = !dockAdaptive;
     setDockAdaptive(next);
@@ -1431,6 +1441,8 @@ export function useSettings() {
     handleStartIconChange,
     dockAdaptive,
     toggleDockAdaptive,
+    dockFloatGap,
+    changeDockFloatGap,
     dockWinNumberEnabled,
     toggleDockWinNumber,
     dockMixedReorder,

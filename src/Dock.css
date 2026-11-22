@@ -1135,3 +1135,8 @@ body {
   background: var(--nectar-text, #fff);
   color: var(--nectar-bg-expanded, #000);
 }
+
+.dock.dock-floating::before,
+.dock.dock-floating::after {
+  display: none;
+}

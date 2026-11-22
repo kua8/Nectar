@@ -81,6 +81,8 @@ interface DockTabProps {
   toggleDockIconOnly: () => void;
   dockAdaptive: boolean;
   toggleDockAdaptive: () => void;
+  dockFloatGap: string;
+  changeDockFloatGap: (value: string) => void;
   startIcon: string;
   handleStartIconChange: (icon: string) => void;
   dockWinNumberEnabled: boolean;
@@ -137,6 +139,8 @@ export function DockTab({
   toggleDockIconOnly,
   dockAdaptive,
   toggleDockAdaptive,
+  dockFloatGap,
+  changeDockFloatGap,
   startIcon,
   handleStartIconChange,
   dockWinNumberEnabled,
@@ -422,6 +426,19 @@ export function DockTab({
                   { value: "dots", label: t("dock.indicator.dots") },
                 ]}
                 onChange={changeDockIndicator}
+              />
+            </SettingRow>
+
+            <SettingRow icon={PanelBottom} label={t("dock.float")} desc={t("dock.float.desc")}>
+              <Dropdown
+                value={dockFloatGap}
+                options={[
+                  { value: "0", label: t("dock.float.off") },
+                  { value: "8", label: t("dock.float.small") },
+                  { value: "16", label: t("dock.float.medium") },
+                  { value: "28", label: t("dock.float.large") },
+                ]}
+                onChange={changeDockFloatGap}
               />
             </SettingRow>
 

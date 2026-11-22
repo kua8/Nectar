@@ -28,7 +28,7 @@ export const SEARCH_ENTRIES: SearchEntry[] = [
   ...group("dock", [
     "dock.enable", "dock.behavior", "dock.previews", "dock.previewDelay", "dock.hideDelay", "dock.attention", "dock.console",
     "dock.search", "dock.searchWith", "dock.searchShortcut", "dock.calendar", "dock.tray", "dock.taskView", "dock.showDesktop",
-    "dock.recycleBin", "dock.iconOnly", "dock.indicator", "dock.winNumber", "dock.adaptive", "dock.mixed", "dock.startIcon",
+    "dock.recycleBin", "dock.iconOnly", "dock.indicator", "dock.winNumber", "dock.adaptive", "dock.float", "dock.mixed", "dock.startIcon",
     "dock.hidden.title", "dock.menu.title",
   ]),
   ...group("overlays", [

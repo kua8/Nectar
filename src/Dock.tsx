@@ -565,6 +565,7 @@ const Dock = memo(function Dock() {
   const [dockIconOnly, setDockIconOnly] = useState(() => localStorage.getItem("nectar-dock-icon-only") === "true");
   const [windowIndicator, setWindowIndicator] = useState(() => localStorage.getItem("nectar-dock-indicator") ?? "bar");
   const [dockAdaptive, setDockAdaptive] = useState(() => localStorage.getItem("nectar-dock-adaptive") === "true");
+  const [floatGap, setFloatGap] = useState(() => Number(localStorage.getItem("nectar-dock-float-gap")) || 0);
   const [startIcon, setStartIcon] = useState(() => localStorage.getItem("nectar-start-icon") || "default");
   const [isMaximized, setIsMaximized] = useState(false);
   const [dockMixedReorder, setDockMixedReorder] = useState(() => localStorage.getItem("nectar-dock-mixed-reorder") === "true");
@@ -670,6 +671,8 @@ const Dock = memo(function Dock() {
 
   // Adaptive mode (fixed dock): stretch to a full-width taskbar while a window is maximized.
   const isAdaptive = dockAdaptive && dockMode === 'fixed' && isMaximized && isExpanded && !isHidden;
+  const gap = isAdaptive ? 0 : floatGap;
+  const floating = gap > 0;
   // Nearly full width, 24px margin per side. Width is pre-scale, so (viewport - 48*scale) / scale.
   const adaptiveWidth = (viewportWidth - 48 * scale) / scale;
 
@@ -790,6 +793,7 @@ const Dock = memo(function Dock() {
 
       const adaptive = getVal("nectar-dock-adaptive", "false");
       setDockAdaptive(adaptive === "true");
+      setFloatGap(Number(getVal("nectar-dock-float-gap", "0")) || 0);
 
       const startIconVal = getVal("nectar-start-icon", "default") || "default";
       setStartIcon(startIconVal);
@@ -875,6 +879,7 @@ const Dock = memo(function Dock() {
       "nectar-dock-icon-only": setDockIconOnly,
       "nectar-dock-indicator": (v) => setWindowIndicator(String(v)),
       "nectar-dock-adaptive": setDockAdaptive,
+      "nectar-dock-float-gap": (v) => setFloatGap(Number(v) || 0),
       "nectar-start-icon": setStartIcon,
       "nectar-dock-mixed-reorder": setDockMixedReorder,
       "nectar-scale": setScale,
@@ -1593,18 +1598,18 @@ const Dock = memo(function Dock() {
         <motion.div
           ref={dockRef}
           layout={!startupAnimating}
-          className={`dock ${isExpanded && !isHidden ? 'dock-expanded' : ''} ${isImpacted && !isExpanded && !isHidden ? 'dock-impacted' : ''} ${dockIconOnly ? 'dock-icon-only' : ''} ${isAdaptive ? 'dock-adaptive' : ''}`}
+          className={`dock ${isExpanded && !isHidden ? 'dock-expanded' : ''} ${isImpacted && !isExpanded && !isHidden ? 'dock-impacted' : ''} ${dockIconOnly ? 'dock-icon-only' : ''} ${isAdaptive ? 'dock-adaptive' : ''} ${floating ? 'dock-floating' : ''}`}
           onMouseEnter={() => setIsDockHovered(true)}
           onMouseLeave={() => { setIsDockHovered(false); setHoveredApp(null); setPressedApp(null); }}
         initial={{ y: -800, opacity: 1, width: 34, height: 34, borderTopLeftRadius: 17, borderTopRightRadius: 17, borderBottomLeftRadius: 17, borderBottomRightRadius: 17 }}
         animate={{
-          y: !isReady ? -800 : (isHidden ? 100 : 0),
+          y: !isReady ? -800 : (isHidden ? 100 + gap : 0),
           width: isExpanded && !isHidden ? (isAdaptive ? adaptiveWidth : 'auto') : 34,
           height: isExpanded && !isHidden ? 'auto' : 34,
           borderTopLeftRadius: (isImpacted || isExpanded) && !isHidden ? 18 : 17,
           borderTopRightRadius: (isImpacted || isExpanded) && !isHidden ? 18 : 17,
-          borderBottomLeftRadius: (isImpacted || isExpanded) && !isHidden ? 0 : 17,
-          borderBottomRightRadius: (isImpacted || isExpanded) && !isHidden ? 0 : 17,
+          borderBottomLeftRadius: (isImpacted || isExpanded) && !isHidden ? (floating ? 18 : 0) : 17,
+          borderBottomRightRadius: (isImpacted || isExpanded) && !isHidden ? (floating ? 18 : 0) : 17,
           opacity: 1,
           scale: scale,
         }}
@@ -1621,15 +1626,15 @@ const Dock = memo(function Dock() {
           opacity: { type: "tween", duration: 0.2 },
           scale: { duration: 0 },
         }}
-        style={{ originX: 0.5, originY: 1, minWidth: 34 }}
+        style={{ originX: 0.5, originY: 1, minWidth: 34, marginBottom: gap }}
         onContextMenu={(e) => handleContextMenu(e, null)}
       >
         <SurfaceShape
           edge="bottom"
-          flare={isExpanded && !isHidden ? 13 : 0}
+          flare={isExpanded && !isHidden && !floating ? 13 : 0}
           settling={startupAnimating}
           radius={(isImpacted || isExpanded) && !isHidden ? 18 : 17}
-          edgeRadius={(isImpacted || isExpanded) && !isHidden ? 0 : 17}
+          edgeRadius={(isImpacted || isExpanded) && !isHidden ? (floating ? 18 : 0) : 17}
         />
         <AnimatePresence>
           {isExpanded && (
