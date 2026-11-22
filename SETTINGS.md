@@ -115,6 +115,9 @@ With **All Monitors** and more than one display, the **Per-Monitor Behavior** to
 | `nectar-dual-clock-enabled` | `"true"` / `"false"` | `"false"` | Show a second clock for another time zone next to the time in the notch. Follows `nectar-time-format-24h`, and shows `+1` / `−1` when that zone is on a different day. |
 | `nectar-dual-clock-zone` | IANA time zone string | `"UTC"` | Time zone of the second clock, for example `"Asia/Tokyo"`. Set by searching a city or time zone in Settings › Notch › Dual Clock. |
 | `nectar-dual-clock-label` | string | `"UTC"` | Name shown beside the second clock, for example `"Tokyo"`. |
+| `nectar-notch-date-enabled` | `"true"` / `"false"` | `"false"` | Show the date next to the time in the notch. Settings > Notch > Date. |
+| `nectar-notch-date-format` | `"weekday"` / `"date"` | `"weekday"` | How the date is written. **weekday** = weekday and day, like `Thu Nov 19`. **date** = only the day and month, like `Nov 19`. Follows the language. |
+| `nectar-notch-date-position` | `"left"` / `"right"` | `"left"` | Which side of the time the date sits on. |
 | `nectar-calendar-view` | `"day"` / `"week"` / `"month"` / `"agenda"` | `"month"` | Which view the notch calendar shows once a calendar source is connected. Set by the Day / Week / Month / Agenda switcher in the notch. |
 | `nectar-calendar-window-view` | `"day"` / `"week"` / `"month"` / `"agenda"` | `"month"` | Which view the Calendar window opens on. It remembers the last one you used. |
 | `nectar-calendar-hidden` | JSON array of strings | `[]` | Calendars you switched off in the Calendar window. Set by the window. |

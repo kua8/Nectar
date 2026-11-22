@@ -64,6 +64,10 @@
 </table>
 </div>
 
+## Documentation
+
+Full documentation is at **[nectar.kua8.lol/docs](https://nectar.kua8.lol/docs)**: every feature, every setting, shortcuts, troubleshooting and how to connect your own AI agent. The settings list is also in [SETTINGS.md](SETTINGS.md).
+
 ## Install
 
 1. Download the installer from the [latest release](https://github.com/kua8/Nectar/releases/latest).
@@ -94,10 +98,10 @@ Get-FileHash .\Nectar-Setup-<version>.exe -Algorithm SHA256
 | **Music** | Album art, track info, playback controls, a visualizer, and a switch between several playing apps. |
 | **Control Center** | Wi-Fi, Bluetooth, Do Not Disturb, volume and brightness. Drag tiles, buttons and sliders into your own layout. |
 | **Status** | Battery (hidden on desktops without one) and weather, in a layout you choose. |
-| **Calendar** | Day, week, month and agenda views, a timer, a stopwatch and Pomodoro. |
+| **Calendar** | Day, week, month and agenda views, a countdown timer with presets and a stopwatch. |
 | **Shelf** | Drop files or text on the notch and drag them out later. |
 
-**AI agents.** Turn on Settings > Notch > AI agents and the notch shows what an agent is doing, with a mascot and Allow or Deny buttons. Claude Code works out of the box. To connect your own tool, see [docs/agents.md](docs/agents.md).
+**AI agents.** Turn on Settings > Notch > AI agents and the notch shows what an agent is doing, with a mascot and Allow or Deny buttons. Claude Code works out of the box. To connect your own tool, see the [agent guide](docs/agents.md).
 
 **Visibility modes.** The notch and the dock each have their own.
 
@@ -154,7 +158,7 @@ External monitors are controlled over DDC/CI. Turn DDC/CI on in the monitor's ow
 
 <br />
 
-Open **Settings › About › Copy Diagnostics** and paste the result into a [bug report](https://github.com/kua8/Nectar/issues/new/choose). It includes your versions, monitors and recent log.
+Open **Settings › Diagnostics › Copy Diagnostics** and paste the result into a [bug report](https://github.com/kua8/Nectar/issues/new/choose). It includes your versions, monitors and recent log.
 
 </details>
 
