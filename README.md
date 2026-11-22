@@ -97,6 +97,8 @@ Get-FileHash .\Nectar-Setup-<version>.exe -Algorithm SHA256
 | **Calendar** | Day, week, month and agenda views, a timer, a stopwatch and Pomodoro. |
 | **Shelf** | Drop files or text on the notch and drag them out later. |
 
+**AI agents.** Turn on Settings > Notch > AI agents and the notch shows what an agent is doing, with a mascot and Allow or Deny buttons. Claude Code works out of the box. To connect your own tool, see [docs/agents.md](docs/agents.md).
+
 **Visibility modes.** The notch and the dock each have their own.
 
 | Mode | Behavior |
