@@ -176,7 +176,7 @@
   "dock.adaptive": "Adaptiver Modus",
   "dock.adaptive.desc": "Auf volle Breite strecken, wenn ein Fenster maximiert ist",
   "dock.float": "Schwebendes Dock",
-  "dock.float.desc": "Löst das Dock wie eine Insel vom unteren Rand",
+  "dock.float.desc": "Dock vom unteren Rand lösen",
   "dock.float.off": "Am Rand",
   "dock.float.small": "Kleiner Abstand",
   "dock.float.medium": "Mittlerer Abstand",

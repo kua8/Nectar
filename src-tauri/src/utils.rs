@@ -612,6 +612,7 @@ fn encode_thumbnail(mut pixels: Vec<u8>, width: u32, height: u32, max_width: u32
 /// Screen and PrintWindow copy first; a capture session per frame leaks GPU memory.
 pub fn capture_hwnd_to_base64(hwnd: HWND, max_width: u32, max_height: u32) -> Option<String> {
     capture_hwnd_gdi(hwnd, max_width, max_height).or_else(|| {
+        crate::diagnostics::log("capture: window copy failed, using Graphics Capture");
         let (pixels, w, h) = crate::capture::capture_window_bgra(hwnd)?;
         if !mostly_painted(&pixels) { return None; }
         encode_thumbnail(pixels, w, h, max_width, max_height)

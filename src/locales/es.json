@@ -176,7 +176,7 @@
   "dock.adaptive": "Modo adaptable",
   "dock.adaptive.desc": "Se estira a todo el ancho cuando hay una ventana maximizada",
   "dock.float": "Dock flotante",
-  "dock.float.desc": "Separa el dock del borde inferior como una isla",
+  "dock.float.desc": "Separa el dock del borde inferior",
   "dock.float.off": "Pegado al borde",
   "dock.float.small": "Hueco pequeño",
   "dock.float.medium": "Hueco medio",

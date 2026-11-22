@@ -176,7 +176,7 @@
   "dock.adaptive": "Adaptive Mode",
   "dock.adaptive.desc": "Stretch to full width when a window is maximized",
   "dock.float": "Floating dock",
-  "dock.float.desc": "Lift the dock off the bottom edge so it floats like an island",
+  "dock.float.desc": "Lift the dock off the bottom edge",
   "dock.float.off": "Attached",
   "dock.float.small": "Small gap",
   "dock.float.medium": "Medium gap",

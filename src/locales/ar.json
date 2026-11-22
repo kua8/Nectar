@@ -176,7 +176,7 @@
   "dock.adaptive": "الوضع التكيّفي",
   "dock.adaptive.desc": "التمدد بالعرض الكامل عند تكبير نافذة",
   "dock.float": "شريط عائم",
-  "dock.float.desc": "يفصل الشريط عن الحافة السفلية ليطفو كجزيرة",
+  "dock.float.desc": "يفصل الشريط عن الحافة السفلية",
   "dock.float.off": "ملاصق للحافة",
   "dock.float.small": "فراغ صغير",
   "dock.float.medium": "فراغ متوسط",

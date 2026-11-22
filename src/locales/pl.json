@@ -176,7 +176,7 @@
   "dock.adaptive": "Tryb adaptacyjny",
   "dock.adaptive.desc": "Rozciągaj na całą szerokość, gdy okno jest zmaksymalizowane",
   "dock.float": "Pływający dock",
-  "dock.float.desc": "Odsuwa dock od dolnej krawędzi jak wyspę",
+  "dock.float.desc": "Odsuwa dock od dolnej krawędzi",
   "dock.float.off": "Przy krawędzi",
   "dock.float.small": "Mały odstęp",
   "dock.float.medium": "Średni odstęp",

@@ -156,7 +156,7 @@
   "dock.adaptive": "Uyarlanabilir Mod",
   "dock.adaptive.desc": "Bir pencere ekranı kapladığında tam genişliğe uzat",
   "dock.float": "Yüzen dock",
-  "dock.float.desc": "Dock'u alt kenardan ayırıp ada gibi yüzdürür",
+  "dock.float.desc": "Dock'u alt kenardan ayırır",
   "dock.float.off": "Kenara bitişik",
   "dock.float.small": "Küçük boşluk",
   "dock.float.medium": "Orta boşluk",
