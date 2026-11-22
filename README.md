@@ -11,7 +11,7 @@
 
 <p><strong>A notch and a dock for Windows.<br />Physics-animated, reactive, and built to replace your taskbar.</strong></p>
 
-[![Latest release](https://shieldcn.dev/badge/release-v1.10.0.svg?logo=lu:Tag)](https://github.com/kua8/Nectar/releases/latest)
+[![Latest release](https://shieldcn.dev/badge/release-v1.11.0.svg?logo=lu:Tag)](https://github.com/kua8/Nectar/releases/latest)
 [![Downloads](https://badges.kua8.lol/downloads.svg)](https://github.com/kua8/Nectar/releases)
 [![License](https://shieldcn.dev/github/license/kua8/Nectar.svg?logo=lu:Scale)](LICENSE)
 [![Platform](https://shieldcn.dev/badge/platform-Windows.svg?logo=ri:FaWindows)](https://www.microsoft.com/windows)
@@ -36,9 +36,9 @@
 
 > **Disclaimer:** I'm a solo dev and I really DID NOT expect this sudden traction for Nectar. I really appreciate the recent support, and I'm trying my best to release fixes as quickly as possible to keep you all happy. But fixing one issue often causes another one. So moving forward I'll do weekly releases with stable builds, plus a pre-release for smaller fixes, and a toggle to decide which version of Nectar you run. This gives me time to search through all the bugs, find the most critical ones, and also have a private life. Thank you for understanding.
 
-> **Antivirus warnings:** We've been getting a lot of reports of Windows, Avast and Kaspersky marking Nectar's exe as a trojan or malware. This happens because Nectar isn't code-signed, and code signing certificates are pretty pricey. We're going to try to enroll in Kaspersky's [Allowlist program](https://www.kaspersky.com/partners/allowlist-program), which can take a while depending on how fast they are. Like I've said before, Nectar is open source: anyone can go through the code line by line and compile it themselves. I make no money from this project and there is no telemetry or tracking in it. There's a saying, "if it's free, you're the product", and that isn't the case here. I purely enjoy making small projects on the side.
+> **Antivirus warnings:** Some antivirus programs (Windows, Avast, Kaspersky) have marked Nectar's exe as a trojan or malware. This happens because Nectar isn't code-signed, and code signing certificates are pretty pricey. I sent Nectar to Kaspersky: they confirmed it was a false detection and fixed it, but they turned down my request to join their [Allowlist program](https://www.kaspersky.com/partners/allowlist-program) and gave no reason. So a new build can still get flagged. If yours does, please open an issue and report the file as a false positive to your antivirus vendor (for Kaspersky, newvirus@kaspersky.com). Nectar is open source: anyone can read the code line by line and compile it themselves. I make no money from this project and there is no telemetry or tracking in it. There's a saying, "if it's free, you're the product", and that isn't the case here. I purely enjoy making small projects on the side.
 >
-> If you'd like to help, I'd appreciate any donations through the Buy Me a Coffee link at the bottom of this README or in the side panel. They go towards the signing certificate. If 15 people sent a dollar a month, it would help a lot.
+> **Code signing:** I won't be signing Nectar any time soon. A certificate costs a lot, and I'll only get one if donations cover it. If you'd like to help, I'd appreciate any donations through the Buy Me a Coffee link at the bottom of this README or in the side panel. They go towards the signing certificate. If 15 people sent a dollar a month, it would help a lot.
 
 ## Features
 
@@ -48,7 +48,7 @@
 | **A dock that replaces your taskbar** | Mirrors your real taskbar, same pinned apps and order, with real icons and names, and a dot on apps that want your attention. |
 | **Native where it counts** | The tray opens the real Windows flyout, and Quit ends an app like Task Manager's End task. |
 | **Out of your way** | Fixed, Smart or Peek modes, and both stay hidden over fullscreen games. |
-| **Made for your setup** | Every monitor, one monitor, or a specific one. Solid, glass or Material You styles with your own accent color. English and Turkish. Every option lives in a plain `settings.json`. |
+| **Made for your setup** | Every monitor, one monitor, or a specific one. Solid, glass or Material You styles with your own accent color. English, Turkish, German, Spanish, French, Polish and Arabic. Every option lives in a plain `settings.json`. |
 | **Light on the system** | Audio capture, cursor tracking and thumbnail work pause themselves when nothing needs them. |
 
 <div align="center">
@@ -171,11 +171,21 @@ bun run tauri dev
 
 ## Roadmap
 
-These are ideas under consideration, not promises.
+These are ideas under consideration, not promises. Requests come from [issues](https://github.com/kua8/Nectar/issues) and [Discussions](https://github.com/kua8/Nectar/discussions).
 
+**Next**
+- [ ] Code signing for the installer and exe (only when donations cover the certificate)
+- [ ] Connect to a specific Wi-Fi network or Bluetooth device from the notch
 - [ ] Background tray programs (antivirus, VPN) in the notch
-- [ ] Lower memory use, with Settings loaded on demand
-- [ ] Code signing for the installer
+- [ ] Lower memory use on several monitors, with Settings loaded on demand
+- [ ] A quick-ask box in the notch that runs a command you set up yourself
+- [ ] Easier access to the per-app volume mixer
+
+**Done recently**
+- [x] Floating dock, a notch on/off toggle and a ping widget
+- [x] Date in the notch
+- [x] Better multi-monitor behavior: fullscreen and maximized windows on another monitor, per-monitor modes
+- [x] Polish translation and more translated settings
 - [x] Stable and pre-release update channels
 - [x] Multiple media sessions, Task Manager in the dock menu, show desktop corner
 
