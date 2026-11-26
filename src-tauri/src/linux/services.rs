@@ -45,28 +45,77 @@ pub fn wire_window_events(app: &AppHandle, window: &tauri::WebviewWindow) {
 
 // ---------------------------------------------------------------- placement
 
-pub fn primary_monitor(app: &AppHandle) -> Option<tauri::Monitor> {
-    let win = app.get_webview_window("main").or_else(|| app.webview_windows().into_values().next())?;
-    win.primary_monitor().ok().flatten().or_else(|| win.current_monitor().ok().flatten())
+/// A monitor in physical pixels, with the same accessors as tauri::Monitor.
+#[derive(Clone, Debug)]
+pub struct Mon {
+    name: Option<String>,
+    pos: tauri::PhysicalPosition<i32>,
+    size: tauri::PhysicalSize<u32>,
+    scale: f64,
+    pub primary: bool,
 }
 
-pub fn monitor_for(app: &AppHandle, kind: &str) -> Option<tauri::Monitor> {
+impl Mon {
+    pub fn name(&self) -> Option<&String> {
+        self.name.as_ref()
+    }
+    pub fn position(&self) -> &tauri::PhysicalPosition<i32> {
+        &self.pos
+    }
+    pub fn size(&self) -> &tauri::PhysicalSize<u32> {
+        &self.size
+    }
+    pub fn scale_factor(&self) -> f64 {
+        self.scale
+    }
+}
+
+/// UI scale, read once on the main thread at startup (X11 has one scale for all monitors).
+static SCALE_BITS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0x3FF0000000000000); // 1.0
+
+pub fn set_scale(scale: f64) {
+    if scale.is_finite() && scale > 0.0 {
+        SCALE_BITS.store(scale.to_bits(), Ordering::Relaxed);
+    }
+}
+
+fn scale() -> f64 {
+    f64::from_bits(SCALE_BITS.load(Ordering::Relaxed))
+}
+
+/// All monitors. Safe from any thread (no GDK), see x11::monitors.
+pub fn monitors() -> Vec<Mon> {
+    crate::x11::monitors()
+        .into_iter()
+        .map(|m| Mon {
+            name: (!m.name.is_empty()).then_some(m.name),
+            pos: tauri::PhysicalPosition::new(m.x, m.y),
+            size: tauri::PhysicalSize::new(m.width, m.height),
+            scale: scale(),
+            primary: m.primary,
+        })
+        .collect()
+}
+
+pub fn primary_monitor(_app: &AppHandle) -> Option<Mon> {
+    let list = monitors();
+    list.iter().find(|m| m.primary).cloned().or_else(|| list.into_iter().next())
+}
+
+pub fn monitor_for(app: &AppHandle, kind: &str) -> Option<Mon> {
     let key = if kind == "dock" { "nectar-dock-monitor-id" } else { "nectar-notch-monitor-id" };
     let mode_key = if kind == "dock" { "nectar-dock-monitor-mode" } else { "nectar-notch-monitor-mode" };
     if crate::utils::setting_str(mode_key).as_deref() == Some("specific") {
         if let Some(id) = crate::utils::setting_str(key) {
-            let win = app.webview_windows().into_values().next()?;
-            if let Ok(list) = win.available_monitors() {
-                if let Some(m) = list.into_iter().find(|m| monitor_id(m) == id) {
-                    return Some(m);
-                }
+            if let Some(m) = monitors().into_iter().find(|m| monitor_id(m) == id) {
+                return Some(m);
             }
         }
     }
     primary_monitor(app)
 }
 
-pub fn monitor_id(m: &tauri::Monitor) -> String {
+pub fn monitor_id(m: &Mon) -> String {
     m.name().cloned().unwrap_or_else(|| format!("{}x{}", m.position().x, m.position().y))
 }
 

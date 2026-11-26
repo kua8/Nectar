@@ -275,6 +275,9 @@ pub fn run() {
                 crate::state::RELAUNCHED.store(true, Ordering::Relaxed);
             }
 
+            if let Some(w) = app.get_webview_window("main") {
+                crate::services::set_scale(w.scale_factor().unwrap_or(1.0));
+            }
             for label in ["main", "dock", "overlay"] {
                 if let Some(w) = app.get_webview_window(label) {
                     make_panel_window(&w);

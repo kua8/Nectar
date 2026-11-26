@@ -181,23 +181,18 @@ pub async fn change_notch_mode(app: AppHandle, mode: String) {
 
 #[tauri::command]
 pub fn get_monitors(app: AppHandle) -> Vec<MonitorInfo> {
-    let Some(win) = app.webview_windows().into_values().next() else { return Vec::new() };
-    let primary = win.primary_monitor().ok().flatten().map(|m| crate::services::monitor_id(&m));
-    win.available_monitors()
-        .unwrap_or_default()
+    let _ = app;
+    crate::services::monitors()
         .iter()
         .enumerate()
-        .map(|(i, m)| {
-            let id = crate::services::monitor_id(m);
-            MonitorInfo {
-                label: m.name().cloned().unwrap_or_else(|| format!("Display {}", i + 1)),
-                x: m.position().x,
-                y: m.position().y,
-                width: m.size().width,
-                height: m.size().height,
-                is_primary: primary.as_deref() == Some(id.as_str()),
-                id,
-            }
+        .map(|(i, m)| MonitorInfo {
+            id: crate::services::monitor_id(m),
+            label: m.name().cloned().unwrap_or_else(|| format!("Display {}", i + 1)),
+            x: m.position().x,
+            y: m.position().y,
+            width: m.size().width,
+            height: m.size().height,
+            is_primary: m.primary,
         })
         .collect()
 }

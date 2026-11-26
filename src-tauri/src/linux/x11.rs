@@ -96,6 +96,10 @@ fn connect() -> Option<X> {
         wm_transient_for: AtomEnum::WM_TRANSIENT_FOR.into(),
         gtk_application_id: a("_GTK_APPLICATION_ID"),
     };
+    {
+        use x11rb::protocol::randr::ConnectionExt as _;
+        let _ = conn.randr_query_version(1, 5).ok().and_then(|c| c.reply().ok());
+    }
     Some(X { conn, root: screen.root, atoms, width: screen.width_in_pixels, height: screen.height_in_pixels })
 }
 
@@ -378,6 +382,69 @@ pub mod keysym {
     pub const UP: u32 = 0xff52;
     pub const DOWN: u32 = 0xff54;
     pub const D: u32 = 0x0064;
+}
+
+#[derive(Clone, Debug)]
+pub struct Monitor {
+    pub name: String,
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
+    pub primary: bool,
+}
+
+/// Monitors from RandR, read over Nectar's own X connection. Background threads must use
+/// this instead of Tauri's monitor API: a tauri::Monitor is built from a gdk::Monitor,
+/// and touching GDK off the main thread corrupts its heap and crashes Nectar.
+pub fn monitors() -> Vec<Monitor> {
+    use x11rb::protocol::randr::ConnectionExt as _;
+    static CACHE: std::sync::Mutex<Option<(std::time::Instant, Vec<Monitor>)>> = std::sync::Mutex::new(None);
+    if let Ok(g) = CACHE.lock() {
+        if let Some((at, list)) = g.as_ref() {
+            if at.elapsed() < std::time::Duration::from_millis(1000) {
+                return list.clone();
+            }
+        }
+    }
+    let Some(x) = x() else { return Vec::new() };
+    let mut list: Vec<Monitor> = x
+        .conn
+        .randr_get_monitors(x.root, true)
+        .ok()
+        .and_then(|c| c.reply().ok())
+        .map(|r| {
+            r.monitors
+                .iter()
+                .map(|m| Monitor {
+                    name: x
+                        .conn
+                        .get_atom_name(m.name)
+                        .ok()
+                        .and_then(|c| c.reply().ok())
+                        .map(|n| String::from_utf8_lossy(&n.name).to_string())
+                        .unwrap_or_default(),
+                    x: m.x as i32,
+                    y: m.y as i32,
+                    width: m.width as u32,
+                    height: m.height as u32,
+                    primary: m.primary,
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    if list.is_empty() {
+        list.push(Monitor { name: "screen".into(), x: 0, y: 0, width: x.width as u32, height: x.height as u32, primary: true });
+    }
+    if !list.iter().any(|m| m.primary) {
+        // No primary set: the one at the origin acts as primary.
+        let i = list.iter().position(|m| m.x == 0 && m.y == 0).unwrap_or(0);
+        list[i].primary = true;
+    }
+    if let Ok(mut g) = CACHE.lock() {
+        *g = Some((std::time::Instant::now(), list.clone()));
+    }
+    list
 }
 
 /// Finds one of Nectar's own top-level windows by title.
