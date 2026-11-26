@@ -1,3 +1,4 @@
+import { isLinux } from "../platform";
 import { Power, Download, Clock, CalendarDays, History, BatteryWarning, RefreshCw, LogOut, Languages, MemoryStick, Zap } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { SettingSection } from "./SettingSection";
@@ -103,6 +104,8 @@ export function GeneralTab({
           </label>
         </SettingRow>
 
+        {/* Memory Saver trims WebView2's working set, which only exists on Windows. */}
+        {!isLinux && (<>
         <SettingRow
           icon={MemoryStick}
           label={t("general.ramSaver")}
@@ -125,6 +128,7 @@ export function GeneralTab({
             <span className="slider"></span>
           </label>
         </SettingRow>
+        </>)}
 
         {hasBattery && (
           <SettingRow

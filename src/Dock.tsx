@@ -437,6 +437,9 @@ function DockPreviewTooltip({
       ref={rootRef}
       style={{ ['--pv-shift' as string]: `${shift}px` }}
       className={`preview-tooltip ${previews.length > 1 ? 'multi' : ''}`}
+      // The tooltip sits inside the dock item, so a click here would also run the item's own click
+      // and focus or restore a second window at the same time (#159).
+      onClick={(e) => e.stopPropagation()}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}

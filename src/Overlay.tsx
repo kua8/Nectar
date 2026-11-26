@@ -1,3 +1,4 @@
+import './platform';
 import { StrictMode, useState, useEffect, useRef, useCallback, useLayoutEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { motion, AnimatePresence } from "framer-motion";

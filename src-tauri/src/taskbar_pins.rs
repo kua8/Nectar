@@ -29,6 +29,53 @@ fn lnk_files() -> Vec<PathBuf> {
         .collect()
 }
 
+/// Shortcuts that can launch a browser web app: taskbar pins, the Start Menu
+/// (including "Chrome Apps" / "Brave Apps" / "Edge Apps" folders) and the desktop.
+fn web_app_shortcut_candidates() -> Vec<PathBuf> {
+    let mut out = lnk_files();
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    if let Ok(appdata) = std::env::var("APPDATA") {
+        dirs.push(Path::new(&appdata).join(r"Microsoft\Windows\Start Menu\Programs"));
+    }
+    if let Ok(profile) = std::env::var("USERPROFILE") {
+        dirs.push(Path::new(&profile).join("Desktop"));
+    }
+    while let Some(dir) = dirs.pop() {
+        let Ok(read) = std::fs::read_dir(&dir) else { continue };
+        for entry in read.flatten() {
+            let p = entry.path();
+            if p.is_dir() {
+                dirs.push(p);
+            } else if p.extension().is_some_and(|x| x.eq_ignore_ascii_case("lnk")) {
+                out.push(p);
+            }
+        }
+    }
+    out
+}
+
+/// The shortcut that starts the web app with this id. Launching the shortcut, rather
+/// than the browser with --app-id, keeps the web app's own AppUserModelID, so Windows
+/// shows its icon in the taskbar instead of the browser's (#160).
+pub fn shortcut_for_web_app(app_id: &str) -> Option<String> {
+    static CACHE: std::sync::Mutex<Option<std::collections::HashMap<String, Option<String>>>> = std::sync::Mutex::new(None);
+    if let Some(hit) = CACHE.lock().ok().and_then(|g| g.as_ref().and_then(|m| m.get(app_id).cloned())) {
+        if hit.as_deref().is_none_or(|p| Path::new(p).exists()) {
+            return hit;
+        }
+    }
+    let needle = format!("--app-id={}", app_id.to_lowercase());
+    let found = web_app_shortcut_candidates().into_iter().find_map(|lnk| {
+        let lnk = lnk.to_string_lossy().to_string();
+        let (_, args) = resolve_shortcut(&lnk)?;
+        args.to_lowercase().contains(&needle).then_some(lnk)
+    });
+    if let Ok(mut g) = CACHE.lock() {
+        g.get_or_insert_with(Default::default).insert(app_id.to_string(), found.clone());
+    }
+    found
+}
+
 fn taskband_favorites() -> Option<Vec<u8>> {
     let out = std::process::Command::new("reg")
         .args(["query", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\Taskband", "/v", "Favorites"])

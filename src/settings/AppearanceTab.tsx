@@ -1,3 +1,4 @@
+import { isLinux } from "../platform";
 import { Palette, Droplet, Contrast, Droplets, Sun, Square, Maximize2, Layers, SwatchBook, Highlighter } from "lucide-react";
 import { SettingRow } from "./SettingRow";
 import { SettingSection } from "./SettingSection";
@@ -177,7 +178,7 @@ export function AppearanceTab({
               <span className="color-picker-label">{themeAccentColor.toUpperCase()}</span>
             </div>
           </SettingRow>
-          <WindowsAccentSync color={themeAccentColor} />
+          {!isLinux && <WindowsAccentSync color={themeAccentColor} />}
           </>
         )}
 
