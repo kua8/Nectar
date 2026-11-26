@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "bundle": {
+    "createUpdaterArtifacts": false,
+    "targets": ["deb", "appimage"],
+    "shortDescription": "A notch and a dock for Linux desktops",
+    "longDescription": "Nectar adds a physics-animated notch with media, calendar and system controls, and a dock that can replace your panel. Works on X11 desktops such as Cinnamon, MATE, Xfce and GNOME on Xorg.",
+    "category": "Utility",
+    "linux": {
+      "deb": {
+        "depends": ["playerctl", "pulseaudio-utils"],
+        "section": "utils"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "active": false
+    }
+  }
+}

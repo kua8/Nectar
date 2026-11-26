@@ -26,6 +26,17 @@ fn catalog() -> &'static HashMap<&'static str, Messages> {
     })
 }
 
+#[cfg(not(windows))]
+fn system_language() -> String {
+    ["LC_ALL", "LC_MESSAGES", "LANG"]
+        .iter()
+        .filter_map(|k| std::env::var(k).ok())
+        .find(|v| !v.is_empty() && v != "C" && v != "POSIX")
+        .and_then(|v| v.split(['_', '.', '-']).next().map(|s| s.to_lowercase()))
+        .unwrap_or_else(|| "en".into())
+}
+
+#[cfg(windows)]
 fn system_language() -> String {
     use windows::Win32::Globalization::GetUserDefaultLocaleName;
     let mut buf = [0u16; 85];

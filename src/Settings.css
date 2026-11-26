@@ -1970,3 +1970,12 @@ input:checked + .slider:before {
   margin-right: 10px;
   flex: none;
 }
+
+/* Linux has no acrylic behind the window, so the surface is opaque. */
+.platform-linux {
+  --window-bg: rgb(20, 20, 26);
+}
+.platform-linux .light-mode,
+.platform-linux.light-mode {
+  --window-bg: rgb(240, 240, 244);
+}

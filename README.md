@@ -89,6 +89,10 @@ Get-FileHash .\Nectar-Setup-<version>.exe -Algorithm SHA256
 
 </details>
 
+### Linux
+
+Nectar also runs on X11 desktops such as Cinnamon (Linux Mint), MATE, Xfce and GNOME on Xorg. Install the `.deb` with `sudo apt install ./nectar_<version>_amd64.deb`. See [docs/linux.md](docs/linux.md) for what's supported, the tools it uses and how to build it.
+
 ## Usage
 
 **Notch panels.** Scroll or swipe on the notch to change panel.
@@ -164,7 +168,7 @@ Open **Settings › Diagnostics › Copy Diagnostics** and paste the result into
 
 ## Build from source
 
-You need [Rust](https://rustup.rs/) and [Bun](https://bun.sh/) on Windows.
+You need [Rust](https://rustup.rs/) and [Bun](https://bun.sh/). On Linux also install the WebKitGTK build packages listed in [docs/linux.md](docs/linux.md#build-from-source).
 
 ```bash
 git clone https://github.com/kua8/Nectar.git

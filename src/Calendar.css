@@ -813,3 +813,12 @@ button {
   font-size: 10.5px;
   color: var(--cw-muted);
 }
+
+/* Linux has no acrylic behind the window, so the surface is opaque. */
+.platform-linux {
+  --cw-bg: rgb(20, 20, 26);
+}
+.platform-linux .light-mode,
+.platform-linux.light-mode {
+  --cw-bg: rgb(246, 246, 248);
+}
