@@ -701,8 +701,23 @@ fn open_with_explorer(target: &str) {
     let _ = std::process::Command::new("explorer.exe").arg(target).creation_flags(0x0800_0000).spawn();
 }
 
+/// A browser started directly with --app-id gets the browser's taskbar identity, so the
+/// web app shows the browser icon (#160). Its shortcut carries the web app's own
+/// AppUserModelID, so use that when there is one.
+fn web_app_shortcut(path: &str, args: Option<&str>) -> Option<String> {
+    if !is_browser_host_process(path) {
+        return None;
+    }
+    let app_id = extract_arg(args?, "--app-id=")?;
+    crate::taskbar_pins::shortcut_for_web_app(&app_id)
+}
+
 /// Opens a path, shortcut or shell app id through the shell.
 fn launch_path(path: &str, args: Option<&str>) {
+    if let Some(lnk) = web_app_shortcut(path, args) {
+        crate::diagnostics::log(&format!("launch: web app through its shortcut {lnk}"));
+        return launch_path(&lnk, None);
+    }
     unsafe {
         use windows::Win32::UI::Shell::ShellExecuteW;
         use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
@@ -1019,6 +1034,7 @@ pub async fn focus_window(hwnd: isize) {
         } else if IsIconic(hwnd).as_bool() {
             let _ = ShowWindow(hwnd, SW_RESTORE);
             force_set_foreground(hwnd);
+            crate::diagnostics::log(&format!("focus: restored {:?}", hwnd.0));
         } else {
             let fg = GetForegroundWindow();
             let mut should_minimize = false;
@@ -1106,10 +1122,12 @@ pub async fn focus_app_windows(hwnds: Vec<isize>) {
         if !IsWindowVisible(hwnd).as_bool() {
             let _ = ShowWindow(hwnd, SW_SHOW);
         }
-        if IsIconic(hwnd).as_bool() {
+        let was_minimized = IsIconic(hwnd).as_bool();
+        if was_minimized {
             let _ = ShowWindow(hwnd, SW_RESTORE);
         }
         let _ = SetForegroundWindow(hwnd);
+        crate::diagnostics::log(&format!("focus: app windows brought {:?} forward, restored: {was_minimized}", hwnd.0));
     })
     .await
     .unwrap_or_default();
